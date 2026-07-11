@@ -5,27 +5,33 @@ import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket } 
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { getPublicInvitationUrl } from "@/lib/config/site";
+import type { InvitationData } from "@/types/invitation";
 
 type Props = {
-    invitation: any;
+    invitation: InvitationData;
     isOpen: boolean;
     onClose: () => void;
-    onPublishSuccess: (updatedInvitation: any) => void;
+    onPublishSuccess: (updatedInvitation: PublishedInvitationResult) => void;
 };
+
+type PublishedInvitationResult = {
+    slug: string;
+    status: NonNullable<InvitationData["status"]>;
+    published_at?: string | null;
+};
+
+type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess }: Props) {
     const [slug, setSlug] = useState(invitation.slug);
-    const [status, setStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
+    const [status, setStatus] = useState<SlugStatus>("idle");
     const [feedback, setFeedback] = useState("");
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishError, setPublishError] = useState("");
     const [copied, setCopied] = useState(false);
     const [isPublished, setIsPublished] = useState(invitation.status === "published");
-    const [mounted, setMounted] = useState(false);
 
     const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => { setMounted(true); }, []);
 
     // Prevent background scrolling when open
     useEffect(() => {
@@ -55,42 +61,56 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
 
     // Reset slug when modal opens
     useEffect(() => {
-        if (isOpen) {
+        if (!isOpen) return;
+        const timeout = window.setTimeout(() => {
             setSlug(invitation.slug);
             setStatus("idle");
             setFeedback("");
             setPublishError("");
             setCopied(false);
             setIsPublished(invitation.status === "published");
-        }
+        }, 0);
+
+        return () => window.clearTimeout(timeout);
     }, [isOpen, invitation.slug, invitation.status]);
 
     // Validation check on slug change
     useEffect(() => {
         if (!isOpen) return;
         if (slug === invitation.slug) {
-            setStatus("idle");
-            setFeedback("");
-            return;
+            const timeout = window.setTimeout(() => {
+                setStatus("idle");
+                setFeedback("");
+            }, 0);
+            return () => window.clearTimeout(timeout);
         }
 
-        if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
+        if (checkTimeoutRef.current) {
+            clearTimeout(checkTimeoutRef.current);
+            checkTimeoutRef.current = null;
+        }
 
         const cleanSlug = slug.toLowerCase().trim();
+        const setValidationState = (nextStatus: SlugStatus, nextFeedback: string) => {
+            const timeout = window.setTimeout(() => {
+                setStatus(nextStatus);
+                setFeedback(nextFeedback);
+            }, 0);
+            return () => window.clearTimeout(timeout);
+        };
+
         if (cleanSlug.length < 3) {
-            setStatus("invalid");
-            setFeedback("Slug must be at least 3 characters");
-            return;
+            return setValidationState("invalid", "Slug must be at least 3 characters");
         }
 
         if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) {
-            setStatus("invalid");
-            setFeedback("Use lowercase letters, numbers, and hyphens only");
-            return;
+            return setValidationState("invalid", "Use lowercase letters, numbers, and hyphens only");
         }
 
-        setStatus("checking");
-        setFeedback("Checking availability...");
+        const statusTimeout = window.setTimeout(() => {
+            setStatus("checking");
+            setFeedback("Checking availability...");
+        }, 0);
 
         checkTimeoutRef.current = setTimeout(async () => {
             try {
@@ -113,11 +133,12 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         }, 500);
 
         return () => {
+            window.clearTimeout(statusTimeout);
             if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
         };
     }, [slug, invitation.slug, invitation.id, isOpen]);
 
-    if (!mounted) return null;
+    if (typeof document === "undefined") return null;
 
     // Front-end validation before publishing
     const validationErrors: string[] = [];

@@ -6,8 +6,15 @@ import { InvitationData } from "@/types/invitation";
 
 export type InvitationRow = Database["public"]["Tables"]["invitations"]["Row"];
 export type TemplateRow = Database["public"]["Tables"]["invitation_templates"]["Row"];
+export type InvitationRowWithTemplate = InvitationRow & {
+    invitation_templates?: {
+        template_key?: string | null;
+        default_music_url?: string | null;
+        default_tick_sound_url?: string | null;
+    } | null;
+};
 
-export function mapInvitationRow(row: any): InvitationData {
+export function mapInvitationRow(row: InvitationRowWithTemplate): InvitationData {
     const fallback = createDefaultInvitation();
     const theme = isObject(row.theme) ? row.theme as Partial<typeof fallback.theme> : fallback.theme;
 
@@ -27,8 +34,11 @@ export function mapInvitationRow(row: any): InvitationData {
         localAudioDefaults.tickSoundUrl ||
         "";
     const musicUrl = row.music_url || defaultMusicUrl || "";
+    const themeTickSoundUrl = isObject(row.theme) && typeof row.theme.tickSoundUrl === "string"
+        ? row.theme.tickSoundUrl
+        : null;
     const tickSoundUrl =
-        (isObject(row.theme) ? (row.theme as any).tickSoundUrl : null) ||
+        themeTickSoundUrl ||
         defaultTickSoundUrl ||
         "";
 

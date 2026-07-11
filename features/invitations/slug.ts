@@ -45,7 +45,7 @@ export async function isSlugAvailable(slug: string, excludeInvitationId?: string
 export async function generateUniqueSlug(primaryName: string, secondaryName?: string, category?: string) {
     const baseSlug = generateBaseSlug(primaryName, secondaryName, category) || "invite";
 
-    let slug = baseSlug;
+    const slug = baseSlug;
     const isAvailable = await isSlugAvailable(slug);
 
     if (isAvailable) {

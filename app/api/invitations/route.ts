@@ -68,5 +68,5 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(mapInvitationRow(data as any), { status: 201 });
+    return NextResponse.json(mapInvitationRow(data), { status: 201 });
 }

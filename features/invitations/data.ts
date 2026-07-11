@@ -52,7 +52,7 @@ export async function getBuilderInvitation(options: {
         let query = supabase.from("invitations").select("*, invitation_templates(template_key)").eq("user_id", user.id);
         query = options.id ? query.eq("id", options.id) : query.eq("slug", options.slug || "");
         const { data } = await query.single();
-        if (data) return mapInvitationRow(data as any);
+        if (data) return mapInvitationRow(data);
     }
 
     const templateKey = options.template || "pastel-floral-wedding";

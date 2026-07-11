@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, Heart, Search, Sparkles } from "lucide-react";
+import { Eye, Heart, Search } from "lucide-react";
 import type { InvitationCategory } from "@/types/invitation";
 
 type TemplateItem = {

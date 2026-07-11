@@ -2,8 +2,10 @@
 
 import { CSSProperties, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { MapPinned, Phone } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
+import type { AnalyticsEventType } from "@/lib/analytics";
 import { InvitationData } from "@/types/invitation";
 
 type Props = {
@@ -11,7 +13,7 @@ type Props = {
     accepted?: boolean;
     onAccept?: () => void;
     onDecline?: () => void;
-    onEvent?: (eventType: any) => void;
+    onEvent?: (eventType: AnalyticsEventType) => void;
     enableAudio?: boolean;
 };
 
@@ -90,11 +92,14 @@ export default function PastelFloralWedding({
     useEffect(() => {
         if (!accepted) {
             stopThisTemplateAudio();
-            setIsAccepted(false);
-            setIsAccepting(false);
-            setDeclineOpen(false);
-            setParticles([]);
-            setPetals([]);
+            const frame = window.requestAnimationFrame(() => {
+                setIsAccepted(false);
+                setIsAccepting(false);
+                setDeclineOpen(false);
+                setParticles([]);
+                setPetals([]);
+            });
+            return () => window.cancelAnimationFrame(frame);
         }
     }, [accepted]);
 
@@ -337,7 +342,7 @@ function ThanksCard({
     invitation: InvitationData;
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
-    onEvent?: (eventType: any) => void;
+    onEvent?: (eventType: AnalyticsEventType) => void;
 }) {
     return (
         <section className="weddingCard thanksCard active">
@@ -390,7 +395,7 @@ function ThanksCard({
 function WeddingBrandCredit() {
     return (
         <p className="weddingBrandCredit">
-            <img src="/vilique-logo.png" alt="" aria-hidden="true" />
+            <Image src="/vilique-logo.png" alt="" aria-hidden="true" width={18} height={18} />
             <span>{siteConfig.creatorLabel}</span>
         </p>
     );

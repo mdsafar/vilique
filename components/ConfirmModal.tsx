@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -29,12 +29,6 @@ export default function ConfirmModal({
     confirmStyle,
     icon,
 }: Props) {
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
     // Prevent background scrolling when open
     useEffect(() => {
         if (!isOpen) return;
@@ -62,7 +56,7 @@ export default function ConfirmModal({
         };
     }, [isOpen]);
 
-    if (!mounted) return null;
+    if (typeof document === "undefined") return null;
 
     return createPortal(
         <AnimatePresence>

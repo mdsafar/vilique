@@ -61,7 +61,7 @@ export async function GET(_request: Request, { params }: Context) {
         return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
     }
 
-    return NextResponse.json(mapInvitationRow(data as any));
+    return NextResponse.json(mapInvitationRow(data));
 }
 
 export async function DELETE(_request: Request, { params }: Context) {

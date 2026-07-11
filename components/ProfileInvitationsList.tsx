@@ -189,7 +189,7 @@ function InvitationRow({
             formData.append("id", invitation.id);
             await deleteInvitation(formData);
             showToast("Invitation deleted successfully", "success");
-        } catch (error) {
+        } catch {
             showToast("Failed to delete invitation", "error");
         } finally {
             setIsDeleting(false);

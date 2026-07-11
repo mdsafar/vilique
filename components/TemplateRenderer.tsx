@@ -1,7 +1,7 @@
 "use client";
 
 import PastelFloralWedding from "@/components/templates/PastelFloralWedding";
-import { InvitationData, RSVPStatus } from "@/types/invitation";
+import { InvitationData } from "@/types/invitation";
 import { AnalyticsEventType } from "@/lib/analytics";
 
 type TemplateRendererProps = {

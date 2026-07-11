@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     AlertTriangle,
@@ -110,7 +110,7 @@ function BuilderContent() {
         [invitation.templateId]
     );
 
-    function buildSavePayload(source: InvitationData = invitation) {
+    const buildSavePayload = useCallback((source: InvitationData = invitation) => {
         const safeEventDate = isValidDateValue(source.eventDate)
             ? source.eventDate
             : toDateInputValue(new Date());
@@ -135,7 +135,7 @@ function BuilderContent() {
             theme: source.theme,
             sections: source.sections || {},
         });
-    }
+    }, [invitation]);
 
     async function ensureDraftExists() {
         if (invitation.id !== "default-draft-placeholder-id") return invitation;
@@ -308,7 +308,7 @@ function BuilderContent() {
         }));
     }
 
-    function updateTheme(key: string, value: any) {
+    function updateTheme(key: keyof InvitationData["theme"], value: InvitationData["theme"][keyof InvitationData["theme"]]) {
         setInvitation((prev) => ({
             ...prev,
             theme: {
@@ -356,37 +356,10 @@ function BuilderContent() {
         });
     }
 
-    async function updateTickFile(file: File | null) {
-        if (!file) {
-            updateTheme("tickSoundUrl", "");
-            return;
-        }
-
-        const draft = await ensureDraftExists();
-        setSaveState("Uploading ticking sound...");
-        const formData = new FormData();
-        formData.set("invitationId", draft.id);
-        formData.set("kind", "music");
-        formData.set("file", file);
-
-        const response = await fetch("/api/media", {
-            method: "POST",
-            body: formData,
-        });
-        const result = await response.json();
-
-        if (!response.ok) {
-            setSaveState(result.error || "Ticking sound upload failed");
-            return;
-        }
-
-        updateTheme("tickSoundUrl", result.url);
-        setSaveState("Saved");
-    }
-
     useEffect(() => {
         previewViewportRef.current?.scrollTo({ top: 0 });
-        setPreviewScrolledToBottom(false);
+        const frame = window.requestAnimationFrame(() => setPreviewScrolledToBottom(false));
+        return () => window.cancelAnimationFrame(frame);
     }, [activeTab, previewScreen]);
 
     useEffect(() => {
@@ -446,7 +419,7 @@ function BuilderContent() {
         }
 
         void loadDraft();
-    }, [searchParams]);
+    }, [buildSavePayload, searchParams]);
 
     useEffect(() => {
         if (!hasLoadedDraft.current || !isPersistedDraft) return;
@@ -474,7 +447,7 @@ function BuilderContent() {
         }, 650);
 
         return () => window.clearTimeout(timeout);
-    }, [invitation, isPersistedDraft]);
+    }, [buildSavePayload, invitation, isPersistedDraft]);
 
     if (isLoadingInvitation) {
         return <BuilderLoadingState />;
@@ -519,7 +492,6 @@ function BuilderContent() {
                         updateField={updateField}
                         updateTheme={updateTheme}
                         updateMusicFile={updateMusicFile}
-                        updateTickFile={updateTickFile}
                     />
                 </aside>
 
@@ -608,7 +580,6 @@ function BuilderContent() {
                     updateField={updateField}
                     updateTheme={updateTheme}
                     updateMusicFile={updateMusicFile}
-                    updateTickFile={updateTickFile}
                 />
             </section>
 
@@ -661,7 +632,7 @@ function BuilderContent() {
                     setInvitation((prev) => ({
                         ...prev,
                         status: updatedInvitation.status,
-                        publishedAt: updatedInvitation.published_at || null,
+                        publishedAt: updatedInvitation.published_at || undefined,
                         slug: updatedInvitation.slug,
                         updatedAt: new Date().toISOString(),
                     }));
@@ -703,11 +674,6 @@ function LeaveModal({
     onCancel: () => void;
 }) {
     const [saving, setSaving] = useState(false);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     // Prevent background scrolling when open
     useEffect(() => {
@@ -736,7 +702,7 @@ function LeaveModal({
         };
     }, [isOpen]);
 
-    if (!mounted) return null;
+    if (typeof document === "undefined") return null;
 
     async function handleSave() {
         setSaving(true);
@@ -934,14 +900,12 @@ function EditorForm({
     updateField,
     updateTheme,
     updateMusicFile,
-    updateTickFile,
 }: {
     activeTab: EditorTab;
     invitation: ReturnType<typeof createDefaultInvitation>;
     updateField: (key: string, value: string) => void;
-    updateTheme: (key: string, value: any) => void;
+    updateTheme: (key: keyof InvitationData["theme"], value: InvitationData["theme"][keyof InvitationData["theme"]]) => void;
     updateMusicFile: (file: File | null) => void;
-    updateTickFile: (file: File | null) => void;
 }) {
     const { startTime, endTime } = parseTimeRange(invitation.eventTime);
 
@@ -1094,7 +1058,7 @@ function EditorForm({
                     lineHeight: 1.35,
                     paddingLeft: "2px",
                 }}>
-                    This sound plays in the background automatically. It's set by the template and cannot be changed.
+                    This sound plays in the background automatically. It&apos;s set by the template and cannot be changed.
                 </p>
             </label>
 

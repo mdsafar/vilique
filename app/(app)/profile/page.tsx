@@ -76,7 +76,6 @@ export default async function ProfilePage() {
     const profile = dashboard.profile;
     const invitations = dashboard.invitations.length ? dashboard.invitations : profile ? [] : fallbackInvitations;
     const displayName = profile?.name || "Guest";
-    const email = profile?.email || "Sign in to save your invitations";
     const initials = getInitials(displayName);
     const greeting = getGreeting();
 
