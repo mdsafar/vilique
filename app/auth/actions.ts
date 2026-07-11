@@ -1,0 +1,87 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { siteConfig } from "@/lib/config/site";
+import { createClient } from "@/lib/supabase/server";
+
+function getRedirectPath(formData: FormData) {
+    const next = String(formData.get("next") || "/profile");
+    return next.startsWith("/") ? next : "/profile";
+}
+
+export async function signInWithEmail(formData: FormData) {
+    const supabase = await createClient();
+    const email = String(formData.get("email") || "");
+    const password = String(formData.get("password") || "");
+    const next = getRedirectPath(formData);
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+        redirect(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
+    }
+
+    redirect(next);
+}
+
+export async function signUpWithEmail(formData: FormData) {
+    const supabase = await createClient();
+    const email = String(formData.get("email") || "");
+    const password = String(formData.get("password") || "");
+    const fullName = String(formData.get("fullName") || "");
+    const next = getRedirectPath(formData);
+
+    const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                full_name: fullName,
+            },
+            emailRedirectTo: `${siteConfig.url}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+    });
+
+    if (error) {
+        redirect(`/signup?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
+    }
+
+    redirect(next);
+}
+
+export async function signInWithGoogle(formData: FormData) {
+    const next = getRedirectPath(formData);
+    const authPage = String(formData.get("authPage") || "login") === "signup" ? "signup" : "login";
+    const view = String(formData.get("view") || "") === "modal" ? "modal" : "";
+    const viewQuery = view ? `&view=${encodeURIComponent(view)}` : "";
+
+    if (process.env.GOOGLE_AUTH_ENABLED !== "true") {
+        redirect(
+            `/${authPage}?error=${encodeURIComponent("Google login is not enabled for this Supabase project yet.")}&next=${encodeURIComponent(next)}${viewQuery}`
+        );
+    }
+
+    const supabase = await createClient();
+    const origin = siteConfig.url;
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+            redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+    });
+
+    if (error || !data.url) {
+        redirect(
+            `/${authPage}?error=${encodeURIComponent(error?.message || "Unable to start Google login.")}&next=${encodeURIComponent(next)}${viewQuery}`
+        );
+    }
+
+    redirect(data.url);
+}
+
+export async function signOut() {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+    redirect("/");
+}
