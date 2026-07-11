@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import BottomNav from "@/components/BottomNav";
 import { siteConfig } from "@/lib/config/site";
+import { ToastProvider } from "@/components/Toast";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -57,8 +57,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        <BottomNav />
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

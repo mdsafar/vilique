@@ -6,17 +6,13 @@ import { FileText, PencilLine, Send, ShieldCheck, Sparkles } from "lucide-react"
 import { signInWithGoogle } from "@/app/auth/actions";
 import { createClient } from "@/lib/supabase/client";
 
-type AuthMode = "login" | "signup";
-
 type Props = {
     next: string;
-    mode?: AuthMode;
 };
 
-export default function AuthRequiredModal({ next, mode = "login" }: Props) {
+export default function AuthRequiredModal({ next }: Props) {
     const router = useRouter();
     const [status, setStatus] = useState<"checking" | "authed" | "guest">("checking");
-    const [modalMode, setModalMode] = useState<AuthMode>(mode);
 
     useEffect(() => {
         let active = true;
@@ -68,7 +64,6 @@ export default function AuthRequiredModal({ next, mode = "login" }: Props) {
 
     if (status !== "guest") return null;
 
-    const isSignup = modalMode === "signup";
     const authBenefits = [
         {
             description: "View and manage your drafts",
@@ -123,7 +118,7 @@ export default function AuthRequiredModal({ next, mode = "login" }: Props) {
                     </span>
                     <span>
                         <ShieldCheck size={18} aria-hidden="true" />
-                        {isSignup ? "Secure sign up" : "Secure sign in"}
+                        Secure sign in
                     </span>
                 </div>
 
@@ -132,9 +127,9 @@ export default function AuthRequiredModal({ next, mode = "login" }: Props) {
                         <span aria-hidden="true">
                             <Sparkles size={18} />
                         </span>
-                        {isSignup ? "Start building" : "Welcome back"}
+                        Welcome back
                     </p>
-                    <h1>{isSignup ? "Create account" : "Log in"}</h1>
+                    <h1>Sign in</h1>
                     <p>
                         Continue with Google to unlock this page, edit drafts, and publish
                         invitation websites.
@@ -155,26 +150,19 @@ export default function AuthRequiredModal({ next, mode = "login" }: Props) {
 
                 <form action={signInWithGoogle}>
                     <input type="hidden" name="next" value={next} />
-                    <input type="hidden" name="authPage" value={modalMode} />
+                    <input type="hidden" name="authPage" value="login" />
                     <input type="hidden" name="view" value="modal" />
                     <button className="oauthButton" type="submit">
                         <span className="googleMark" aria-hidden="true">G</span>
-                        {isSignup ? "Sign up with Google" : "Continue with Google"}
+                        Continue with Google
                     </button>
                 </form>
 
-                <p className="authSwitch">
+                <p className="authSwitch" style={{ justifyContent: "center" }}>
                     <span>
                         <ShieldCheck size={18} aria-hidden="true" />
                         We never post without your permission
                     </span>
-                    <b>{isSignup ? "Already have an account? " : "New here? "}</b>
-                    <button
-                        onClick={() => setModalMode(isSignup ? "login" : "signup")}
-                        type="button"
-                    >
-                        {isSignup ? "Log in with Google" : "Sign up with Google"}
-                    </button>
                 </p>
             </section>
         </div>

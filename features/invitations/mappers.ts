@@ -1,4 +1,5 @@
 import { templates } from "@/data/templates";
+import { getTemplateAudioDefaults } from "@/lib/config/templateAudio";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { Database, Json } from "@/types/database";
 import { InvitationData } from "@/types/invitation";
@@ -6,15 +7,36 @@ import { InvitationData } from "@/types/invitation";
 export type InvitationRow = Database["public"]["Tables"]["invitations"]["Row"];
 export type TemplateRow = Database["public"]["Tables"]["invitation_templates"]["Row"];
 
-export function mapInvitationRow(row: InvitationRow): InvitationData {
+export function mapInvitationRow(row: any): InvitationData {
     const fallback = createDefaultInvitation();
     const theme = isObject(row.theme) ? row.theme as Partial<typeof fallback.theme> : fallback.theme;
+
+    // Use the template's built-in default sounds when the invitation
+    // hasn't had custom audio uploaded yet.
+    const templateDefaults = row.invitation_templates as {
+        template_key?: string;
+        default_music_url?: string | null;
+        default_tick_sound_url?: string | null;
+    } | undefined;
+
+    const templateId = templateDefaults?.template_key || "pastel-floral-wedding";
+    const localAudioDefaults = getTemplateAudioDefaults(templateId);
+    const defaultMusicUrl = templateDefaults?.default_music_url || localAudioDefaults.musicUrl || "";
+    const defaultTickSoundUrl =
+        templateDefaults?.default_tick_sound_url ||
+        localAudioDefaults.tickSoundUrl ||
+        "";
+    const musicUrl = row.music_url || defaultMusicUrl || "";
+    const tickSoundUrl =
+        (isObject(row.theme) ? (row.theme as any).tickSoundUrl : null) ||
+        defaultTickSoundUrl ||
+        "";
 
     return {
         id: row.id,
         slug: row.slug,
         category: normalizeCategory(row.category),
-        templateId: row.template_id || "pastel-floral-wedding",
+        templateId,
         title: row.title,
         primaryName: row.primary_name,
         secondaryName: row.secondary_name || "",
@@ -26,7 +48,10 @@ export function mapInvitationRow(row: InvitationRow): InvitationData {
         phone: row.phone || "",
         whatsapp: row.whatsapp || "",
         message: row.message || "",
-        musicUrl: row.music_url || "",
+        musicUrl,
+        tickSoundUrl,
+        defaultMusicUrl,
+        defaultTickSoundUrl,
         coverImageUrl: row.cover_image_url || "",
         galleryUrls: Array.isArray(row.gallery_urls) ? row.gallery_urls.filter(isString) : [],
         theme: {

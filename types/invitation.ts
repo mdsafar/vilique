@@ -34,6 +34,8 @@ export interface InvitationData {
 
     musicUrl?: string;
     tickSoundUrl?: string;
+    defaultMusicUrl?: string;
+    defaultTickSoundUrl?: string;
     coverImageUrl?: string;
     galleryUrls?: string[];
 
@@ -43,6 +45,8 @@ export interface InvitationData {
         backgroundColor: string;
         textColor: string;
         fontStyle: string;
+        musicDuration?: number;
+        tickSoundUrl?: string;
     };
     sections?: Record<string, unknown>;
     status?: "draft" | "published" | "archived";

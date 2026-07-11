@@ -12,9 +12,14 @@ import {
     Search,
     X,
     Filter,
+    ExternalLink,
 } from "lucide-react";
-import { deleteInvitation } from "@/app/profile/actions";
+import { deleteInvitation } from "@/app/(app)/profile/actions";
 import { InvitationData } from "@/types/invitation";
+import { getPublicInvitationUrl } from "@/lib/config/site";
+import ConfirmModal from "./ConfirmModal";
+import { AlertTriangle } from "lucide-react";
+import { useToast } from "./Toast";
 
 interface ProfileInvitationsListProps {
     initialInvitations: InvitationData[];
@@ -153,10 +158,34 @@ export default function ProfileInvitationsList({
 }
 
 function InvitationRow({ invitation, rsvps }: { invitation: InvitationData; rsvps: number }) {
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const { showToast } = useToast();
+
     const isPublished = invitation.status === "published";
     const isSample = invitation.id.startsWith("sample-");
-    const editHref = invitation.id.startsWith("sample-") ? "/templates" : `/builder?id=${invitation.id}`;
-    const previewHref = invitation.id.startsWith("sample-") ? "/templates" : `/invite/${invitation.slug}`;
+    const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}`;
+    const previewHref = isSample
+        ? "/templates"
+        : isPublished
+            ? `/i/${invitation.slug}`
+            : `/builder/preview?id=${invitation.id}`;
+    const publicUrl = getPublicInvitationUrl(invitation.slug);
+
+    async function handleDeleteConfirm() {
+        setIsDeleting(true);
+        try {
+            const formData = new FormData();
+            formData.append("id", invitation.id);
+            await deleteInvitation(formData);
+            showToast("Invitation deleted successfully", "success");
+        } catch (error) {
+            showToast("Failed to delete invitation", "error");
+        } finally {
+            setIsDeleting(false);
+            setIsDeleteOpen(false);
+        }
+    }
 
     return (
         <article className="profileInviteRow">
@@ -207,27 +236,58 @@ function InvitationRow({ invitation, rsvps }: { invitation: InvitationData; rsvp
                     <span>Updated {formatDate(invitation.updatedAt)}</span>
                 </div>
 
+                {isPublished && !isSample ? (
+                    <a className="profilePublicLink" href={previewHref} target="_blank" rel="noreferrer">
+                        <ExternalLink size={13} aria-hidden="true" />
+                        <span>{publicUrl}</span>
+                    </a>
+                ) : null}
+
                 <div className="profileInviteActions">
                     <Link href={previewHref} className="btnPreview">
                         <Eye size={14} aria-hidden="true" />
-                        Preview
+                        {isPublished ? "View invitation" : "Preview"}
                     </Link>
                     <Link href={editHref} className="btnEdit">
                         <PencilLine size={14} aria-hidden="true" />
                         Edit
                     </Link>
                     {isSample ? null : (
-                        <form action={deleteInvitation}>
-                            <input type="hidden" name="id" value={invitation.id} />
+                        <>
                             <button
-                                type="submit"
+                                type="button"
                                 className="btnDelete"
+                                onClick={() => setIsDeleteOpen(true)}
                                 aria-label={`Delete ${invitation.title}`}
                             >
                                 <Trash2 size={14} aria-hidden="true" />
                                 Delete
                             </button>
-                        </form>
+
+                            <ConfirmModal
+                                isOpen={isDeleteOpen}
+                                onClose={() => setIsDeleteOpen(false)}
+                                onConfirm={handleDeleteConfirm}
+                                isPending={isDeleting}
+                                title="Delete Invitation"
+                                message={
+                                    <>
+                                        Are you sure you want to delete <strong>{invitation.title}</strong>? This action is permanent and cannot be undone.
+                                    </>
+                                }
+                                confirmText="Delete"
+                                confirmStyle={{
+                                    background: "#dc2626",
+                                    color: "#fff",
+                                    boxShadow: "0 4px 12px rgba(220, 38, 38, 0.2)",
+                                }}
+                                icon={
+                                    <span className="modalWarningIcon" style={{ color: "#ef4444", background: "rgba(239, 68, 68, 0.1)" }}>
+                                        <AlertTriangle size={24} />
+                                    </span>
+                                }
+                            />
+                        </>
                     )}
                 </div>
             </div>

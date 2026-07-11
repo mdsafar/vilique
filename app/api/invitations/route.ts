@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
+import { mapInvitationRow } from "@/features/invitations/mappers";
 import { createClient } from "@/lib/supabase/server";
 import { invitationCreateSchema } from "@/features/invitations/validation";
 
@@ -60,13 +61,12 @@ export async function POST(request: Request) {
             gallery_urls: [],
             status: "draft",
         })
-        .select("id, slug")
+        .select("*, invitation_templates(template_key)")
         .single();
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json(mapInvitationRow(data as any), { status: 201 });
 }
-

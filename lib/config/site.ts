@@ -27,3 +27,11 @@ export const siteConfig = {
         "event invitation website",
     ],
 } as const;
+
+export function getPublicInvitationUrl(slug: string) {
+    const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        "http://localhost:3000";
+    return `${baseUrl}/i/${slug}`;
+}

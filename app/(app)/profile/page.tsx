@@ -8,6 +8,7 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { getDashboardData } from "@/features/invitations/data";
 import { InvitationData } from "@/types/invitation";
 import ProfileInvitationsList from "@/components/ProfileInvitationsList";
+import ProfileCard from "@/components/ProfileCard";
 
 const fallbackInvitations: InvitationData[] = [
     {
@@ -117,41 +118,12 @@ export default async function ProfilePage() {
             <AuthRequiredModal next="/profile" />
 
             <section className="profileOverview" aria-label="Profile overview">
-                <article className="profileCard">
-                    <div className="profileCardMain">
-                        <div
-                            className="profileAvatar"
-                            style={profile?.avatarUrl ? { backgroundImage: `url(${profile.avatarUrl})` } : undefined}
-                            aria-hidden="true"
-                        >
-                            {profile?.avatarUrl ? null : initials}
-                        </div>
-
-                        <div className="profileDetails">
-                            <span className="profileGreeting">{greeting},</span>
-                            <h1>{displayName}</h1>
-                            <p>{email}</p>
-                        </div>
-                    </div>
-
-                    {/* Pay-per-publish pricing widget inside the overview */}
-                    <div className="profilePlanUsage">
-                        <div className="usageMeta">
-                            <span>Publishing Summary</span>
-                        </div>
-                        <div className="pricingRateInfo">
-                            <div className="rateDetails">
-                                <span className="rateLabel">Published Live:</span>
-                                <strong className="rateValue">{activePublishedCount}</strong>
-                            </div>
-                            <div className="rateDetails">
-                                <span className="rateLabel">Total Spent:</span>
-                                <strong className="rateValue">₹{activePublishedCount * 20}</strong>
-                            </div>
-                        </div>
-                        <p className="usageDisclaimer">One-time publishing total for invitations hosted live indefinitely.</p>
-                    </div>
-                </article>
+                <ProfileCard
+                    profile={profile}
+                    activePublishedCount={activePublishedCount}
+                    initials={initials}
+                    greeting={greeting}
+                />
 
                 <section className="profileStats" aria-label="Invitation metrics">
                     {stats.map((item) => {

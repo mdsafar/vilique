@@ -2,133 +2,125 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import PastelFloralWedding from "@/components/templates/PastelFloralWedding";
+import { Share2 } from "lucide-react";
+import TemplateRenderer from "@/components/TemplateRenderer";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
+import { trackInvitationEvent, AnalyticsEventType } from "@/lib/analytics";
+import { getPublicInvitationUrl } from "@/lib/config/site";
 
 type Props = {
     invitation: InvitationData;
+    isPublic?: boolean;
 };
 
-export default function PublicInviteExperience({ invitation }: Props) {
+export default function PublicInviteExperience({ invitation, isPublic = false }: Props) {
     const [accepted, setAccepted] = useState(false);
-    const [guestName, setGuestName] = useState("");
-    const [guestPhone, setGuestPhone] = useState("");
-    const [guestCount, setGuestCount] = useState(1);
-    const [wish, setWish] = useState("");
-    const [status, setStatus] = useState("");
     const [isPending, startTransition] = useTransition();
 
     useEffect(() => {
-        void trackEvent(invitation.id, "view");
-    }, [invitation.id]);
+        if (isPublic) {
+            void trackInvitationEvent(invitation.id, "view");
+        }
+    }, [invitation.id, isPublic]);
 
     function submitRsvp(nextStatus: RSVPStatus) {
         startTransition(async () => {
-            const fallbackName = guestName.trim() || "Guest";
             const response = await fetch("/api/rsvps", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     invitationId: invitation.id,
-                    guestName: fallbackName,
-                    guestPhone,
-                    guestCount,
+                    guestName: "Guest",
+                    guestPhone: "",
+                    guestCount: 1,
                     status: nextStatus,
-                    message: wish,
+                    message: "",
                 }),
             });
 
-            if (!response.ok) {
-                setStatus("Could not submit RSVP. Please try again.");
-                return;
-            }
+            if (!response.ok) return;
 
-            setStatus("RSVP received");
             setAccepted(nextStatus === "accepted");
+
+            if (isPublic) {
+                void trackInvitationEvent(invitation.id, "rsvp_submit");
+            }
         });
     }
 
-    function submitWish() {
-        if (!wish.trim()) return;
+    async function handleShare() {
+        const shareTitle = invitation.secondaryName
+            ? `${invitation.primaryName} & ${invitation.secondaryName}'s Wedding Invitation`
+            : invitation.title;
+        const shareText = invitation.message || "You are invited to celebrate with us!";
+        const shareUrl = getPublicInvitationUrl(invitation.slug);
 
-        startTransition(async () => {
-            const response = await fetch("/api/wishes", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    invitationId: invitation.id,
-                    guestName: guestName.trim() || "Guest",
-                    message: wish,
-                }),
-            });
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText,
+                    url: shareUrl,
+                });
+                if (isPublic) void trackInvitationEvent(invitation.id, "share");
+                return;
+            } catch {
+                // Fail-safe to fallback clipboard copy
+            }
+        }
 
-            setStatus(response.ok ? "Wish sent" : "Could not send wish.");
-            if (response.ok) setWish("");
-        });
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            alert("Link copied to clipboard!");
+            if (isPublic) void trackInvitationEvent(invitation.id, "share");
+        } catch {
+            // Clipboard fail
+        }
+    }
+
+    function handleAnalyticsEvent(eventType: AnalyticsEventType) {
+        if (isPublic) {
+            void trackInvitationEvent(invitation.id, eventType);
+        }
     }
 
     return (
         <div className="invitePreviewShell">
-            <Link className="inviteBackButton" href="/templates">
-                Browse templates
-            </Link>
-
-            <PastelFloralWedding
+            <TemplateRenderer
                 invitation={invitation}
                 accepted={accepted}
                 onAccept={() => submitRsvp("accepted")}
                 onDecline={() => submitRsvp("declined")}
+                onEvent={handleAnalyticsEvent}
+                enableAudio={!isPublic}
             />
 
-            <section className="publicInvitePanel">
-                <div>
-                    <p className="eyebrow">RSVP</p>
-                    <h2>Send your response</h2>
-                </div>
-                <label>
-                    <span>Name</span>
-                    <input value={guestName} onChange={(event) => setGuestName(event.target.value)} />
-                </label>
-                <label>
-                    <span>Phone</span>
-                    <input value={guestPhone} onChange={(event) => setGuestPhone(event.target.value)} />
-                </label>
-                <label>
-                    <span>Guests</span>
-                    <input
-                        min={1}
-                        max={10}
-                        type="number"
-                        value={guestCount}
-                        onChange={(event) => setGuestCount(Number(event.target.value))}
-                    />
-                </label>
-                <label>
-                    <span>Wish</span>
-                    <textarea value={wish} onChange={(event) => setWish(event.target.value)} />
-                </label>
-                <div className="publicInviteActions">
-                    <button type="button" disabled={isPending} onClick={() => submitRsvp("accepted")}>
-                        Accept
-                    </button>
-                    <button type="button" disabled={isPending} onClick={() => submitRsvp("maybe")}>
-                        Maybe
-                    </button>
-                    <button type="button" disabled={isPending} onClick={submitWish}>
-                        Send wish
-                    </button>
-                </div>
-                {status ? <p className="publicInviteStatus">{status}</p> : null}
-            </section>
+            {isPublic && (
+                <button
+                    className="floatingShareBtn"
+                    onClick={handleShare}
+                    aria-label="Share invitation"
+                    style={{
+                        position: "fixed",
+                        bottom: "24px",
+                        right: "24px",
+                        width: "48px",
+                        height: "48px",
+                        borderRadius: "999px",
+                        background: "#fff",
+                        border: "1.5px solid #d8cde8",
+                        color: "#5c5070",
+                        boxShadow: "0 8px 24px rgba(80, 50, 80, 0.16)",
+                        display: "grid",
+                        placeItems: "center",
+                        cursor: "pointer",
+                        zIndex: 999,
+                        transition: "all 0.2s"
+                    }}
+                >
+                    <Share2 size={20} />
+                </button>
+            )}
         </div>
     );
 }
-
-async function trackEvent(invitationId: string, eventType: "view") {
-    await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invitationId, eventType, metadata: {} }),
-    }).catch(() => undefined);
-}
-

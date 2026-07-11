@@ -13,7 +13,11 @@ export async function getActiveTemplates() {
             .order("created_at", { ascending: true });
 
         if (error || !data?.length) return templates;
-        return data.map(mapTemplateRow);
+
+        const implementedTemplateIds = new Set(templates.map((template) => template.id));
+        const implementedRows = data.filter((row) => implementedTemplateIds.has(row.template_key));
+
+        return implementedRows.length ? implementedRows.map(mapTemplateRow) : templates;
     } catch {
         return templates;
     }
@@ -23,7 +27,7 @@ export async function getPublishedInvitationBySlug(slug: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("invitations")
-        .select("*")
+        .select("*, invitation_templates(template_key)")
         .eq("slug", slug)
         .eq("status", "published")
         .single();
@@ -45,10 +49,10 @@ export async function getBuilderInvitation(options: {
     if (!user) return null;
 
     if (options.id || options.slug) {
-        let query = supabase.from("invitations").select("*").eq("user_id", user.id);
+        let query = supabase.from("invitations").select("*, invitation_templates(template_key)").eq("user_id", user.id);
         query = options.id ? query.eq("id", options.id) : query.eq("slug", options.slug || "");
         const { data } = await query.single();
-        if (data) return mapInvitationRow(data);
+        if (data) return mapInvitationRow(data as any);
     }
 
     const templateKey = options.template || "pastel-floral-wedding";
@@ -112,7 +116,7 @@ export async function getDashboardData() {
 
     const { data: invitationRows } = await supabase
         .from("invitations")
-        .select("*")
+        .select("*, invitation_templates(template_key)")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 

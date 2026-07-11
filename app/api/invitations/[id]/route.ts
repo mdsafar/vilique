@@ -52,7 +52,7 @@ export async function GET(_request: Request, { params }: Context) {
 
     const { data, error } = await supabase
         .from("invitations")
-        .select("*")
+        .select("*, invitation_templates(template_key)")
         .eq("id", id)
         .eq("user_id", user.id)
         .single();
@@ -61,7 +61,31 @@ export async function GET(_request: Request, { params }: Context) {
         return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
     }
 
-    return NextResponse.json(mapInvitationRow(data));
+    return NextResponse.json(mapInvitationRow(data as any));
+}
+
+export async function DELETE(_request: Request, { params }: Context) {
+    const { id } = await params;
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { error } = await supabase
+        .from("invitations")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+    if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
 }
 
 function stripUndefined(value: Database["public"]["Tables"]["invitations"]["Update"]) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { CSSProperties, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { MapPinned, Phone } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import { InvitationData } from "@/types/invitation";
@@ -10,6 +11,8 @@ type Props = {
     accepted?: boolean;
     onAccept?: () => void;
     onDecline?: () => void;
+    onEvent?: (eventType: any) => void;
+    enableAudio?: boolean;
 };
 
 type CountdownValue = {
@@ -43,13 +46,16 @@ type FallingPetal = {
     delay: number;
 };
 
-const songPlaySeconds = 20;
+let activeTickAudio: HTMLAudioElement | null = null;
+let activeSongAudio: HTMLAudioElement | null = null;
 
 export default function PastelFloralWedding({
     invitation,
     accepted = false,
     onAccept,
     onDecline,
+    onEvent,
+    enableAudio = false,
 }: Props) {
     const [isAccepted, setIsAccepted] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
@@ -60,6 +66,10 @@ export default function PastelFloralWedding({
     const [isSongPlaying, setIsSongPlaying] = useState(false);
     const songRef = useRef<HTMLAudioElement>(null);
     const tickRef = useRef<HTMLAudioElement>(null);
+    const songTimeoutRef = useRef<number | null>(null);
+    const mountedRef = useRef(true);
+    const audioSuspendedRef = useRef(false);
+    const pathname = usePathname();
 
     const eventDate = useMemo(
         () => parseEventDate(invitation.eventDate, invitation.eventTime),
@@ -72,25 +82,64 @@ export default function PastelFloralWedding({
     );
 
     const countdown = useCountdown(eventDate);
-    const songUrl = normalizeAudioUrl(invitation.musicUrl);
-    const tickUrl = normalizeAudioUrl(invitation.tickSoundUrl);
+    const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl) : null;
+    const tickUrl = enableAudio ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl) : null;
 
     const showAcceptedScreen = accepted || isAccepted;
 
     useEffect(() => {
-        const song = songRef.current;
-        const tick = tickRef.current;
+        if (!accepted) {
+            stopThisTemplateAudio();
+            setIsAccepted(false);
+            setIsAccepting(false);
+            setDeclineOpen(false);
+            setParticles([]);
+            setPetals([]);
+        }
+    }, [accepted]);
 
-        return () => {
-            stopAudio(song);
-            stopAudio(tick);
-        };
-    }, []);
+    function stopThisTemplateAudio(updateState = true) {
+        if (songTimeoutRef.current) {
+            window.clearTimeout(songTimeoutRef.current);
+            songTimeoutRef.current = null;
+        }
+        stopAudio(songRef.current);
+        stopAudio(tickRef.current);
+        stopAudio(activeSongAudio);
+        stopAudio(activeTickAudio);
+        if (updateState && mountedRef.current) {
+            setIsSongPlaying(false);
+            setHasStartedTick(false);
+        }
+    }
 
     useEffect(() => {
-        if (!tickUrl || hasStartedTick || isSongPlaying) return;
+        mountedRef.current = true;
+        const handlePageHide = () => stopThisTemplateAudio(false);
+        const handlePreviewAudioStart = () => {
+            audioSuspendedRef.current = true;
+            stopThisTemplateAudio();
+        };
+        const handlePreviewAudioStop = () => {
+            audioSuspendedRef.current = false;
+        };
+        window.addEventListener("pagehide", handlePageHide);
+        window.addEventListener("viliqu:sound-preview-start", handlePreviewAudioStart);
+        window.addEventListener("viliqu:sound-preview-stop", handlePreviewAudioStop);
+        return () => {
+            mountedRef.current = false;
+            window.removeEventListener("pagehide", handlePageHide);
+            window.removeEventListener("viliqu:sound-preview-start", handlePreviewAudioStart);
+            window.removeEventListener("viliqu:sound-preview-stop", handlePreviewAudioStop);
+            stopThisTemplateAudio(false);
+        };
+    }, [pathname]);
+
+    useEffect(() => {
+        if (!enableAudio || !tickUrl || hasStartedTick || isSongPlaying) return;
 
         const startFromGesture = (event: Event) => {
+            if (audioSuspendedRef.current) return;
             const target = event.target as Element | null;
             if (target?.closest(".rsvpAcceptBtn")) return;
             setHasStartedTick(true);
@@ -107,7 +156,7 @@ export default function PastelFloralWedding({
                 document.removeEventListener(eventName, startFromGesture)
             );
         };
-    }, [hasStartedTick, isSongPlaying, tickUrl]);
+    }, [enableAudio, hasStartedTick, isSongPlaying, tickUrl]);
 
     useEffect(() => {
         const onVisibilityChange = () => {
@@ -116,25 +165,50 @@ export default function PastelFloralWedding({
                 return;
             }
 
-            if (hasStartedTick && !isSongPlaying) {
+            if (enableAudio && hasStartedTick && !isSongPlaying) {
                 playTick(tickRef.current);
             }
         };
 
         document.addEventListener("visibilitychange", onVisibilityChange);
         return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-    }, [hasStartedTick, isSongPlaying]);
+    }, [enableAudio, hasStartedTick, isSongPlaying]);
 
     function handleAccept(event: MouseEvent<HTMLButtonElement>) {
         event.stopPropagation();
-        const rect = event.currentTarget.getBoundingClientRect();
-        const x = event.clientX || rect.left + rect.width / 2;
-        const y = event.clientY || rect.top + rect.height / 2;
+        const sparkleTarget = event.currentTarget.querySelector("b") ?? event.currentTarget;
+        const targetRect = sparkleTarget.getBoundingClientRect();
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+        const page = event.currentTarget.closest(".pastelWeddingPage") as HTMLElement | null;
+        const pageTransform = page ? window.getComputedStyle(page).transform : "none";
+        const pageRect = page?.getBoundingClientRect();
+        const scaleX = page && pageRect ? pageRect.width / page.offsetWidth : 1;
+        const scaleY = page && pageRect ? pageRect.height / page.offsetHeight : 1;
+        const hasScaledPage = page && pageRect && pageTransform !== "none" && scaleX > 0 && scaleY > 0;
+        const x = hasScaledPage ? (targetX - pageRect.left) / scaleX : targetX;
+        const y = hasScaledPage ? (targetY - pageRect.top) / scaleY : targetY;
 
         setIsAccepting(true);
         createSparkles(x, y, setParticles);
         createPetals(setPetals);
-        playCelebrationSong(songRef.current, tickRef.current, setIsSongPlaying);
+        if (enableAudio) {
+            const musicDuration = invitation.theme?.musicDuration ?? 20;
+            if (songTimeoutRef.current) {
+                window.clearTimeout(songTimeoutRef.current);
+            }
+            songTimeoutRef.current = playCelebrationSong(
+                songRef.current,
+                tickRef.current,
+                (value) => {
+                    if (mountedRef.current) {
+                        setIsSongPlaying(value);
+                    }
+                },
+                musicDuration
+            );
+            onEvent?.("music_play");
+        }
 
         window.setTimeout(() => {
             setIsAccepted(true);
@@ -179,6 +253,7 @@ export default function PastelFloralWedding({
                         invitation={invitation}
                         eventParts={eventParts}
                         countdown={countdown}
+                        onEvent={onEvent}
                     />
                 )}
             </div>
@@ -257,10 +332,12 @@ function ThanksCard({
     invitation,
     eventParts,
     countdown,
+    onEvent,
 }: {
     invitation: InvitationData;
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
+    onEvent?: (eventType: any) => void;
 }) {
     return (
         <section className="weddingCard thanksCard active">
@@ -288,7 +365,7 @@ function ThanksCard({
                 <div>
                     <h2>{invitation.venueName}</h2>
                     <p>{invitation.venueAddress}</p>
-                    <a href={invitation.mapLink} target="_blank" rel="noreferrer">
+                    <a href={invitation.mapLink} target="_blank" rel="noreferrer" onClick={() => onEvent?.("map_click")}>
                         <MapPinned size={14} aria-hidden="true" />
                         GET DIRECTIONS
                     </a>
@@ -296,7 +373,7 @@ function ThanksCard({
             </div>
 
             {invitation.phone ? (
-                <a className="phonePill" href={`tel:${invitation.phone}`}>
+                <a className="phonePill" href={`tel:${invitation.phone}`} onClick={() => onEvent?.("call_click")}>
                     <Phone size={14} aria-hidden="true" />
                     {invitation.phone}
                 </a>
@@ -480,6 +557,12 @@ function normalizeAudioUrl(url?: string) {
 
 function playTick(audio: HTMLAudioElement | null) {
     if (!audio) return;
+    if (activeSongAudio && !activeSongAudio.paused) return;
+    if (activeTickAudio && activeTickAudio !== audio) {
+        activeTickAudio.pause();
+        activeTickAudio.currentTime = 0;
+    }
+    activeTickAudio = audio;
     audio.volume = 0.45;
     audio.loop = true;
     void audio.play().catch(() => undefined);
@@ -489,15 +572,27 @@ function stopAudio(audio: HTMLAudioElement | null) {
     if (!audio) return;
     audio.pause();
     audio.currentTime = 0;
+    if (activeTickAudio === audio) {
+        activeTickAudio = null;
+    }
+    if (activeSongAudio === audio) {
+        activeSongAudio = null;
+    }
 }
 
 function playCelebrationSong(
     song: HTMLAudioElement | null,
     tick: HTMLAudioElement | null,
-    setIsSongPlaying: (value: boolean) => void
+    setIsSongPlaying: (value: boolean) => void,
+    musicDuration: number
 ) {
-    if (!song) return;
+    if (!song) return null;
 
+    if (activeSongAudio && activeSongAudio !== song) {
+        stopAudio(activeSongAudio);
+    }
+    activeSongAudio = song;
+    stopAudio(activeTickAudio);
     stopAudio(tick);
     song.pause();
     song.currentTime = 0;
@@ -505,15 +600,22 @@ function playCelebrationSong(
     setIsSongPlaying(true);
 
     void song.play().catch(() => {
+        if (activeSongAudio !== song) return;
         setIsSongPlaying(false);
         playTick(tick);
     });
 
-    window.setTimeout(() => {
-        stopAudio(song);
-        setIsSongPlaying(false);
-        playTick(tick);
-    }, songPlaySeconds * 1000);
+    if (musicDuration > 0) {
+        return window.setTimeout(() => {
+            if (activeSongAudio !== song) return;
+            stopAudio(song);
+            setIsSongPlaying(false);
+            playTick(tick);
+        }, musicDuration * 1000);
+    }
+
+    song.loop = true;
+    return null;
 }
 
 function createPetals(setPetals: (value: FallingPetal[]) => void) {
