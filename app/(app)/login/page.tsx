@@ -5,7 +5,7 @@ import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
     title: "Log in",
-    description: "Log in to your Viliqu account.",
+    description: "Log in to your Vilique account.",
 };
 
 type Props = {
@@ -43,7 +43,7 @@ export default async function LoginPage({ searchParams }: Props) {
                 <div className="authCopy">
                     <p className="eyebrow">Welcome back</p>
                     <h1>Log in</h1>
-                    <p>Continue with Google to open your Viliqu profile, edit drafts, and publish invitation websites.</p>
+                    <p>Continue with Google to open your Vilique profile, edit drafts, and publish invitation websites.</p>
                 </div>
 
                 {error ? <div className="authError">{error}</div> : null}

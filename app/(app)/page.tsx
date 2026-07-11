@@ -4,7 +4,7 @@ import { CalendarHeart, MapPinned, Music2, Sparkles, Wand2 } from "lucide-react"
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  title: "Viliqu",
+  title: "Vilique",
 };
 
 const features = [

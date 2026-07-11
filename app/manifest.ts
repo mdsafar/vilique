@@ -21,13 +21,13 @@ export default function manifest(): MetadataRoute.Manifest {
         ],
         shortcuts: [
             {
-                name: "Viliqu Templates",
+                name: "Vilique Templates",
                 short_name: "Templates",
                 description: "Browse invitation website templates.",
                 url: "/templates",
             },
             {
-                name: "Viliqu Dashboard",
+                name: "Vilique Dashboard",
                 short_name: "Dashboard",
                 description: "Manage your invitation websites.",
                 url: "/profile",

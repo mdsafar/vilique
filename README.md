@@ -1,6 +1,6 @@
-# Viliqu
+# Vilique
 
-Viliqu is a mobile-first Next.js application for creating, customizing, publishing, and sharing invitation websites.
+Vilique is a mobile-first Next.js application for creating, customizing, publishing, and sharing invitation websites.
 
 The app includes a template marketplace, invitation builder, public invite pages, profile dashboard, RSVP/event APIs, Supabase authentication, and Supabase-backed invitation data.
 
@@ -42,7 +42,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-NEXT_PUBLIC_APP_NAME=Viliqu
+NEXT_PUBLIC_APP_NAME=Vilique
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_SUPPORT_EMAIL=
 GOOGLE_AUTH_ENABLED=false
@@ -99,4 +99,4 @@ The active invitation template ID `pastel-floral-wedding` is used by the local t
 
 ## Deployment
 
-Set the same public environment values in the deployment provider dashboard before publishing Viliqu. Ensure Supabase URL, anon key, auth settings, and callback URLs match the deployed application URL.
+Set the same public environment values in the deployment provider dashboard before publishing Vilique. Ensure Supabase URL, anon key, auth settings, and callback URLs match the deployed application URL.

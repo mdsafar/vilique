@@ -224,7 +224,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                 <label>
                                     <span>Customize your public link:</span>
                                     <div className="slugInputWrapper">
-                                        <span className="slugDomain">viliqu.com/i/</span>
+                                        <span className="slugDomain">vilique.com/i/</span>
                                         <input
                                             type="text"
                                             value={slug}

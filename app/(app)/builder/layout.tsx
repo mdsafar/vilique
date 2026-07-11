@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Viliqu Builder",
-    description: "Customize and publish invitation websites with Viliqu Builder.",
+    title: "Vilique Builder",
+    description: "Customize and publish invitation websites with Vilique Builder.",
 };
 
 export default function BuilderLayout({

@@ -1,7 +1,7 @@
 {
-  "name": "viliqu",
+  "name": "vilique",
   "version": "0.1.0",
-  "description": "Create beautiful invitation websites in minutes with Viliqu.",
+  "description": "Create beautiful invitation websites in minutes with Vilique.",
   "private": true,
   "scripts": {
     "dev": "next dev",

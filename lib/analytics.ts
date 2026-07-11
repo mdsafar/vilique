@@ -10,7 +10,7 @@ export type AnalyticsEventType =
 export async function trackInvitationEvent(invitationId: string, eventType: AnalyticsEventType, metadata: Record<string, unknown> = {}) {
     // Simple session-storage deduplication for "view" events to avoid inflating view counts on refresh
     if (eventType === "view") {
-        const key = `viliqu_viewed_${invitationId}`;
+        const key = `vilique_viewed_${invitationId}`;
         try {
             if (sessionStorage.getItem(key)) {
                 return;

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Viliqu Dashboard",
-    description: "Manage, preview, and publish your Viliqu invitation websites.",
+    title: "Vilique Dashboard",
+    description: "Manage, preview, and publish your Vilique invitation websites.",
 };
 
 export default function ProfileLayout({

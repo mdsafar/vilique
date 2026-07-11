@@ -35,7 +35,7 @@ let activeSoundPreviewAudio: HTMLAudioElement | null = null;
 let activeSoundPreviewStop: (() => void) | null = null;
 
 function dispatchSoundPreviewState(isPlaying: boolean) {
-    window.dispatchEvent(new Event(isPlaying ? "viliqu:sound-preview-start" : "viliqu:sound-preview-stop"));
+    window.dispatchEvent(new Event(isPlaying ? "vilique:sound-preview-start" : "vilique:sound-preview-stop"));
 }
 
 export default function BuilderPage() {

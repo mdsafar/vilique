@@ -5,7 +5,7 @@ import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
     title: "Sign up",
-    description: "Create your Viliqu account.",
+    description: "Create your Vilique account.",
 };
 
 type Props = {
@@ -43,7 +43,7 @@ export default async function SignupPage({ searchParams }: Props) {
                 <div className="authCopy">
                     <p className="eyebrow">Start building</p>
                     <h1>Create account</h1>
-                    <p>Use Google to create your Viliqu account, save invitations, collect RSVPs, and publish faster.</p>
+                    <p>Use Google to create your Vilique account, save invitations, collect RSVPs, and publish faster.</p>
                 </div>
 
                 {error ? <div className="authError">{error}</div> : null}

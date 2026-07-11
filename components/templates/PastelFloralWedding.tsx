@@ -124,13 +124,13 @@ export default function PastelFloralWedding({
             audioSuspendedRef.current = false;
         };
         window.addEventListener("pagehide", handlePageHide);
-        window.addEventListener("viliqu:sound-preview-start", handlePreviewAudioStart);
-        window.addEventListener("viliqu:sound-preview-stop", handlePreviewAudioStop);
+        window.addEventListener("vilique:sound-preview-start", handlePreviewAudioStart);
+        window.addEventListener("vilique:sound-preview-stop", handlePreviewAudioStop);
         return () => {
             mountedRef.current = false;
             window.removeEventListener("pagehide", handlePageHide);
-            window.removeEventListener("viliqu:sound-preview-start", handlePreviewAudioStart);
-            window.removeEventListener("viliqu:sound-preview-stop", handlePreviewAudioStop);
+            window.removeEventListener("vilique:sound-preview-start", handlePreviewAudioStart);
+            window.removeEventListener("vilique:sound-preview-stop", handlePreviewAudioStop);
             stopThisTemplateAudio(false);
         };
     }, [pathname]);
