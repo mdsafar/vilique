@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
-import { Share2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import TemplateRenderer from "@/components/TemplateRenderer";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 import { trackInvitationEvent, AnalyticsEventType } from "@/lib/analytics";
-import { getPublicInvitationUrl } from "@/lib/config/site";
 
 type Props = {
     invitation: InvitationData;
@@ -15,7 +12,23 @@ type Props = {
 
 export default function PublicInviteExperience({ invitation, isPublic = false }: Props) {
     const [accepted, setAccepted] = useState(false);
-    const [isPending, startTransition] = useTransition();
+
+    useEffect(() => {
+        if (!isPublic) return;
+
+        const inviteBackground =
+            "radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%)";
+        const previousHtmlBackground = document.documentElement.style.background;
+        const previousBodyBackground = document.body.style.background;
+
+        document.documentElement.style.background = inviteBackground;
+        document.body.style.background = inviteBackground;
+
+        return () => {
+            document.documentElement.style.background = previousHtmlBackground;
+            document.body.style.background = previousBodyBackground;
+        };
+    }, [isPublic]);
 
     useEffect(() => {
         if (isPublic) {
@@ -24,57 +37,14 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     }, [invitation.id, isPublic]);
 
     function submitRsvp(nextStatus: RSVPStatus) {
-        startTransition(async () => {
-            const response = await fetch("/api/rsvps", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    invitationId: invitation.id,
-                    guestName: "Guest",
-                    guestPhone: "",
-                    guestCount: 1,
-                    status: nextStatus,
-                    message: "",
-                }),
+        setAccepted(nextStatus === "accepted");
+
+        if (isPublic) {
+            void trackInvitationEvent(invitation.id, "rsvp_submit", {
+                status: nextStatus,
+                source: "template_tap",
+                createsRsvpRecord: false,
             });
-
-            if (!response.ok) return;
-
-            setAccepted(nextStatus === "accepted");
-
-            if (isPublic) {
-                void trackInvitationEvent(invitation.id, "rsvp_submit");
-            }
-        });
-    }
-
-    async function handleShare() {
-        const shareTitle = invitation.secondaryName
-            ? `${invitation.primaryName} & ${invitation.secondaryName}'s Wedding Invitation`
-            : invitation.title;
-        const shareText = invitation.message || "You are invited to celebrate with us!";
-        const shareUrl = getPublicInvitationUrl(invitation.slug);
-
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: shareTitle,
-                    text: shareText,
-                    url: shareUrl,
-                });
-                if (isPublic) void trackInvitationEvent(invitation.id, "share");
-                return;
-            } catch {
-                // Fail-safe to fallback clipboard copy
-            }
-        }
-
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-            alert("Link copied to clipboard!");
-            if (isPublic) void trackInvitationEvent(invitation.id, "share");
-        } catch {
-            // Clipboard fail
         }
     }
 
@@ -92,35 +62,8 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 onAccept={() => submitRsvp("accepted")}
                 onDecline={() => submitRsvp("declined")}
                 onEvent={handleAnalyticsEvent}
-                enableAudio={!isPublic}
+                enableAudio={true}
             />
-
-            {isPublic && (
-                <button
-                    className="floatingShareBtn"
-                    onClick={handleShare}
-                    aria-label="Share invitation"
-                    style={{
-                        position: "fixed",
-                        bottom: "24px",
-                        right: "24px",
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "999px",
-                        background: "#fff",
-                        border: "1.5px solid #d8cde8",
-                        color: "#5c5070",
-                        boxShadow: "0 8px 24px rgba(80, 50, 80, 0.16)",
-                        display: "grid",
-                        placeItems: "center",
-                        cursor: "pointer",
-                        zIndex: 999,
-                        transition: "all 0.2s"
-                    }}
-                >
-                    <Share2 size={20} />
-                </button>
-            )}
         </div>
     );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { templates } from "@/data/templates";
@@ -10,6 +11,16 @@ type Props = {
         id: string;
     }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { id } = await params;
+    const template = templates.find((item) => item.id === id);
+
+    return {
+        title: template ? `${template.name} Preview` : "Template Preview",
+        description: template?.description || "Preview a Vilique invitation template.",
+    };
+}
 
 export default async function TemplatePreviewPage({ params }: Props) {
     const { id } = await params;
@@ -36,4 +47,3 @@ export default async function TemplatePreviewPage({ params }: Props) {
         </div>
     );
 }
-

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
     ArrowLeft,
@@ -26,6 +27,17 @@ type Props = {
         id: string;
     }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { id } = await params;
+    const templates = await getActiveTemplates();
+    const template = templates.find((item) => item.id === id);
+
+    return {
+        title: template?.name || "Template",
+        description: template?.description || "Preview a Vilique invitation template.",
+    };
+}
 
 const categoryLabels: Record<InvitationCategory, string> = {
     wedding: "Wedding",

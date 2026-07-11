@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { signInWithGoogle } from "@/app/auth/actions";
-import { siteConfig } from "@/lib/config/site";
+import AppLogo from "@/components/AppLogo";
 
 export const metadata: Metadata = {
     title: "Sign up",
@@ -27,7 +27,9 @@ export default async function SignupPage({ searchParams }: Props) {
             {isModal ? <AuthBackdrop /> : null}
 
             <nav className="authNav" aria-label="Authentication navigation">
-                <Link href="/">{siteConfig.name}</Link>
+                <Link href="/">
+                    <AppLogo size={30} />
+                </Link>
                 <div>
                     <Link href="/">Home</Link>
                     <Link href="/templates">Templates</Link>

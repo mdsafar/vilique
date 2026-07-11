@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Vilique Dashboard",
+    title: "Dashboard",
     description: "Manage, preview, and publish your Vilique invitation websites.",
 };
 

@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import {
     CalendarDays,
     Eye,
+    BarChart3,
     PencilLine,
     Trash2,
     UsersRound,
@@ -13,6 +14,8 @@ import {
     X,
     Filter,
     ExternalLink,
+    Copy,
+    Check,
 } from "lucide-react";
 import { deleteInvitation } from "@/app/(app)/profile/actions";
 import { InvitationData } from "@/types/invitation";
@@ -23,12 +26,12 @@ import { useToast } from "./Toast";
 
 interface ProfileInvitationsListProps {
     initialInvitations: InvitationData[];
-    rsvps: number;
+    invitationStats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
 }
 
 export default function ProfileInvitationsList({
     initialInvitations,
-    rsvps,
+    invitationStats,
 }: ProfileInvitationsListProps) {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
@@ -123,7 +126,7 @@ export default function ProfileInvitationsList({
                         <InvitationRow
                             invitation={invitation}
                             key={invitation.id}
-                            rsvps={rsvps}
+                            stats={invitationStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
                         />
                     ))}
                 </div>
@@ -157,9 +160,16 @@ export default function ProfileInvitationsList({
     );
 }
 
-function InvitationRow({ invitation, rsvps }: { invitation: InvitationData; rsvps: number }) {
+function InvitationRow({
+    invitation,
+    stats,
+}: {
+    invitation: InvitationData;
+    stats: { rsvps: number; views: number; acceptsRsvps?: boolean };
+}) {
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
     const { showToast } = useToast();
 
     const isPublished = invitation.status === "published";
@@ -187,10 +197,20 @@ function InvitationRow({ invitation, rsvps }: { invitation: InvitationData; rsvp
         }
     }
 
+    function handleCopyPublicLink() {
+        navigator.clipboard.writeText(publicUrl).then(() => {
+            setIsCopied(true);
+            showToast("Invitation link copied", "success");
+            window.setTimeout(() => setIsCopied(false), 1600);
+        }).catch(() => {
+            showToast("Could not copy link", "error");
+        });
+    }
+
     return (
         <article className="profileInviteRow">
             <div
-                className={`profileInvitePreview ${invitation.category}`}
+                className={`profileInvitePreview ${invitation.category} ${invitation.templateId}`}
                 style={{
                     "--invite-accent": invitation.theme.primaryColor,
                     "--invite-soft": invitation.theme.secondaryColor,
@@ -229,28 +249,44 @@ function InvitationRow({ invitation, rsvps }: { invitation: InvitationData; rsvp
                         <CalendarDays size={14} aria-hidden="true" />
                         {formatDate(invitation.eventDate)}
                     </span>
+                    {stats.acceptsRsvps ? (
+                        <span>
+                            <UsersRound size={14} aria-hidden="true" />
+                            {stats.rsvps} RSVPs
+                        </span>
+                    ) : null}
                     <span>
-                        <UsersRound size={14} aria-hidden="true" />
-                        {rsvps} RSVPs
+                        <BarChart3 size={14} aria-hidden="true" />
+                        {stats.views} Views
                     </span>
                     <span>Updated {formatDate(invitation.updatedAt)}</span>
                 </div>
 
                 {isPublished && !isSample ? (
-                    <a className="profilePublicLink" href={previewHref} target="_blank" rel="noreferrer">
-                        <ExternalLink size={13} aria-hidden="true" />
-                        <span>{publicUrl}</span>
-                    </a>
+                    <div className="profilePublicLinkWrap">
+                        <a className="profilePublicLink" href={previewHref} target="_blank" rel="noreferrer">
+                            <ExternalLink size={13} aria-hidden="true" />
+                            <span>{publicUrl}</span>
+                        </a>
+                        <button
+                            className="profileCopyLinkBtn"
+                            type="button"
+                            onClick={handleCopyPublicLink}
+                            aria-label="Copy invitation link"
+                        >
+                            {isCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                        </button>
+                    </div>
                 ) : null}
 
                 <div className="profileInviteActions">
                     <Link href={previewHref} className="btnPreview">
                         <Eye size={14} aria-hidden="true" />
-                        {isPublished ? "View invitation" : "Preview"}
+                        <span>{isPublished ? "View invitation" : "Preview"}</span>
                     </Link>
                     <Link href={editHref} className="btnEdit">
                         <PencilLine size={14} aria-hidden="true" />
-                        Edit
+                        <span>Edit</span>
                     </Link>
                     {isSample ? null : (
                         <>
@@ -261,7 +297,7 @@ function InvitationRow({ invitation, rsvps }: { invitation: InvitationData; rsvp
                                 aria-label={`Delete ${invitation.title}`}
                             >
                                 <Trash2 size={14} aria-hidden="true" />
-                                Delete
+                                <span>Delete</span>
                             </button>
 
                             <ConfirmModal

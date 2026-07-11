@@ -67,7 +67,7 @@ export default function TemplatesCatalog({ templates }: Props) {
 
                         <section className="marketSearch" aria-label="Template search">
                             <label className="searchBox">
-                                <Search size={17} aria-hidden="true" />
+                                <Search size={18} aria-hidden="true" />
                                 <input
                                     value={searchTerm}
                                     onChange={(event) => setSearchTerm(event.target.value)}

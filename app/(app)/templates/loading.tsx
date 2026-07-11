@@ -11,15 +11,15 @@ export default function TemplatesLoading() {
                             <div className="skeletonLine" style={{ width: "240px", height: "32px", background: "rgba(23,23,23,0.08)", borderRadius: "6px" }} />
                         </div>
 
-                        <section className="marketSearch" style={{ margin: 0 }}>
-                            <div className="searchBox" style={{ opacity: 0.6, width: "300px" }}>
-                                <Search size={18} />
-                                <div style={{ width: "120px", height: "14px", background: "rgba(0,0,0,0.06)", borderRadius: "4px" }} />
+                        <section className="marketSearch">
+                            <div className="searchBox skeletonPulse" style={{ opacity: 0.6 }}>
+                                <Search size={18} aria-hidden="true" />
+                                <div className="skeletonPulse" style={{ width: "120px", height: "14px", background: "rgba(23,23,23,0.06)", borderRadius: "4px" }} />
                             </div>
                         </section>
                     </div>
 
-                    <nav className="categoryScroller" style={{ opacity: 0.6, background: "rgba(37, 22, 53, 0.04)", padding: "5px", borderRadius: "14px" }}>
+                    <nav className="categoryScroller" style={{ opacity: 0.6 }}>
                         {Array.from({ length: 2 }).map((_, i) => (
                             <span
                                 key={i}
@@ -51,10 +51,19 @@ export default function TemplatesLoading() {
                                 }}
                             />
                         </div>
-                        <div className="templateInfo" style={{ padding: "14px 4px 4px" }}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                <div style={{ width: "80px", height: "12px", background: "rgba(23,23,23,0.06)", borderRadius: "4px" }} />
-                                <div style={{ width: "160px", height: "18px", background: "rgba(23,23,23,0.08)", borderRadius: "4px" }} />
+                        <div className="templateInfo">
+                            <div className="templateText" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                <div className="skeletonPulse" style={{ width: "80px", height: "12px", background: "rgba(23,23,23,0.06)", borderRadius: "4px" }} />
+                                <div className="skeletonPulse" style={{ width: "160px", height: "18px", background: "rgba(23,23,23,0.08)", borderRadius: "4px" }} />
+                                <div className="skeletonPulse" style={{ width: "120px", height: "14px", background: "rgba(23,23,23,0.05)", borderRadius: "4px" }} />
+                            </div>
+                            <div className="templateFooter" style={{ marginTop: "12px" }}>
+                                <div className="paletteDots">
+                                    {Array.from({ length: 3 }).map((_, dotIdx) => (
+                                        <i key={dotIdx} className="skeletonPulse" style={{ backgroundColor: "rgba(23,23,23,0.05)", width: "16px", height: "16px", borderRadius: "50%", display: "inline-block" }} />
+                                    ))}
+                                </div>
+                                <div className="skeletonPulse" style={{ width: "80px", height: "24px", borderRadius: "12px", background: "rgba(23,23,23,0.06)" }} />
                             </div>
                         </div>
                     </article>

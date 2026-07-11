@@ -82,8 +82,8 @@ export default function PastelFloralWedding({
     );
 
     const countdown = useCountdown(eventDate);
-    const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl) : null;
-    const tickUrl = enableAudio ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl) : null;
+    const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl || invitation.defaultMusicUrl) : null;
+    const tickUrl = enableAudio ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
     const showAcceptedScreen = accepted || isAccepted;
 
@@ -323,7 +323,7 @@ function InviteCard({
                     <b>♡</b>
                 </button>
             </div>
-            <p className="weddingBrandCredit">{siteConfig.creatorLabel}</p>
+            <WeddingBrandCredit />
         </section>
     );
 }
@@ -382,8 +382,17 @@ function ThanksCard({
             <div className="goldLine dividerHeart">❤</div>
             <p className="countdownTitle">COUNTDOWN TO WEDDING</p>
             <CountdownGrid countdown={countdown} />
-            <p className="weddingBrandCredit">{siteConfig.creatorLabel}</p>
+            <WeddingBrandCredit />
         </section>
+    );
+}
+
+function WeddingBrandCredit() {
+    return (
+        <p className="weddingBrandCredit">
+            <img src="/vilique-logo.png" alt="" aria-hidden="true" />
+            <span>{siteConfig.creatorLabel}</span>
+        </p>
     );
 }
 

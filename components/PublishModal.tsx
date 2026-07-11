@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Copy, Share2, Eye, ExternalLink, X, Check, AlertTriangle, Loader2 } from "lucide-react";
+import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { createPortal } from "react-dom";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 
 type Props = {
@@ -19,8 +21,37 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
     const [publishError, setPublishError] = useState("");
     const [copied, setCopied] = useState(false);
     const [isPublished, setIsPublished] = useState(invitation.status === "published");
+    const [mounted, setMounted] = useState(false);
 
     const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => { setMounted(true); }, []);
+
+    // Prevent background scrolling when open
+    useEffect(() => {
+        if (!isOpen) return;
+        const scrollY = window.scrollY;
+        const prev = {
+            bodyOverflow: document.body.style.overflow,
+            bodyPosition: document.body.style.position,
+            bodyTop: document.body.style.top,
+            bodyWidth: document.body.style.width,
+            htmlOverflow: document.documentElement.style.overflow,
+        };
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = "100%";
+        return () => {
+            document.documentElement.style.overflow = prev.htmlOverflow;
+            document.body.style.overflow = prev.bodyOverflow;
+            document.body.style.position = prev.bodyPosition;
+            document.body.style.top = prev.bodyTop;
+            document.body.style.width = prev.bodyWidth;
+            window.scrollTo(0, scrollY);
+        };
+    }, [isOpen]);
 
     // Reset slug when modal opens
     useEffect(() => {
@@ -86,7 +117,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         };
     }, [slug, invitation.slug, invitation.id, isOpen]);
 
-    if (!isOpen) return null;
+    if (!mounted) return null;
 
     // Front-end validation before publishing
     const validationErrors: string[] = [];
@@ -170,11 +201,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         const shareText = invitation.message || "You are invited to celebrate with us!";
 
         if (navigator.share) {
-            navigator.share({
-                title: shareTitle,
-                text: shareText,
-                url: publicUrl,
-            }).catch(() => undefined);
+            navigator.share({ title: shareTitle, text: shareText, url: publicUrl }).catch(() => undefined);
         } else {
             copyToClipboard();
         }
@@ -189,116 +216,142 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         return `https://wa.me/?text=${whatsappText}`;
     }
 
-    return (
-        <div className="publishModalOverlay" role="dialog" aria-modal="true">
-            <div className="publishModalPanel">
-                <header className="publishModalHeader">
-                    <h2>{isPublished ? "Invitation Published!" : "Publish Invitation"}</h2>
-                    <button className="publishModalClose" onClick={onClose} aria-label="Close">
-                        <X size={20} />
-                    </button>
-                </header>
+    return createPortal(
+        <AnimatePresence>
+            {isOpen && (
+                <div className="publishModalOverlay" role="dialog" aria-modal="true" aria-label="Publish invitation">
+                    <motion.div
+                        className="publishModalBackdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                    />
 
-                <div className="publishModalContent">
-                    {publishError && (
-                        <div className="publishModalError">
-                            <AlertTriangle size={16} />
-                            <span>{publishError}</span>
+                    <motion.div
+                        className="publishModalPanel"
+                        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                        transition={{ type: "spring", duration: 0.4 }}
+                    >
+                        {/* Header */}
+                        <div className="publishModalBanner">
+                            <div>
+                                <h2 className="publishModalBannerTitle">
+                                    {isPublished ? "🎉 Invitation is Live!" : "Publish Invitation"}
+                                </h2>
+                                <p className="publishModalBannerSub">
+                                    {isPublished ? "Share your link with guests!" : "Set your URL and go live."}
+                                </p>
+                            </div>
+                            <button className="publishModalClose" onClick={onClose} aria-label="Close">
+                                <X size={18} />
+                            </button>
                         </div>
-                    )}
 
-                    {!isPublished ? (
-                        <>
-                            {hasValidationErrors && (
-                                <div className="publishModalValidation">
-                                    <p>Please complete all required fields before publishing:</p>
-                                    <ul>
-                                        {validationErrors.map((err, i) => (
-                                            <li key={i}>{err}</li>
-                                        ))}
-                                    </ul>
+                        {/* Body */}
+                        <div className="publishModalContent">
+                            {publishError && (
+                                <div className="publishModalError">
+                                    <AlertTriangle size={15} />
+                                    <span>{publishError}</span>
                                 </div>
                             )}
 
-                            <div className="publishModalSlugForm">
-                                <label>
-                                    <span>Customize your public link:</span>
-                                    <div className="slugInputWrapper">
-                                        <span className="slugDomain">vilique.com/i/</span>
-                                        <input
-                                            type="text"
-                                            value={slug}
-                                            onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
-                                            placeholder="event-name"
-                                            disabled={isPublishing}
-                                        />
+                            {!isPublished ? (
+                                <>
+                                    {hasValidationErrors && (
+                                        <div className="publishModalValidation">
+                                            <p>Complete required fields first:</p>
+                                            <ul>
+                                                {validationErrors.map((err, i) => (
+                                                    <li key={i}>{err}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    <div className="publishModalSlugForm">
+                                        <label>
+                                            <span>Your public link</span>
+                                            <div className="slugInputWrapper">
+                                                <span className="slugDomain">vilique.com/i/</span>
+                                                <input
+                                                    type="text"
+                                                    value={slug}
+                                                    readOnly
+                                                    tabIndex={-1}
+                                                />
+                                                {status === "checking" && <Loader2 className="spinner slugStatusIcon" size={16} />}
+                                                {status === "available" && <Check className="slugStatusIcon available" size={16} />}
+                                                {status === "taken" && <X className="slugStatusIcon taken" size={16} />}
+                                                {status === "invalid" && <AlertTriangle className="slugStatusIcon invalid" size={16} />}
+                                            </div>
+                                        </label>
+
+                                        {feedback && (
+                                            <p className={`slugFeedback ${status}`}>
+                                                <span>{feedback}</span>
+                                            </p>
+                                        )}
                                     </div>
-                                </label>
 
-                                {feedback && (
-                                    <p className={`slugFeedback ${status}`}>
-                                        {status === "checking" && <Loader2 className="spinner" size={12} />}
-                                        {status === "available" && <Check size={12} />}
-                                        {status === "taken" && <X size={12} />}
-                                        {status === "invalid" && <AlertTriangle size={12} />}
-                                        <span>{feedback}</span>
-                                    </p>
-                                )}
-                            </div>
+                                    <div className="publishActions">
+                                        <button
+                                            className="publishBtnCancel"
+                                            onClick={onClose}
+                                            disabled={isPublishing}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            className="publishBtnPrimary"
+                                            onClick={handlePublish}
+                                            disabled={!canPublish}
+                                        >
+                                            {isPublishing
+                                                ? <><Loader2 size={16} className="spinner" /> Publishing…</>
+                                                : <><Rocket size={16} /> Publish Now</>
+                                            }
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="publishSuccessState">
+                                    <div className="publishLinkCard">
+                                        <span className="linkUrl">{publicUrl}</span>
+                                        <button className="copyBtn" onClick={copyToClipboard}>
+                                            {copied ? <Check size={15} /> : <Copy size={15} />}
+                                            {copied ? "Copied!" : "Copy"}
+                                        </button>
+                                    </div>
 
-                            <div className="publishActions">
-                                <button
-                                    className="primaryBtn publishBtn"
-                                    onClick={handlePublish}
-                                    disabled={!canPublish}
-                                >
-                                    {isPublishing ? "Publishing..." : "Publish Now"}
-                                </button>
-                                <button className="secondaryBtn cancelBtn" onClick={onClose} disabled={isPublishing}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="publishSuccessState">
-                            <div className="successIcon">
-                                <Check size={32} />
-                            </div>
-                            <h3>Your link is ready</h3>
-                            
-                            <div className="publishLinkCard">
-                                <span className="linkUrl">{publicUrl}</span>
-                                <button className="copyBtn" onClick={copyToClipboard}>
-                                    {copied ? "Copied!" : <Copy size={16} />}
-                                </button>
-                            </div>
+                                    <div className="publishSuccessActions">
+                                        <button className="publishBtnShare" onClick={shareInvitation}>
+                                            <Share2 size={16} /> Share Link
+                                        </button>
+                                        <a className="publishBtnWhatsapp" href={getWhatsAppShareUrl()} target="_blank" rel="noopener noreferrer">
+                                            WhatsApp
+                                        </a>
+                                        <a className="publishBtnOpen" href={publicUrl} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink size={15} /> Open
+                                        </a>
+                                    </div>
 
-                            <div className="publishSuccessActions">
-                                <button className="primaryBtn" onClick={shareInvitation}>
-                                    <Share2 size={16} />
-                                    Share Link
-                                </button>
-                                <a className="secondaryBtn" href={getWhatsAppShareUrl()} target="_blank" rel="noopener noreferrer">
-                                    Share on WhatsApp
-                                </a>
-                                <a className="secondaryBtn" href={publicUrl} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink size={16} />
-                                    Open Invitation
-                                </a>
-                            </div>
-
-                            <hr className="divider" style={{ width: "100%", border: "0", borderTop: "1px solid rgba(23,23,23,0.08)", margin: "14px 0" }} />
-
-                            <div className="unpublishZone">
-                                <p>Need to make changes? You can unpublish your invitation to make it private again.</p>
-                                <button className="unpublishBtn" onClick={handleUnpublish} disabled={isPublishing}>
-                                    {isPublishing ? "Unpublishing..." : "Unpublish"}
-                                </button>
-                            </div>
+                                    <div className="unpublishZone">
+                                        <p>Need to make changes? Unpublish to make it private again.</p>
+                                        <button className="unpublishBtn" onClick={handleUnpublish} disabled={isPublishing}>
+                                            {isPublishing ? "Unpublishing…" : "Unpublish"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </motion.div>
                 </div>
-            </div>
-        </div>
+            )}
+        </AnimatePresence>,
+        document.body
     );
 }

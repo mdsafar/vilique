@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { CalendarHeart, MapPinned, Music2, Sparkles, Wand2 } from "lucide-react";
+import AppLogo from "@/components/AppLogo";
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  title: "Vilique",
+  title: {
+    absolute: "Vilique",
+  },
 };
 
 const features = [
@@ -41,6 +44,8 @@ export default function HomePage() {
     <main className="page homePage">
       <section className="homeHero">
         <div className="homeHeroCopy">
+          <AppLogo className="homeHeroLogo" size={42} />
+
           <p className="eyebrow">Premium invitation websites in minutes</p>
 
           <h1>Build animated invitations guests remember</h1>

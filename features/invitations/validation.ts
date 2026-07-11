@@ -62,4 +62,3 @@ export const mediaUploadSchema = z.object({
     invitationId: z.string().uuid(),
     kind: z.enum(["image", "music"]),
 });
-

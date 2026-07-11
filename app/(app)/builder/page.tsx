@@ -3,9 +3,13 @@
 import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+    AlertTriangle,
+    CalendarDays,
     ChevronDown,
     ChevronLeft,
+    Clock3,
     Eye,
+    Loader2,
     Pause,
     PencilLine,
     Play,
@@ -14,8 +18,11 @@ import {
     Smartphone,
     X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { createPortal } from "react-dom";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import PublishModal from "@/components/PublishModal";
+import { useToast } from "@/components/Toast";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { templates } from "@/data/templates";
 import TemplateRenderer from "@/components/TemplateRenderer";
@@ -49,13 +56,18 @@ export default function BuilderPage() {
 function BuilderContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { showToast } = useToast();
     const [invitation, setInvitation] = useState(createDefaultInvitation());
+    const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
     const [activeTab, setActiveTab] = useState<EditorTab>("content");
     const [previewScreen, setPreviewScreen] = useState<PreviewScreen>("invite");
     const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
     const [saveState, setSaveState] = useState("Creating draft...");
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+    const [isSavingDraft, setIsSavingDraft] = useState(false);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
     const [previewScrolledToBottom, setPreviewScrolledToBottom] = useState(false);
     const previewViewportRef = useRef<HTMLDivElement>(null);
     const lastSavedPayload = useRef("");
@@ -63,8 +75,11 @@ function BuilderContent() {
     const createDraftPromise = useRef<Promise<InvitationData> | null>(null);
     const isNewDraft = useRef(true);
     const initialInvitation = useRef<InvitationData | null>(null);
+    const openedFromExistingInvitation = useRef(false);
     const currentBuilderPath = `/builder${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
     const isPersistedDraft = invitation.id !== "default-draft-placeholder-id";
+    const isEditingPublished = openedFromExistingInvitation.current && invitation.status === "published";
+    const backTarget = openedFromExistingInvitation.current ? "/profile" : "/templates";
 
     useEffect(() => {
         if (!mobileEditorOpen) return;
@@ -96,13 +111,17 @@ function BuilderContent() {
     );
 
     function buildSavePayload(source: InvitationData = invitation) {
+        const safeEventDate = isValidDateValue(source.eventDate)
+            ? source.eventDate
+            : toDateInputValue(new Date());
+
         return JSON.stringify({
             slug: source.slug,
             category: source.category,
             title: source.title,
             primaryName: source.primaryName,
             secondaryName: source.secondaryName || null,
-            eventDate: source.eventDate,
+            eventDate: safeEventDate,
             eventTime: source.eventTime,
             venueName: source.venueName,
             venueAddress: source.venueAddress,
@@ -156,6 +175,9 @@ function BuilderContent() {
                     updatedAt: draft.updatedAt || new Date().toISOString(),
                 };
 
+                if (typeof window !== "undefined") {
+                    sessionStorage.setItem(`vilique-new-draft-${draft.id}`, "true");
+                }
                 setInvitation(nextInvitation);
                 router.replace(`/builder?id=${draft.id}`);
                 return nextInvitation;
@@ -167,13 +189,19 @@ function BuilderContent() {
         return createDraftPromise.current;
     }
 
-    async function saveInvitation(options: { createIfNeeded?: boolean } = {}) {
+    async function saveInvitation(options: { createIfNeeded?: boolean; isExplicitUserSave?: boolean } = {}) {
         const source = options.createIfNeeded ? await ensureDraftExists() : invitation;
         if (source.id === "default-draft-placeholder-id") return null;
 
         const payload = buildSavePayload(source);
         if (payload === lastSavedPayload.current) {
             setSaveState("Saved");
+            if (options.isExplicitUserSave) {
+                isNewDraft.current = false;
+                if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(`vilique-new-draft-${source.id}`);
+                }
+            }
             return source;
         }
 
@@ -187,7 +215,12 @@ function BuilderContent() {
         if (response.ok) {
             lastSavedPayload.current = payload;
             setSaveState("Saved");
-            isNewDraft.current = false;
+            if (options.isExplicitUserSave) {
+                isNewDraft.current = false;
+                if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(`vilique-new-draft-${source.id}`);
+                }
+            }
             initialInvitation.current = source;
             return source;
         }
@@ -197,15 +230,51 @@ function BuilderContent() {
         return null;
     }
 
+    async function handleSaveDraft() {
+        setIsSavingDraft(true);
+        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+        if (saved) {
+            router.push("/profile");
+        } else {
+            setIsSavingDraft(false);
+        }
+    }
+
+    async function handleUpdateInvitation() {
+        setIsPublishing(true);
+        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+        setIsPublishing(false);
+        if (saved) {
+            setSaveState(invitation.status === "published" ? "Updated" : "Saved");
+            showToast("Invitation updated successfully", "success");
+            window.setTimeout(navigateBackToList, 450);
+        }
+    }
+
+    function navigateBackToList() {
+        if (openedFromExistingInvitation.current && typeof window !== "undefined" && window.history.length > 1) {
+            router.back();
+            return;
+        }
+
+        router.push(backTarget);
+    }
+
     async function saveAndPreview() {
+        setIsPreviewing(true);
         const savedInvitation = await saveInvitation({ createIfNeeded: true });
         if (savedInvitation) {
             router.push(`/builder/preview?id=${savedInvitation.id}`);
+        } else {
+            setIsPreviewing(false);
         }
     }
 
     async function saveAndOpenPublish() {
+        setIsPublishing(true);
+        // Don't mark as explicit user save yet — user can still cancel out of the publish modal
         const savedInvitation = await saveInvitation({ createIfNeeded: true });
+        setIsPublishing(false);
         if (savedInvitation) {
             setIsPublishModalOpen(true);
         }
@@ -228,7 +297,7 @@ function BuilderContent() {
                 });
             }
         }
-        router.push("/templates");
+        navigateBackToList();
     }
 
     function updateField(key: string, value: string) {
@@ -341,30 +410,39 @@ function BuilderContent() {
         hasLoadedDraft.current = true;
 
         const existingId = searchParams.get("id");
+        openedFromExistingInvitation.current = !!existingId;
         const templateKey = searchParams.get("template") || "pastel-floral-wedding";
 
-        isNewDraft.current = !existingId;
+        const isSessionNewDraft = existingId && typeof window !== "undefined"
+            ? sessionStorage.getItem(`vilique-new-draft-${existingId}`) === "true"
+            : !existingId;
+        isNewDraft.current = !!isSessionNewDraft;
 
         async function loadDraft() {
             if (existingId) {
                 const response = await fetch(`/api/invitations/${existingId}`);
                 if (response.ok) {
-                    const draft = await response.json();
+                    const draft = normalizeInvitationDate(await response.json());
                     setInvitation(draft);
                     initialInvitation.current = draft;
                     lastSavedPayload.current = buildSavePayload(draft);
-                    setSaveState("Saved");
+                    setSaveState(draft.status === "published" ? "Published" : "Saved");
+                    setIsLoadingInvitation(false);
                     return;
                 }
             }
 
-            setInvitation((prev) => ({
-                ...prev,
+            const defaultInv = {
+                ...createDefaultInvitation(),
                 templateId: templateKey,
                 updatedAt: new Date().toISOString(),
-            }));
+            };
+            const normalizedDefaultInv = normalizeInvitationDate(defaultInv);
+            setInvitation(normalizedDefaultInv);
             initialInvitation.current = null;
+            lastSavedPayload.current = buildSavePayload(normalizedDefaultInv);
             setSaveState("Not saved");
+            setIsLoadingInvitation(false);
         }
 
         void loadDraft();
@@ -398,6 +476,10 @@ function BuilderContent() {
         return () => window.clearTimeout(timeout);
     }, [invitation, isPersistedDraft]);
 
+    if (isLoadingInvitation) {
+        return <BuilderLoadingState />;
+    }
+
     return (
         <main className="builderShell">
             <AuthRequiredModal next={currentBuilderPath} />
@@ -409,7 +491,7 @@ function BuilderContent() {
                     onClick={() => setLeaveModalOpen(true)}
                 >
                     <ChevronLeft size={20} aria-hidden="true" />
-                    <span>Templates</span>
+                    <span>{openedFromExistingInvitation.current ? "Profile" : "Templates"}</span>
                 </button>
 
                 <div className="builderTitle">
@@ -417,10 +499,7 @@ function BuilderContent() {
                     <strong>{selectedTemplate?.name || "Custom Template"}</strong>
                 </div>
 
-                <button type="button" className="builderPreviewBtn" onClick={saveAndPreview}>
-                    <Eye size={18} aria-hidden="true" />
-                    <span>Preview</span>
-                </button>
+                <div aria-hidden="true" />
             </header>
 
             <section className="builderWorkspace">
@@ -534,26 +613,36 @@ function BuilderContent() {
             </section>
 
             <div className="builderBottomBar">
-                <button type="button" onClick={() => saveInvitation({ createIfNeeded: true })}>
-                    <Save size={17} aria-hidden="true" />
-                    Save
-                </button>
-                <button type="button" onClick={saveAndPreview}>
-                    <Eye size={17} aria-hidden="true" />
+                {!isEditingPublished ? (
+                    <button type="button" onClick={handleSaveDraft} disabled={isSavingDraft || isPreviewing || isPublishing}>
+                        {isSavingDraft ? <Loader2 size={17} className="spinner" /> : <Save size={17} aria-hidden="true" />}
+                        <span>Save Draft</span>
+                    </button>
+                ) : null}
+                <button type="button" onClick={saveAndPreview} disabled={isSavingDraft || isPreviewing || isPublishing}>
+                    {isPreviewing ? <Loader2 size={17} className="spinner" /> : <Eye size={17} aria-hidden="true" />}
                     <span>Preview</span>
                 </button>
-                <button type="button" onClick={saveAndOpenPublish}>
-                    <Rocket size={17} aria-hidden="true" />
-                    Publish
+                <button
+                    type="button"
+                    onClick={isEditingPublished ? handleUpdateInvitation : saveAndOpenPublish}
+                    disabled={isSavingDraft || isPreviewing || isPublishing}
+                >
+                    {isPublishing ? <Loader2 size={17} className="spinner" /> : <Rocket size={17} aria-hidden="true" />}
+                    <span>
+                        {isPublishing
+                            ? isEditingPublished ? "Updating..." : "Publishing..."
+                            : isEditingPublished ? "Update" : "Publish"}
+                    </span>
                 </button>
             </div>
 
             <LeaveModal
                 isOpen={leaveModalOpen}
-                isSaving={saveState === "Saving..."}
+                mode={isEditingPublished ? "update" : "draft"}
                 onSave={async () => {
-                    const savedInvitation = await saveInvitation({ createIfNeeded: true });
-                    if (savedInvitation) router.push("/templates");
+                    const savedInvitation = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+                    if (savedInvitation) navigateBackToList();
                 }}
                 onDiscard={handleDiscard}
                 onCancel={() => setLeaveModalOpen(false)}
@@ -564,6 +653,11 @@ function BuilderContent() {
                 isOpen={isPublishModalOpen}
                 onClose={() => setIsPublishModalOpen(false)}
                 onPublishSuccess={(updatedInvitation) => {
+                    // Mark as explicitly saved since user completed publishing
+                    isNewDraft.current = false;
+                    if (typeof window !== "undefined" && invitation.id) {
+                        sessionStorage.removeItem(`vilique-new-draft-${invitation.id}`);
+                    }
                     setInvitation((prev) => ({
                         ...prev,
                         status: updatedInvitation.status,
@@ -573,7 +667,7 @@ function BuilderContent() {
                     }));
                     setSaveState(updatedInvitation.status === "published" ? "Published" : "Saved");
                     if (updatedInvitation.status === "published") {
-                        router.push("/profile");
+                        navigateBackToList();
                     }
                 }}
             />
@@ -581,22 +675,68 @@ function BuilderContent() {
     );
 }
 
+function BuilderLoadingState() {
+    return (
+        <main className="builderShell builderLoadingShell" aria-busy="true">
+            <div className="builderLoadingCard">
+                <Loader2 className="spinner" size={28} aria-hidden="true" />
+                <div>
+                    <strong>Opening builder</strong>
+                    <span>Loading your invitation</span>
+                </div>
+            </div>
+        </main>
+    );
+}
+
 function LeaveModal({
     isOpen,
-    isSaving,
+    mode,
     onSave,
     onDiscard,
     onCancel,
 }: {
     isOpen: boolean;
-    isSaving: boolean;
+    mode: "draft" | "update";
     onSave: () => Promise<void>;
     onDiscard: () => void;
     onCancel: () => void;
 }) {
     const [saving, setSaving] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Prevent background scrolling when open
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const scrollY = window.scrollY;
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousBodyPosition = document.body.style.position;
+        const previousBodyTop = document.body.style.top;
+        const previousBodyWidth = document.body.style.width;
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = "100%";
+
+        return () => {
+            document.documentElement.style.overflow = previousHtmlOverflow;
+            document.body.style.overflow = previousBodyOverflow;
+            document.body.style.position = previousBodyPosition;
+            document.body.style.top = previousBodyTop;
+            document.body.style.width = previousBodyWidth;
+            window.scrollTo(0, scrollY);
+        };
+    }, [isOpen]);
+
+    if (!mounted) return null;
 
     async function handleSave() {
         setSaving(true);
@@ -604,49 +744,164 @@ function LeaveModal({
         setSaving(false);
     }
 
-    return (
-        <div className="leaveModalScrim" onClick={onCancel}>
-            <div
-                className="leaveModalCard"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Leave builder"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="leaveModalIcon">📋</div>
-                <h3>Save before leaving?</h3>
-                <p>
-                    Your invitation has unsaved changes. Would you like to save
-                    your draft before going back?
-                </p>
-                <div className="leaveModalActions">
-                    <button
-                        type="button"
-                        className="leaveModalSave"
-                        onClick={handleSave}
-                        disabled={saving || isSaving}
-                    >
-                        {saving ? "Saving…" : "Save Draft"}
-                    </button>
-                    <button
-                        type="button"
-                        className="leaveModalDiscard"
-                        onClick={onDiscard}
-                        disabled={saving}
-                    >
-                        Discard
-                    </button>
-                    <button
-                        type="button"
-                        className="leaveModalCancel"
+    const isUpdateMode = mode === "update";
+
+    return createPortal(
+        <AnimatePresence>
+            {isOpen && (
+                <div
+                    className="modalOverlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Save changes"
+                >
+                    <motion.div
+                        className="modalBackdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         onClick={onCancel}
-                        disabled={saving}
+                    />
+
+                    <motion.section
+                        initial={{ opacity: 0, scale: 0.94, y: 18 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.94, y: 18 }}
+                        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                        style={{
+                            position: "relative",
+                            zIndex: 1,
+                            width: "min(100%, 380px)",
+                            background: "#ffffff",
+                            border: "1px solid rgba(23,23,23,0.08)",
+                            borderRadius: "24px",
+                            padding: "28px 24px 24px",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "14px",
+                            textAlign: "center",
+                            boxShadow: "0 24px 60px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.9)",
+                        }}
                     >
-                        Cancel
-                    </button>
+                        {/* Icon */}
+                        <div style={{
+                            width: "52px",
+                            height: "52px",
+                            borderRadius: "16px",
+                            background: "rgba(251,191,36,0.1)",
+                            border: "1px solid rgba(251,191,36,0.3)",
+                            display: "grid",
+                            placeItems: "center",
+                            color: "#d97706",
+                        }}>
+                            <AlertTriangle size={24} strokeWidth={2} />
+                        </div>
+
+                        {/* Title */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <h2 style={{
+                                margin: 0,
+                                fontSize: "18px",
+                                fontWeight: 800,
+                                color: "#111827",
+                                fontFamily: "Arial, Helvetica, sans-serif",
+                                letterSpacing: "-0.02em",
+                            }}>
+                                {isUpdateMode ? "Discard changes?" : "Save before leaving?"}
+                            </h2>
+                            <p style={{
+                                margin: 0,
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                lineHeight: 1.5,
+                            }}>
+                                {isUpdateMode
+                                    ? "Your live invitation has unsaved changes. Discard them or keep editing."
+                                    : "Your invitation has unsaved changes. Would you like to save your draft before going back?"
+                                }
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", marginTop: "4px" }}>
+                            {!isUpdateMode ? (
+                                <button
+                                    type="button"
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    style={{
+                                        width: "100%",
+                                        minHeight: "46px",
+                                        borderRadius: "14px",
+                                        border: "none",
+                                        background: saving
+                                            ? "#e5e7eb"
+                                            : "linear-gradient(135deg, #8c4cf3 0%, #c46fb4 100%)",
+                                        color: saving ? "#9ca3af" : "#fff",
+                                        fontWeight: 800,
+                                        fontSize: "14px",
+                                        cursor: saving ? "not-allowed" : "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "8px",
+                                        transition: "all 0.2s",
+                                        boxShadow: saving ? "none" : "0 4px 16px rgba(140, 76, 243, 0.3)",
+                                    }}
+                                >
+                                    <Save size={15} />
+                                    {saving ? "Saving…" : "Save Draft"}
+                                </button>
+                            ) : null}
+
+                            {/* Discard & Keep Editing row */}
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                    type="button"
+                                    onClick={onDiscard}
+                                    disabled={saving}
+                                    style={{
+                                        flex: 1,
+                                        minHeight: "42px",
+                                        borderRadius: "12px",
+                                        background: "#fef2f2",
+                                        border: "1.5px solid rgba(239,68,68,0.2)",
+                                        color: "#dc2626",
+                                        fontWeight: 700,
+                                        fontSize: "13.5px",
+                                        cursor: saving ? "not-allowed" : "pointer",
+                                        transition: "all 0.2s",
+                                    }}
+                                >
+                                    Discard
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    disabled={saving}
+                                    style={{
+                                        flex: 1,
+                                        minHeight: "42px",
+                                        borderRadius: "12px",
+                                        background: "#f9fafb",
+                                        border: "1.5px solid #e5e7eb",
+                                        color: "#6b7280",
+                                        fontWeight: 700,
+                                        fontSize: "13.5px",
+                                        cursor: saving ? "not-allowed" : "pointer",
+                                        transition: "all 0.2s",
+                                    }}
+                                >
+                                    Keep Editing
+                                </button>
+                            </div>
+                        </div>
+                    </motion.section>
                 </div>
-            </div>
-        </div>
+            )}
+        </AnimatePresence>,
+        document.body
     );
 }
 
@@ -688,6 +943,8 @@ function EditorForm({
     updateMusicFile: (file: File | null) => void;
     updateTickFile: (file: File | null) => void;
 }) {
+    const { startTime, endTime } = parseTimeRange(invitation.eventTime);
+
     if (activeTab === "content") {
         return (
             <div className="editorForm">
@@ -719,12 +976,26 @@ function EditorForm({
             <div className="editorForm">
                 <label>
                     <span>Date</span>
-                    <input type="date" value={invitation.eventDate} onChange={(e) => updateField("eventDate", e.target.value)} />
+                    <DatePickerField
+                        value={invitation.eventDate}
+                        onChange={(value) => updateField("eventDate", value)}
+                    />
                 </label>
 
                 <label>
-                    <span>Time</span>
-                    <input value={invitation.eventTime} onChange={(e) => updateField("eventTime", e.target.value)} maxLength={35} />
+                    <span>Start Time</span>
+                    <TimePickerField
+                        value={startTime}
+                        onChange={(value) => updateField("eventTime", formatTimeRange(value, endTime))}
+                    />
+                </label>
+
+                <label>
+                    <span>End Time</span>
+                    <TimePickerField
+                        value={endTime}
+                        onChange={(value) => updateField("eventTime", formatTimeRange(startTime, value))}
+                    />
                 </label>
 
                 <label>
@@ -745,12 +1016,25 @@ function EditorForm({
             <div className="editorForm">
                 <label>
                     <span>Phone / WhatsApp</span>
-                    <input value={invitation.phone || ""} onChange={(e) => updateField("phone", e.target.value)} maxLength={20} />
+                    <input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={invitation.phone || ""}
+                        onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, ""))}
+                        maxLength={15}
+                    />
                 </label>
 
                 <label>
                     <span>Map Link</span>
-                    <input value={invitation.mapLink} onChange={(e) => updateField("mapLink", e.target.value)} maxLength={250} />
+                    <input
+                        type="url"
+                        inputMode="url"
+                        value={invitation.mapLink}
+                        onChange={(e) => updateField("mapLink", e.target.value)}
+                        maxLength={250}
+                    />
                 </label>
             </div>
         );
@@ -849,6 +1133,300 @@ function EditorForm({
             </label>
         </div>
     );
+}
+
+function DatePickerField({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const fallbackDate = useMemo(() => new Date(), []);
+    const selectedDate = parseDateValue(value) || fallbackDate;
+    const [visibleMonth, setVisibleMonth] = useState(() => selectedDate || new Date());
+    const calendarDays = getCalendarDays(visibleMonth);
+
+    useEffect(() => {
+        if (!isValidDateValue(value)) {
+            onChange(toDateInputValue(fallbackDate));
+        }
+    }, [fallbackDate, onChange, value]);
+
+    function selectDate(date: Date) {
+        onChange(toDateInputValue(date));
+        setVisibleMonth(date);
+        setOpen(false);
+    }
+
+    return (
+        <div className="customPicker">
+            <button
+                className="customPickerTrigger"
+                type="button"
+                onClick={() => setOpen((current) => !current)}
+            >
+                <span>{formatDisplayDate(selectedDate)}</span>
+                <CalendarDays size={18} aria-hidden="true" />
+            </button>
+
+            {open ? (
+                <div className="customPickerPopover datePickerPopover">
+                    <div className="customPickerHeader">
+                        <strong>
+                            {visibleMonth.toLocaleString("en", { month: "long", year: "numeric" })}
+                        </strong>
+                        <div>
+                            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))} aria-label="Previous month">
+                                <ChevronLeft size={17} aria-hidden="true" />
+                            </button>
+                            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} aria-label="Next month">
+                                <ChevronLeft size={17} aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="datePickerGrid">
+                        {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+                            <b key={`${day}-${index}`}>{day}</b>
+                        ))}
+                        {calendarDays.map((date) => {
+                            const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
+                            const isSelected = selectedDate ? isSameDate(date, selectedDate) : false;
+
+                            return (
+                                <button
+                                    className={isSelected ? "selected" : !isCurrentMonth ? "muted" : undefined}
+                                    key={date.toISOString()}
+                                    type="button"
+                                    onClick={() => selectDate(date)}
+                                >
+                                    {date.getDate()}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="customPickerFooter single">
+                        <button type="button" onClick={() => selectDate(new Date())}>Today</button>
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function TimePickerField({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const parsed = parseTimeInputParts(value);
+
+    function updateTime(next: Partial<ReturnType<typeof parseTimeInputParts>>) {
+        onChange(toTimeInputFromParts({ ...parsed, ...next }));
+    }
+
+    return (
+        <div className="customPicker">
+            <button
+                className="customPickerTrigger"
+                type="button"
+                onClick={() => setOpen((current) => !current)}
+            >
+                <span>{value ? fromTimeInputValue(value) : "Select time"}</span>
+                <Clock3 size={18} aria-hidden="true" />
+            </button>
+
+            {open ? (
+                <div className="customPickerPopover timePickerPopover">
+                    <div className="timePickerColumns">
+                        <PickerColumn
+                            values={Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))}
+                            selected={parsed.hour}
+                            onSelect={(hour) => updateTime({ hour })}
+                        />
+                        <PickerColumn
+                            values={Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))}
+                            selected={parsed.minute}
+                            onSelect={(minute) => updateTime({ minute })}
+                        />
+                        <PickerColumn
+                            values={["AM", "PM"]}
+                            selected={parsed.period}
+                            onSelect={(period) => updateTime({ period: period as "AM" | "PM" })}
+                        />
+                    </div>
+
+                    <div className="customPickerFooter single">
+                        <button type="button" onClick={() => setOpen(false)}>Done</button>
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function PickerColumn({
+    values,
+    selected,
+    onSelect,
+}: {
+    values: string[];
+    selected: string;
+    onSelect: (value: string) => void;
+}) {
+    return (
+        <div className="timePickerColumn">
+            {values.map((value) => (
+                <button
+                    className={value === selected ? "selected" : undefined}
+                    key={value}
+                    type="button"
+                    onClick={() => onSelect(value)}
+                >
+                    {value}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function parseTimeRange(value: string) {
+    const [rawStart = "", rawEnd = ""] = value.split(/\s*[-–—]\s*/).map((part) => part.trim());
+
+    return {
+        startTime: toTimeInputValue(rawStart),
+        endTime: toTimeInputValue(rawEnd),
+    };
+}
+
+function parseTimeInputParts(value: string) {
+    const [hours = "09", minutes = "00"] = (value || "09:00").split(":");
+    const hours24 = Number(hours);
+    const period = hours24 >= 12 ? "PM" : "AM";
+    const hour = String(hours24 % 12 || 12).padStart(2, "0");
+
+    return {
+        hour,
+        minute: String(Number(minutes) || 0).padStart(2, "0"),
+        period,
+    } as const;
+}
+
+function toTimeInputFromParts({
+    hour,
+    minute,
+    period,
+}: {
+    hour: string;
+    minute: string;
+    period: "AM" | "PM";
+}) {
+    let hours = Number(hour);
+    if (period === "PM" && hours < 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, "0")}:${minute}`;
+}
+
+function parseDateValue(value: string) {
+    if (!value) return null;
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+}
+
+function isValidDateValue(value: string) {
+    return parseDateValue(value) !== null;
+}
+
+function toDateInputValue(date: Date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatDisplayDate(date: Date) {
+    return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    }).format(date);
+}
+
+function addMonths(date: Date, amount: number) {
+    return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function getCalendarDays(month: Date) {
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    const start = new Date(firstDay);
+    start.setDate(firstDay.getDate() - firstDay.getDay());
+
+    return Array.from({ length: 42 }, (_, index) => {
+        const date = new Date(start);
+        date.setDate(start.getDate() + index);
+        return date;
+    });
+}
+
+function isSameDate(left: Date, right: Date) {
+    return left.getFullYear() === right.getFullYear() &&
+        left.getMonth() === right.getMonth() &&
+        left.getDate() === right.getDate();
+}
+
+function normalizeInvitationDate<T extends InvitationData>(invitation: T): T {
+    if (isValidDateValue(invitation.eventDate)) return invitation;
+
+    return {
+        ...invitation,
+        eventDate: toDateInputValue(new Date()),
+    };
+}
+
+function toTimeInputValue(value: string) {
+    const normalized = value.trim().toUpperCase();
+    if (!normalized) return "";
+
+    const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/);
+    if (!match) return "";
+
+    let hours = Number(match[1]);
+    const minutes = Number(match[2] || "00");
+    const meridiem = match[3];
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) return "";
+
+    if (meridiem === "PM" && hours < 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function formatTimeRange(startTime: string, endTime: string) {
+    const startLabel = fromTimeInputValue(startTime);
+    const endLabel = fromTimeInputValue(endTime);
+
+    if (startLabel && endLabel) return `${startLabel} - ${endLabel}`;
+    return startLabel || endLabel;
+}
+
+function fromTimeInputValue(value: string) {
+    if (!value) return "";
+
+    const [rawHours = "0", rawMinutes = "00"] = value.split(":");
+    const hours24 = Number(rawHours);
+    const minutes = Number(rawMinutes);
+    if (Number.isNaN(hours24) || Number.isNaN(minutes)) return "";
+
+    const meridiem = hours24 >= 12 ? "PM" : "AM";
+    const hours12 = hours24 % 12 || 12;
+
+    return `${String(hours12).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${meridiem}`;
 }
 
 

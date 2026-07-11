@@ -155,7 +155,7 @@ export default async function ProfilePage() {
 
                 <ProfileInvitationsList
                     initialInvitations={invitations}
-                    rsvps={dashboard.rsvps}
+                    invitationStats={dashboard.invitationStats}
                 />
             </section>
         </main>

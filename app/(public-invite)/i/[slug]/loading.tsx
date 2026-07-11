@@ -10,7 +10,8 @@ export default function PublicInviteLoading() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#fff8f3",
+                background:
+                    "radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%)",
                 color: "#b99aad",
                 gap: "16px"
             }}

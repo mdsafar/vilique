@@ -111,6 +111,7 @@ export async function getDashboardData() {
             drafts: 0,
             views: 0,
             rsvps: 0,
+            invitationStats: {},
         };
     }
 
@@ -120,19 +121,43 @@ export async function getDashboardData() {
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
-    const invitationIds = invitationRows?.map((row) => row.id) || [];
-    const [rsvpResult, viewResult] = invitationIds.length
+    const invitations = (invitationRows || []).map(mapInvitationRow);
+    const invitationIds = invitations.map((invitation) => invitation.id);
+    const rsvpEligibleInvitationIds = invitations
+        .filter((invitation) => templateCollectsDetailedRsvps(invitation.templateId))
+        .map((invitation) => invitation.id);
+
+    const [rsvpRowsResult, viewResult, viewRowsResult] = invitationIds.length
         ? await Promise.all([
-              supabase.from("rsvps").select("id", { count: "exact", head: true }).in("invitation_id", invitationIds),
+              rsvpEligibleInvitationIds.length
+                  ? supabase.from("rsvps").select("invitation_id").in("invitation_id", rsvpEligibleInvitationIds)
+                  : Promise.resolve({ data: [] }),
               supabase
                   .from("invitation_events")
                   .select("id", { count: "exact", head: true })
                   .in("invitation_id", invitationIds)
                   .eq("event_type", "view"),
+              supabase
+                  .from("invitation_events")
+                  .select("invitation_id")
+                  .in("invitation_id", invitationIds)
+                  .eq("event_type", "view"),
           ])
-        : [{ count: 0 }, { count: 0 }];
+        : [{ data: [] }, { count: 0 }, { data: [] }];
 
-    const invitations = (invitationRows || []).map(mapInvitationRow);
+    const invitationStats = Object.fromEntries(
+        invitations.map((invitation) => [
+            invitation.id,
+            {
+                acceptsRsvps: templateCollectsDetailedRsvps(invitation.templateId),
+                rsvps: templateCollectsDetailedRsvps(invitation.templateId)
+                    ? (rsvpRowsResult.data || []).filter((row) => row.invitation_id === invitation.id).length
+                    : 0,
+                views: (viewRowsResult.data || []).filter((row) => row.invitation_id === invitation.id).length,
+            },
+        ])
+    );
+    const totalRsvps = (rsvpRowsResult.data || []).length;
 
     return {
         profile: {
@@ -148,8 +173,13 @@ export async function getDashboardData() {
         published: invitations.filter((item) => item.status === "published").length,
         drafts: invitations.filter((item) => item.status === "draft").length,
         views: viewResult.count || 0,
-        rsvps: rsvpResult.count || 0,
+        rsvps: totalRsvps,
+        invitationStats,
     };
+}
+
+function templateCollectsDetailedRsvps(templateId: string) {
+    return !["pastel-floral-wedding"].includes(templateId);
 }
 
 function getUserMetadataString(metadata: unknown, key: string) {

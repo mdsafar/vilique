@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBuilderInvitation } from "@/features/invitations/data";
 import PublicInviteExperience from "@/components/PublicInviteExperience";
@@ -6,6 +7,11 @@ import { ArrowLeft } from "lucide-react";
 
 type Props = {
     searchParams: Promise<{ id?: string }>;
+};
+
+export const metadata: Metadata = {
+    title: "Preview",
+    description: "Preview your Vilique invitation draft.",
 };
 
 export default async function BuilderPreviewPage({ searchParams }: Props) {
