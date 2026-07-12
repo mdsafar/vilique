@@ -174,22 +174,21 @@ function InvitationRow({
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
-    const [isDuplicating, setIsDuplicating] = useState(false);
-    const [isArchiving, setIsArchiving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const router = useRouter();
     const { showToast } = useToast();
 
+
+    const isPublished = invitation.status === "published";
 
     const eventPhase = getEventPhase({
         eventDate: invitation.eventDate,
         eventTime: invitation.eventTime,
         eventTimezone: invitation.eventTimezone,
     });
-    const completed = invitation.lifecycleStatus === "completed" || eventPhase === "completed";
-    const inProgress = !completed && eventPhase === "in_progress";
+    const completed = isPublished && (invitation.lifecycleStatus === "completed" || eventPhase === "completed");
+    const inProgress = isPublished && !completed && eventPhase === "in_progress";
 
-    const isPublished = invitation.status === "published";
     const isSample = invitation.id.startsWith("sample-");
     const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}&from=profile`;
     const previewHref = isSample
@@ -203,41 +202,6 @@ function InvitationRow({
         setIsEditing(true);
         router.push(editHref);
     };
-
-    async function handleDuplicate() {
-        setIsDuplicating(true);
-        try {
-            const res = await fetch(`/api/invitations/${invitation.id}/duplicate`, {
-                method: "POST"
-            });
-            if (!res.ok) throw new Error("Duplication failed");
-            const data = await res.json();
-            showToast("Invitation duplicated successfully!", "success");
-            router.push(`/builder?id=${data.id}`);
-        } catch {
-            showToast("Failed to duplicate invitation", "error");
-        } finally {
-            setIsDuplicating(false);
-        }
-    }
-
-    async function handleArchive() {
-        setIsArchiving(true);
-        try {
-            const res = await fetch(`/api/invitations/${invitation.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ lifecycleStatus: "archived" }),
-            });
-            if (!res.ok) throw new Error("Archival failed");
-            showToast("Invitation archived successfully", "success");
-            window.location.reload();
-        } catch {
-            showToast("Failed to archive invitation", "error");
-        } finally {
-            setIsArchiving(false);
-        }
-    }
 
     async function handleDeleteConfirm() {
         setIsDeleting(true);
@@ -347,42 +311,15 @@ function InvitationRow({
                     </div>
                 ) : null}
 
-                <div className="profileInviteActions">
-                    {completed ? (
+                <div className={`profileInviteActions ${completed || inProgress ? "profileInviteActions--completed" : ""
+                    }`}>
+                    {completed || inProgress ? (
                         <>
                             <a href={previewHref} target="_blank" rel="noreferrer" className="btnPreview">
                                 <Eye size={14} aria-hidden="true" />
                                 <span>View</span>
                             </a>
-                            <button
-                                type="button"
-                                className="btnDuplicate"
-                                onClick={handleDuplicate}
-                                disabled={isDuplicating}
-                                style={{
-                                    background: "#f1f5f9",
-                                    color: "#334155",
-                                    border: "1px solid #e2e8f0"
-                                }}
-                            >
-                                {isDuplicating ? <Loader2 size={14} className="spinner" aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                                <span>{isDuplicating ? "Cloning..." : "Duplicate"}</span>
-                            </button>
-                            <button
-                                type="button"
-                                className="btnArchive"
-                                onClick={handleArchive}
-                                disabled={isArchiving}
-                                style={{
-                                    background: "#f1f5f9",
-                                    color: "#334155",
-                                    border: "1px solid #e2e8f0"
-                                }}
-                            >
-                                {isArchiving ? <Loader2 size={14} className="spinner" aria-hidden="true" /> : <Archive size={14} aria-hidden="true" />}
-                                <span>{isArchiving ? "Archiving..." : "Archive"}</span>
-                            </button>
-                            <Link href={`/builder?id=${invitation.id}&tab=rsvps`} className="btnAnalytics">
+                            <Link href={""} className="btnAnalytics">
                                 <UsersRound size={14} aria-hidden="true" />
                                 <span>Analytics</span>
                             </Link>
@@ -420,7 +357,7 @@ function InvitationRow({
                             </button>
                         </>
                     )}
-                    {isSample ? null : (
+                    {isSample || completed || inProgress ? null : (
                         <>
                             <button
                                 type="button"

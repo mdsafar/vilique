@@ -258,14 +258,7 @@ export default function PastelFloralWedding({
     }
 
     return (
-        <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""} ${completed ? "eventCompleted" : ""}`}>
-            {completed && (
-                <div className="invitationCompletedOverlay">
-                    <span className="invitationCompletedBadge">
-                        Event Completed
-                    </span>
-                </div>
-            )}
+        <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""}`}>
             {songUrl ? <audio ref={songRef} src={songUrl} preload="auto" /> : null}
             {tickUrl ? <audio ref={tickRef} src={tickUrl} preload="auto" loop /> : null}
 
