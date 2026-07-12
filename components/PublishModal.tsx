@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket } from "lucide-react";
+import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket, CreditCard, ShieldCheck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { getPublicInvitationUrl } from "@/lib/config/site";
+import { useRazorpay } from "@/hooks/useRazorpay";
+import { formatPaiseToCurrency } from "@/lib/currency";
 import type { InvitationData } from "@/types/invitation";
 
 type Props = {
@@ -22,6 +24,14 @@ type PublishedInvitationResult = {
 
 type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
+interface PaymentInfo {
+    isFree: boolean;
+    pricePaise: number;
+    currency: string;
+    alreadyPaid: boolean;
+    templateName: string;
+}
+
 export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess }: Props) {
     const [slug, setSlug] = useState(invitation.slug);
     const [status, setStatus] = useState<SlugStatus>("idle");
@@ -30,6 +40,20 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
     const [publishError, setPublishError] = useState("");
     const [copied, setCopied] = useState(false);
     const [isPublished, setIsPublished] = useState(invitation.status === "published");
+
+    // Razorpay payment integration states
+    const { loadScript } = useRazorpay();
+    const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+    const [loadingPaymentInfo, setLoadingPaymentInfo] = useState(true);
+    const [paymentError, setPaymentError] = useState("");
+    const [paymentProcessingState, setPaymentProcessingState] = useState<
+        | "idle"
+        | "creatingOrder"
+        | "openingCheckout"
+        | "verifyingPayment"
+        | "paymentSuccess"
+        | "failed"
+    >("idle");
 
     const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -59,7 +83,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         };
     }, [isOpen]);
 
-    // Reset slug when modal opens
+    // Reset fields and fetch payment status when modal opens
     useEffect(() => {
         if (!isOpen) return;
         const timeout = window.setTimeout(() => {
@@ -69,14 +93,33 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             setPublishError("");
             setCopied(false);
             setIsPublished(invitation.status === "published");
+            setPaymentProcessingState("idle");
+            setPaymentError("");
         }, 0);
 
+        setLoadingPaymentInfo(true);
+        fetch(`/api/payments/status?invitationId=${invitation.id}`)
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to load pricing information");
+                return res.json();
+            })
+            .then((data) => {
+                setPaymentInfo(data);
+            })
+            .catch((err) => {
+                console.error("Error loading payment status:", err);
+                setPaymentError("Could not retrieve pricing details. Please check your network connection.");
+            })
+            .finally(() => {
+                setLoadingPaymentInfo(false);
+            });
+
         return () => window.clearTimeout(timeout);
-    }, [isOpen, invitation.slug, invitation.status]);
+    }, [isOpen, invitation.id, invitation.slug, invitation.status]);
 
     // Validation check on slug change
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || isPublished) return;
         if (slug === invitation.slug) {
             const timeout = window.setTimeout(() => {
                 setStatus("idle");
@@ -136,7 +179,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             window.clearTimeout(statusTimeout);
             if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
         };
-    }, [slug, invitation.slug, invitation.id, isOpen]);
+    }, [slug, invitation.slug, invitation.id, isOpen, isPublished]);
 
     if (typeof document === "undefined") return null;
 
@@ -150,13 +193,165 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
 
     const hasValidationErrors = validationErrors.length > 0;
     const isSlugTakenOrInvalid = slug !== invitation.slug && (status === "taken" || status === "invalid");
-    const canPublish = !hasValidationErrors && !isSlugTakenOrInvalid && !isPublishing;
+    
+    // Can trigger publication or checkout if details are complete and state is ready
+    const isBusy = isPublishing || loadingPaymentInfo || paymentProcessingState !== "idle";
+    const canPublishOrPay = !hasValidationErrors && !isSlugTakenOrInvalid && !isBusy;
 
     const currentSlug = isPublished ? invitation.slug : slug;
     const publicUrl = getPublicInvitationUrl(currentSlug);
 
+    // Triggers Razorpay Checkout & verification
+    async function handlePaymentAndPublish() {
+        if (!canPublishOrPay || !paymentInfo) return;
+        setPublishError("");
+        setPaymentError("");
+
+        // 1. If it is already paid or template is free, publish directly
+        if (paymentInfo.alreadyPaid || paymentInfo.isFree) {
+            handlePublish();
+            return;
+        }
+
+        // 2. Otherwise, initiate Razorpay order
+        setPaymentProcessingState("creatingOrder");
+        try {
+            const orderRes = await fetch("/api/payments/razorpay/order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ invitationId: invitation.id }),
+            });
+
+            const orderData = await orderRes.json();
+            if (!orderRes.ok) {
+                throw new Error(orderData.error || "Failed to initialize payment order");
+            }
+
+            if (orderData.status === "alreadyPaid") {
+                setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
+                handlePublish();
+                return;
+            }
+
+            if (orderData.status === "freePublish") {
+                setPaymentInfo(prev => prev ? { ...prev, isFree: true } : null);
+                handlePublish();
+                return;
+            }
+
+            // 3. Load Razorpay Checkout Script
+            setPaymentProcessingState("openingCheckout");
+            const isScriptLoaded = await loadScript();
+            if (!isScriptLoaded) {
+                throw new Error("Unable to load payment portal script. Please check your connection.");
+            }
+
+            // 4. Initialize Razorpay Checkout Modal
+            const options = {
+                key: orderData.keyId,
+                amount: orderData.amount,
+                currency: orderData.currency,
+                name: orderData.name,
+                description: orderData.description,
+                order_id: orderData.orderId,
+                handler: async function (response: any) {
+                    setPaymentProcessingState("verifyingPayment");
+                    try {
+                        const verifyRes = await fetch("/api/payments/razorpay/verify", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                invitationId: invitation.id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                slug: slug.toLowerCase().trim(),
+                            }),
+                        });
+
+                        const verifyData = await verifyRes.json();
+                        
+                        if (verifyRes.ok && verifyData.status === "success") {
+                            setPaymentProcessingState("paymentSuccess");
+                            setIsPublished(true);
+                            setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
+                            onPublishSuccess({
+                                slug: verifyData.slug,
+                                status: "published",
+                                published_at: new Date().toISOString(),
+                            });
+                        } else if (verifyData.status === "paymentPaidPublishFailed") {
+                            // Payment processed but publishing failed (e.g. slug collision).
+                            // User is now marked as already paid so they can choose a new slug and retry publishing.
+                            setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
+                            setPaymentProcessingState("idle");
+                            setPublishError(verifyData.message || verifyData.error);
+                        } else {
+                            throw new Error(verifyData.error || "Payment verification failed");
+                        }
+                    } catch (verifyErr: any) {
+                        console.error(verifyErr);
+                        setPaymentProcessingState("failed");
+                        setPaymentError(verifyErr.message || "Failed to verify transaction. Please contact support.");
+                    }
+                },
+                modal: {
+                    ondismiss: function () {
+                        setPaymentProcessingState("idle");
+                    },
+                },
+                prefill: {
+                    contact: invitation.phone || undefined,
+                },
+                theme: {
+                    color: invitation.theme?.primaryColor || "#b99aad",
+                },
+                config: {
+                    display: {
+                        blocks: {
+                            banks: {
+                                name: "All Payment Options",
+                                instruments: [
+                                    {
+                                        method: "upi",
+                                    },
+                                    {
+                                        method: "card",
+                                    },
+                                    {
+                                        method: "netbanking",
+                                    },
+                                    {
+                                        method: "wallet",
+                                    },
+                                ],
+                            },
+                        },
+                        sequence: ["block.banks"],
+                        preferences: {
+                            show_default_blocks: false,
+                        },
+                    },
+                },
+            };
+
+            const rzp = new (window as any).Razorpay(options);
+            rzp.on("payment.failed", function (response: any) {
+                console.error("Payment failure callback:", response.error);
+                setPaymentProcessingState("failed");
+                setPaymentError(response.error.description || "Payment failed. Please try again.");
+            });
+            rzp.open();
+        } catch (err: any) {
+            console.error(err);
+            setPaymentProcessingState("idle");
+            setPaymentError(err.message || "Failed to initiate payment");
+        }
+    }
+
+    // Traditional publishing for free templates or already-paid invitations
     async function handlePublish() {
-        if (!canPublish) return;
+        if (!canPublishOrPay) return;
         setIsPublishing(true);
         setPublishError("");
 
@@ -183,6 +378,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         }
     }
 
+    // Handles unpublishing back to draft status
     async function handleUnpublish() {
         setIsPublishing(true);
         setPublishError("");
@@ -266,7 +462,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                     {isPublished ? "Share your link with guests!" : "Set your URL and go live."}
                                 </p>
                             </div>
-                            <button className="publishModalClose" onClick={onClose} aria-label="Close">
+                            <button className="publishModalClose" onClick={onClose} aria-label="Close" disabled={isBusy}>
                                 <X size={18} />
                             </button>
                         </div>
@@ -280,7 +476,19 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                 </div>
                             )}
 
-                            {!isPublished ? (
+                            {paymentError && (
+                                <div className="publishModalError">
+                                    <AlertTriangle size={15} />
+                                    <span>{paymentError}</span>
+                                </div>
+                            )}
+
+                            {loadingPaymentInfo ? (
+                                <div className="publishModalLoadingState">
+                                    <Loader2 className="spinner" size={24} />
+                                    <p>Loading price specifications...</p>
+                                </div>
+                            ) : !isPublished ? (
                                 <>
                                     {hasValidationErrors && (
                                         <div className="publishModalValidation">
@@ -293,6 +501,49 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                         </div>
                                     )}
 
+                                    {/* Pricing & Premium Template details card */}
+                                    {paymentInfo && (
+                                        <div className="publishTemplateSummary">
+                                            <div className="summaryHeader">
+                                                <span className="templateNameLabel">Template:</span>
+                                                <span className="templateNameVal">{paymentInfo.templateName || "Premium Design"}</span>
+                                            </div>
+
+                                            <div className="pricingDetailBlock">
+                                                {paymentInfo.alreadyPaid ? (
+                                                    <div className="alreadyPaidStatusTag">
+                                                        <ShieldCheck size={16} />
+                                                        <span>Template already paid</span>
+                                                    </div>
+                                                ) : paymentInfo.isFree ? (
+                                                    <div className="freePricingLabel">
+                                                        <span>Publishing Price: </span>
+                                                        <strong>Free Template</strong>
+                                                    </div>
+                                                ) : (
+                                                    <div className="premiumPricingLabel">
+                                                        <span>Publishing Price: </span>
+                                                        <strong>{formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}</strong>
+                                                        <span className="oneTimeText">(One-time fee)</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {!paymentInfo.isFree && !paymentInfo.alreadyPaid && (
+                                                <div className="includedFeaturesList">
+                                                    <p className="featuresTitle">Included with Premium:</p>
+                                                    <ul>
+                                                        <li>✓ Customizable URL slug</li>
+                                                        <li>✓ Sound Effects & Background Music</li>
+                                                        <li>✓ Interactive Maps Navigation</li>
+                                                        <li>✓ RSVP Manager & Guest Wishes</li>
+                                                        <li>✓ Fast mobile loading speeds</li>
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="publishModalSlugForm">
                                         <label>
                                             <span>Your public link</span>
@@ -301,8 +552,9 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                 <input
                                                     type="text"
                                                     value={slug}
-                                                    readOnly
-                                                    tabIndex={-1}
+                                                    onChange={(e) => setSlug(e.target.value)}
+                                                    disabled={isBusy}
+                                                    placeholder="e.g. maya-arjun"
                                                 />
                                                 {status === "checking" && <Loader2 className="spinner slugStatusIcon" size={16} />}
                                                 {status === "available" && <Check className="slugStatusIcon available" size={16} />}
@@ -322,24 +574,51 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                         <button
                                             className="publishBtnCancel"
                                             onClick={onClose}
-                                            disabled={isPublishing}
+                                            disabled={isBusy}
                                         >
                                             Cancel
                                         </button>
-                                        <button
-                                            className="publishBtnPrimary"
-                                            onClick={handlePublish}
-                                            disabled={!canPublish}
-                                        >
-                                            {isPublishing
-                                                ? <><Loader2 size={16} className="spinner" /> Publishing…</>
-                                                : <><Rocket size={16} /> Publish Now</>
-                                            }
-                                        </button>
+                                        
+                                        {paymentInfo?.isFree || paymentInfo?.alreadyPaid ? (
+                                            <button
+                                                className="publishBtnPrimary"
+                                                onClick={handlePublish}
+                                                disabled={!canPublishOrPay}
+                                            >
+                                                {isPublishing ? (
+                                                    <><Loader2 size={16} className="spinner" /> Publishing…</>
+                                                ) : (
+                                                    <><Rocket size={16} /> Publish Now</>
+                                                )}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                className="publishBtnPrimary payAndPublishBtn"
+                                                onClick={handlePaymentAndPublish}
+                                                disabled={!canPublishOrPay}
+                                            >
+                                                {paymentProcessingState === "creatingOrder" && (
+                                                    <><Loader2 size={16} className="spinner" /> Processing Order…</>
+                                                )}
+                                                {paymentProcessingState === "openingCheckout" && (
+                                                    <><Loader2 size={16} className="spinner" /> Opening Checkout…</>
+                                                )}
+                                                {paymentProcessingState === "verifyingPayment" && (
+                                                    <><Loader2 size={16} className="spinner" /> Verifying Payment…</>
+                                                )}
+                                                {paymentProcessingState === "idle" && (
+                                                    <><CreditCard size={16} /> {paymentInfo ? `Pay ${formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}` : "Pay"} & Publish</>
+                                                )}
+                                            </button>
+                                        )}
                                     </div>
                                 </>
-                            ) : (
+							) : (
                                 <div className="publishSuccessState">
+                                    <div className="publishSuccessBanner">
+                                        <p className="successSubtitle">Your invitation website is officially live. Share the public link with guests!</p>
+                                    </div>
+
                                     <div className="publishLinkCard">
                                         <span className="linkUrl">{publicUrl}</span>
                                         <button className="copyBtn" onClick={copyToClipboard}>
@@ -356,12 +635,12 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                             WhatsApp
                                         </a>
                                         <a className="publishBtnOpen" href={publicUrl} target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink size={15} /> Open
+                                            <ExternalLink size={15} /> Open Invitation
                                         </a>
                                     </div>
 
                                     <div className="unpublishZone">
-                                        <p>Need to make changes? Unpublish to make it private again.</p>
+                                        <p>Need to make changes? You can unpublish to return it to draft status, edit, and republish anytime for free.</p>
                                         <button className="unpublishBtn" onClick={handleUnpublish} disabled={isPublishing}>
                                             {isPublishing ? "Unpublishing…" : "Unpublish"}
                                         </button>

@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, UserRound } from "lucide-react";
+import { LayoutGrid, UserRound } from "lucide-react";
 
 export default function BottomNav() {
     const pathname = usePathname();
 
-    const hiddenRoutes = ["/builder", "/invite", "/templates/", "/login", "/signup"];
+    const hiddenRoutes = ["/builder", "/invite", "/templates/", "/login", "/signup", "/dashboard/payment-history"];
     const navItems = [
-        { href: "/", label: "Home", icon: Home, active: pathname === "/" },
-        { href: "/templates", label: "Templates", icon: LayoutGrid, active: pathname.startsWith("/templates") },
+        { href: "/templates", label: "Templates", icon: LayoutGrid, active: pathname === "/" || pathname.startsWith("/templates") },
         {
             href: "/profile",
             label: "Profile",

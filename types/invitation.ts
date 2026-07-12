@@ -54,4 +54,13 @@ export interface InvitationData {
 
     createdAt: string;
     updatedAt: string;
+
+    lifecycleStatus?: "draft" | "published" | "completed" | "archived" | "unpublished";
+    eventTimezone?: string;
+    changeRiskStatus?: "low" | "medium" | "high";
+    identitySnapshot?: any;
+    identityFingerprint?: string;
+    firstPublishedAt?: string;
+    completedAt?: string;
+    archivedAt?: string;
 }

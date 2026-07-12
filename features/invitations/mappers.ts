@@ -73,6 +73,14 @@ export function mapInvitationRow(row: InvitationRowWithTemplate): InvitationData
         publishedAt: row.published_at || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        lifecycleStatus: row.lifecycle_status,
+        eventTimezone: row.event_timezone,
+        changeRiskStatus: row.change_risk_status,
+        identitySnapshot: row.identity_snapshot,
+        identityFingerprint: row.identity_fingerprint || undefined,
+        firstPublishedAt: row.first_published_at || undefined,
+        completedAt: row.completed_at || undefined,
+        archivedAt: row.archived_at || undefined,
     };
 }
 
@@ -95,6 +103,8 @@ type InvitationUpdateInput = {
     galleryUrls?: string[];
     theme?: Record<string, unknown>;
     sections?: Record<string, unknown>;
+    lifecycleStatus?: "draft" | "published" | "completed" | "archived" | "unpublished";
+    eventTimezone?: string;
 };
 
 export function toInvitationUpdate(values: InvitationUpdateInput) {
@@ -117,6 +127,8 @@ export function toInvitationUpdate(values: InvitationUpdateInput) {
         gallery_urls: values.galleryUrls as Json | undefined,
         theme: values.theme as Json | undefined,
         sections: values.sections as Json | undefined,
+        lifecycle_status: values.lifecycleStatus,
+        event_timezone: values.eventTimezone,
         updated_at: new Date().toISOString(),
     };
 }

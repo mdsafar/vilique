@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, AlertTriangle } from "lucide-react";
+import { LogOut, AlertTriangle, History } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
@@ -61,15 +61,25 @@ export default function ProfileCard({ profile, activePublishedCount, initials, g
             </div>
 
             {profile && (
-                <button
-                    className="profileLogoutButton"
-                    onClick={() => setIsConfirmOpen(true)}
-                    title="Log out"
-                    type="button"
-                >
-                    <LogOut size={14} />
-                    <span>Log out</span>
-                </button>
+                <div className="profileHeaderButtons">
+                    <a
+                        href="/dashboard/payment-history"
+                        className="profileHistoryButton"
+                        title="Payment History"
+                    >
+                        <History size={14} />
+                        <span>Transactions</span>
+                    </a>
+                    <button
+                        className="profileLogoutButton"
+                        onClick={() => setIsConfirmOpen(true)}
+                        title="Log out"
+                        type="button"
+                    >
+                        <LogOut size={14} />
+                        <span>Log out</span>
+                    </button>
+                </div>
             )}
 
             {/* Pay-per-publish pricing widget inside the overview */}

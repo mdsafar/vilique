@@ -27,11 +27,10 @@ export default async function LoginPage({ searchParams }: Props) {
             {isModal ? <AuthBackdrop /> : null}
 
             <nav className="authNav" aria-label="Authentication navigation">
-                <Link href="/">
+                <Link href="/templates">
                     <AppLogo size={30} />
                 </Link>
                 <div>
-                    <Link href="/">Home</Link>
                     <Link href="/templates">Templates</Link>
                 </div>
             </nav>
@@ -67,7 +66,7 @@ export default async function LoginPage({ searchParams }: Props) {
 
                 <div className="authQuickLinks" aria-label="Quick links">
                     <Link href="/templates">Browse templates</Link>
-                    <Link href="/">Back home</Link>
+                    <Link href="/templates">Back to templates</Link>
                 </div>
             </section>
         </main>

@@ -26,7 +26,7 @@ export const templates: InvitationTemplate[] = [
         mood: "Elegant garden ceremony",
         badge: "Premium",
         popularity: "Featured",
-        features: ["Floating flowers", "Countdown", "RSVP", "Venue card"],
+        features: ["Floating flowers", "Countdown", "Music", "Venue actions"],
         palette: ["#b99aad", "#789988", "#f8f1fa", "#c7a45c"],
         previewSections: ["Accept screen", "Music", "Map", "WhatsApp"],
     },

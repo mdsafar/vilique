@@ -35,6 +35,8 @@ export const invitationUpdateSchema = z.object({
     galleryUrls: z.array(z.string().url()).optional(),
     theme: z.record(z.string(), z.unknown()).optional(),
     sections: z.record(z.string(), z.unknown()).optional(),
+    lifecycleStatus: z.enum(["draft", "published", "completed", "archived", "unpublished"]).optional(),
+    eventTimezone: z.string().max(80).optional(),
 });
 
 export const rsvpCreateSchema = z.object({

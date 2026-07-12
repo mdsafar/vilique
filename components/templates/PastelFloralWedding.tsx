@@ -6,6 +6,7 @@ import Image from "next/image";
 import { MapPinned, Phone } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
+import { isEventCompleted } from "@/lib/lifecycle";
 import { InvitationData } from "@/types/invitation";
 
 type Props = {
@@ -84,6 +85,14 @@ export default function PastelFloralWedding({
     );
 
     const countdown = useCountdown(eventDate);
+    const completed = useMemo(() => {
+        return invitation.lifecycleStatus === 'completed' || isEventCompleted({
+            eventDate: invitation.eventDate,
+            eventTime: invitation.eventTime,
+            eventTimezone: invitation.eventTimezone,
+        });
+    }, [invitation.lifecycleStatus, invitation.eventDate, invitation.eventTime, invitation.eventTimezone]);
+
     const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl || invitation.defaultMusicUrl) : null;
     const tickUrl = enableAudio ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
@@ -230,7 +239,14 @@ export default function PastelFloralWedding({
     }
 
     return (
-        <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""}`}>
+        <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""} ${completed ? "eventCompleted" : ""}`}>
+            {completed && (
+                <div className="invitationCompletedOverlay">
+                    <span className="invitationCompletedBadge">
+                        Event Completed
+                    </span>
+                </div>
+            )}
             {songUrl ? <audio ref={songRef} src={songUrl} preload="auto" /> : null}
             {tickUrl ? <audio ref={tickRef} src={tickUrl} preload="auto" loop /> : null}
 
@@ -252,6 +268,7 @@ export default function PastelFloralWedding({
                         isAccepting={isAccepting}
                         onAccept={handleAccept}
                         onDecline={handleDecline}
+                        completed={completed}
                     />
                 ) : (
                     <ThanksCard
@@ -259,6 +276,7 @@ export default function PastelFloralWedding({
                         eventParts={eventParts}
                         countdown={countdown}
                         onEvent={onEvent}
+                        completed={completed}
                     />
                 )}
             </div>
@@ -273,6 +291,7 @@ function InviteCard({
     isAccepting,
     onAccept,
     onDecline,
+    completed,
 }: {
     invitation: InvitationData;
     eventParts: ReturnType<typeof formatEventParts>;
@@ -280,9 +299,10 @@ function InviteCard({
     isAccepting: boolean;
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
     onDecline: () => void;
+    completed: boolean;
 }) {
     return (
-        <section className={`weddingCard inviteScreen active ${isAccepting ? "accepting" : ""}`}>
+        <section className={`weddingCard inviteScreen active ${isAccepting ? "accepting" : ""} ${completed ? "completed" : ""}`}>
             <CardDecor />
 
             <p className="weddingTopText">WEDDING INVITATION</p>
@@ -314,20 +334,31 @@ function InviteCard({
             </div>
 
             <div className="goldLine dividerHeart">❤</div>
-            <p className="countdownTitle">COUNTDOWN TO WEDDING</p>
-            <CountdownGrid countdown={countdown} />
+            <p className="countdownTitle">
+                {completed ? "EVENT COMPLETED" : "COUNTDOWN TO WEDDING"}
+            </p>
+            <CountdownGrid countdown={completed ? { days: "00", hours: "00", mins: "00", secs: "00" } : countdown} />
 
-            <p className="rsvpTitle">WILL YOU ATTEND?</p>
-            <div className="rsvpButtons">
-                <button className="rsvpAcceptBtn" onClick={onAccept}>
-                    <span>Accept</span>
-                    <b>♡</b>
-                </button>
-                <button className="rsvpDeclineBtn" onClick={onDecline}>
-                    <span>Decline</span>
-                    <b>♡</b>
-                </button>
-            </div>
+            {!completed ? (
+                <>
+                    <p className="rsvpTitle">WILL YOU ATTEND?</p>
+                    <div className="rsvpButtons">
+                        <button className="rsvpAcceptBtn" onClick={onAccept}>
+                            <span>Accept</span>
+                            <b>♡</b>
+                        </button>
+                        <button className="rsvpDeclineBtn" onClick={onDecline}>
+                            <span>Decline</span>
+                            <b>♡</b>
+                        </button>
+                    </div>
+                </>
+            ) : (
+                <div className="rsvpCompletedMsg">
+                    <p className="rsvpTitle">RSVP CLOSED</p>
+                    <p className="rsvpCompletedSubText">This event has concluded. Thank you!</p>
+                </div>
+            )}
             <WeddingBrandCredit />
         </section>
     );
@@ -338,14 +369,16 @@ function ThanksCard({
     eventParts,
     countdown,
     onEvent,
+    completed,
 }: {
     invitation: InvitationData;
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
     onEvent?: (eventType: AnalyticsEventType) => void;
+    completed: boolean;
 }) {
     return (
-        <section className="weddingCard thanksCard active">
+        <section className={`weddingCard thanksCard active ${completed ? "completed" : ""}`}>
             <CardDecor />
 
             <h1 className="thanksTitle">We Can&apos;t Wait!</h1>
@@ -385,8 +418,10 @@ function ThanksCard({
             ) : null}
 
             <div className="goldLine dividerHeart">❤</div>
-            <p className="countdownTitle">COUNTDOWN TO WEDDING</p>
-            <CountdownGrid countdown={countdown} />
+            <p className="countdownTitle">
+                {completed ? "EVENT COMPLETED" : "COUNTDOWN TO WEDDING"}
+            </p>
+            <CountdownGrid countdown={completed ? { days: "00", hours: "00", mins: "00", secs: "00" } : countdown} />
             <WeddingBrandCredit />
         </section>
     );

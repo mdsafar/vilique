@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
     CalendarDays,
@@ -16,10 +17,13 @@ import {
     ExternalLink,
     Copy,
     Check,
+    Archive,
+    Loader2,
 } from "lucide-react";
 import { deleteInvitation } from "@/app/(app)/profile/actions";
 import { InvitationData } from "@/types/invitation";
 import { getPublicInvitationUrl } from "@/lib/config/site";
+import { isEventCompleted } from "@/lib/lifecycle";
 import ConfirmModal from "./ConfirmModal";
 import { AlertTriangle } from "lucide-react";
 import { useToast } from "./Toast";
@@ -170,17 +174,68 @@ function InvitationRow({
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
+    const [isDuplicating, setIsDuplicating] = useState(false);
+    const [isArchiving, setIsArchiving] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const router = useRouter();
     const { showToast } = useToast();
+
+
+    const completed = invitation.lifecycleStatus === "completed" || isEventCompleted({
+        eventDate: invitation.eventDate,
+        eventTime: invitation.eventTime,
+        eventTimezone: invitation.eventTimezone,
+    });
 
     const isPublished = invitation.status === "published";
     const isSample = invitation.id.startsWith("sample-");
-    const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}`;
+    const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}&from=profile`;
     const previewHref = isSample
         ? "/templates"
         : isPublished
             ? `/i/${invitation.slug}`
             : `/builder/preview?id=${invitation.id}`;
     const publicUrl = getPublicInvitationUrl(invitation.slug);
+
+    const handleEdit = () => {
+        setIsEditing(true);
+        router.push(editHref);
+    };
+
+    async function handleDuplicate() {
+        setIsDuplicating(true);
+        try {
+            const res = await fetch(`/api/invitations/${invitation.id}/duplicate`, {
+                method: "POST"
+            });
+            if (!res.ok) throw new Error("Duplication failed");
+            const data = await res.json();
+            showToast("Invitation duplicated successfully!", "success");
+            router.push(`/builder?id=${data.id}`);
+        } catch (e) {
+            showToast("Failed to duplicate invitation", "error");
+        } finally {
+            setIsDuplicating(false);
+        }
+    }
+
+    async function handleArchive() {
+        setIsArchiving(true);
+        try {
+            const res = await fetch(`/api/invitations/${invitation.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lifecycleStatus: "archived" }),
+            });
+            if (!res.ok) throw new Error("Archival failed");
+            showToast("Invitation archived successfully", "success");
+            window.location.reload();
+        } catch {
+            showToast("Failed to archive invitation", "error");
+        } finally {
+            setIsArchiving(false);
+        }
+    }
 
     async function handleDeleteConfirm() {
         setIsDeleting(true);
@@ -232,10 +287,16 @@ function InvitationRow({
 
             <div className="profileInviteInfo">
                 <div className="profileInviteHeader">
-                    <span className={`profileStatus ${isPublished ? "published" : "draft"}`}>
-                        <span className="pulseDot" />
-                        {isPublished ? "Published" : "Draft"}
-                    </span>
+                    {completed ? (
+                        <span className="profileStatus completed">
+                            Event Completed
+                        </span>
+                    ) : (
+                        <span className={`profileStatus ${isPublished ? "published" : "draft"}`}>
+                            <span className="pulseDot" />
+                            {isPublished ? "Published" : "Draft"}
+                        </span>
+                    )}
                     {isSample && <span className="sampleLabel">Sample Template</span>}
                 </div>
 
@@ -280,14 +341,78 @@ function InvitationRow({
                 ) : null}
 
                 <div className="profileInviteActions">
-                    <Link href={previewHref} className="btnPreview">
-                        <Eye size={14} aria-hidden="true" />
-                        <span>{isPublished ? "View invitation" : "Preview"}</span>
-                    </Link>
-                    <Link href={editHref} className="btnEdit">
-                        <PencilLine size={14} aria-hidden="true" />
-                        <span>Edit</span>
-                    </Link>
+                    {completed ? (
+                        <>
+                            <a href={previewHref} target="_blank" rel="noreferrer" className="btnPreview">
+                                <Eye size={14} aria-hidden="true" />
+                                <span>View</span>
+                            </a>
+                            <button
+                                type="button"
+                                className="btnDuplicate"
+                                onClick={handleDuplicate}
+                                disabled={isDuplicating}
+                                style={{
+                                    background: "#f1f5f9",
+                                    color: "#334155",
+                                    border: "1px solid #e2e8f0"
+                                }}
+                            >
+                                {isDuplicating ? <Loader2 size={14} className="spinner" aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                                <span>{isDuplicating ? "Cloning..." : "Duplicate"}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="btnArchive"
+                                onClick={handleArchive}
+                                disabled={isArchiving}
+                                style={{
+                                    background: "#f1f5f9",
+                                    color: "#334155",
+                                    border: "1px solid #e2e8f0"
+                                }}
+                            >
+                                {isArchiving ? <Loader2 size={14} className="spinner" aria-hidden="true" /> : <Archive size={14} aria-hidden="true" />}
+                                <span>{isArchiving ? "Archiving..." : "Archive"}</span>
+                            </button>
+                            <Link href={`/builder?id=${invitation.id}&tab=rsvps`} className="btnAnalytics">
+                                <UsersRound size={14} aria-hidden="true" />
+                                <span>Analytics</span>
+                            </Link>
+                        </>
+                    ) : (
+                        <>
+                            <Link href={previewHref} className="btnPreview">
+                                <Eye size={14} aria-hidden="true" />
+                                <span>{isPublished ? "View invitation" : "Preview"}</span>
+                            </Link>
+                            <button
+                                type="button"
+                                className="btnEdit"
+                                onClick={handleEdit}
+                                disabled={isEditing}
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "6px",
+                                    cursor: isEditing ? "not-allowed" : "pointer"
+                                }}
+                            >
+                                {isEditing ? (
+                                    <>
+                                        <Loader2 size={14} className="spinner" aria-hidden="true" />
+                                        <span>Editing...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <PencilLine size={14} aria-hidden="true" />
+                                        <span>Edit</span>
+                                    </>
+                                )}
+                            </button>
+                        </>
+                    )}
                     {isSample ? null : (
                         <>
                             <button

@@ -19,6 +19,7 @@ import {
     Wand2,
 } from "lucide-react";
 import TemplateDetailPreview from "@/components/templates/TemplateDetailPreview";
+import UseTemplateButton from "@/components/UseTemplateButton";
 import { getActiveTemplates } from "@/features/invitations/data";
 import { InvitationCategory } from "@/types/invitation";
 
@@ -129,13 +130,7 @@ export default async function TemplateDetailsPage({ params }: Props) {
                     </div>
 
                     <div className="heroActions detailActions">
-                        <Link
-                            className="primaryBtn"
-                            href={`/builder?template=${template.id}`}
-                        >
-                            <Sparkles size={17} aria-hidden="true" />
-                            Use Template
-                        </Link>
+                        <UseTemplateButton templateId={template.id} />
 
                         <Link className="secondaryBtn" href={`/templates/${template.id}/preview`}>
                             <Eye size={17} aria-hidden="true" />

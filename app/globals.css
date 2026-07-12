@@ -58,6 +58,55 @@ a {
   display: inline-block;
 }
 
+.skeletonBase {
+  display: block;
+  max-width: 100%;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0)),
+    rgba(37, 22, 53, 0.07);
+  background-size: 220% 100%;
+  animation: skeletonShimmer 1.7s ease-in-out infinite;
+}
+
+.skeletonRoundedSm { border-radius: 6px; }
+.skeletonRoundedMd { border-radius: 10px; }
+.skeletonRoundedLg { border-radius: 14px; }
+.skeletonRoundedXl { border-radius: 20px; }
+.skeletonRoundedFull { border-radius: 999px; }
+
+.templateSkeletonPreview {
+  min-height: 220px;
+  width: 100%;
+}
+
+.publicInviteSkeletonCard {
+  min-height: 720px;
+  justify-content: flex-start;
+  gap: 22px;
+}
+
+.loadingButton {
+  position: relative;
+}
+
+.loadingButton > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 160% 0; }
+  100% { background-position: -60% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBase {
+    animation: none;
+  }
+}
+
 .homeHeroLogo {
   margin-bottom: 22px;
   font-size: 18px;
@@ -403,7 +452,6 @@ p {
 .primaryBtn,
 .secondaryBtn,
 .smallBtn,
-.templateInfo a,
 .card a {
   min-height: 48px;
   padding: 0 24px;
@@ -458,6 +506,23 @@ p {
 .templatesPage {
   max-width: 1600px;
   padding-inline: 16px;
+}
+
+.templatesAppHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0 0 4px;
+}
+
+.templatesBrand {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  color: #251635;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
 }
 
 /* Glassmorphism Marketplace Banner */
@@ -730,6 +795,7 @@ p {
   border: 1px solid #e5e7eb;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.01), 0 8px 20px rgba(74, 53, 92, 0.02);
   min-width: 0;
+  position: relative;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -740,6 +806,17 @@ p {
   box-shadow: 
     0 16px 36px rgba(74, 53, 92, 0.08),
     0 2px 10px rgba(126, 91, 213, 0.04);
+}
+
+.templateCardLink {
+  color: inherit;
+  display: block;
+  height: 100%;
+}
+
+.templateCardLink:focus-visible {
+  outline: 3px solid rgba(126, 91, 213, 0.28);
+  outline-offset: -3px;
 }
 
 /* absolute-overlay save button container */
@@ -970,8 +1047,6 @@ p {
 
 .templateInfo {
   padding: 12px;
-  display: grid;
-  gap: 8px;
   min-width: 0;
 }
 
@@ -1011,62 +1086,32 @@ p {
   text-overflow: ellipsis;
 }
 
+.templateFeatureChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.templateFeatureChips span {
+  min-height: 22px;
+  border-radius: 4px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  background: #f5f1fb;
+  color: #6d5d78;
+  font-size: 9.5px;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .templateText p,
 .templateText span,
 .templatePreviewGlass span,
 .detailPreviewStack i {
   overflow-wrap: anywhere;
-}
-
-.templateFooter {
-  border-top: 1px solid #f3f4f6;
-  padding-top: 10px;
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.templateFooter a {
-  background: #111827;
-  color: #fff;
-  border: none;
-  min-height: 28px;
-  padding: 0 12px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font-weight: 700;
-  font-size: 10.5px;
-  transition: all 0.2s ease;
-  width: auto;
-  box-shadow: none;
-}
-
-.templateFooter a:hover {
-  background: #1f2937;
-  transform: translateY(-1px);
-}
-
-.paletteDots {
-  display: flex;
-  align-items: center;
-}
-
-.paletteDots i {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  margin-left: -5px;
-}
-
-.paletteDots i:first-child {
-  margin-left: 0;
 }
 
 .templateMiniSections {
@@ -1421,19 +1466,23 @@ p {
 
 .bottomNav {
   position: fixed;
-  left: 12px;
-  right: 12px;
+  left: 50%;
+  right: auto;
   bottom: var(--bottom-nav-offset);
   z-index: 50;
+  width: min(430px, calc(100% - 24px));
+  padding: 6px;
+  transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(18px);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 999px;
   min-height: var(--bottom-nav-height);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14);
+  box-sizing: border-box;
 }
 
 .bottomNav a {
@@ -1441,7 +1490,7 @@ p {
   align-items: center;
   justify-content: center;
   min-height: 50px;
-  margin: 0 6px;
+  gap: 8px;
   border-radius: 999px;
   font-weight: 800;
   font-size: 14px;
@@ -2460,11 +2509,11 @@ p {
 }
 
 .bottomNav {
-  left: 12px;
-  right: 12px;
-  width: auto;
+  left: 50%;
+  right: auto;
+  width: min(430px, calc(100% - 24px));
   min-height: 64px;
-  transform: none;
+  transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14);
@@ -6637,7 +6686,6 @@ p {
   .primaryBtn,
   .secondaryBtn,
   .smallBtn,
-  .templateInfo a,
   .card a,
   .marketHeroStrip a,
   .dashboardActions a,
@@ -6804,6 +6852,16 @@ p {
     border-radius: 20px;
     padding: 18px 16px 20px;
     margin: 0 0 10px;
+  }
+
+  .templatesAppHeader {
+    margin-bottom: 10px;
+  }
+
+  .templatesBrand {
+    min-height: 42px;
+    gap: 10px;
+    font-size: 18px;
   }
 
   .marketHeroPanel::before {
@@ -7019,13 +7077,8 @@ p {
 
   .templateInfo {
     padding: 8px;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
-  }
-
-  .templateMetaRow,
-  .templateFooter {
-    gap: 6px;
   }
 
   .templateMetaRow {
@@ -7066,26 +7119,15 @@ p {
     text-overflow: ellipsis;
   }
 
-  .templateFooter a {
-    min-height: 24px;
-    padding-inline: 8px;
-    font-size: 9.5px;
-    background: #111827;
-    color: #fff;
-    border: none;
-    box-shadow: none;
-    border-radius: 5px;
+  .templateFeatureChips {
+    gap: 4px;
+    margin-top: 5px;
   }
 
-  .templateFooter a svg {
-    width: 10px;
-    height: 10px;
-  }
-
-  .paletteDots i {
-    width: 11px;
-    height: 11px;
-    border-width: 1px;
+  .templateFeatureChips span {
+    min-height: 19px;
+    padding-inline: 6px;
+    font-size: 8px;
   }
 
   .dashboardHero {
@@ -7269,8 +7311,10 @@ p {
   }
 
   .bottomNav {
-    left: 10px;
-    right: 10px;
+    left: 50%;
+    right: auto;
+    width: min(390px, calc(100% - 20px));
+    transform: translateX(-50%);
     min-height: 58px;
   }
 
@@ -7305,11 +7349,6 @@ p {
 
   .templateText h2 {
     font-size: 18px;
-  }
-
-  .templateFooter {
-    align-items: center;
-    justify-content: space-between;
   }
 
   .dashboardActions {
@@ -8868,6 +8907,27 @@ body:has(.publicInvitationWrapper) {
     align-items: flex-start;
   }
 
+  .profileHeaderButtons {
+    position: relative !important;
+    top: unset !important;
+    right: unset !important;
+    margin-top: -8px;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .profileHistoryButton span,
+  .profileLogoutButton span {
+    display: inline;
+  }
+
+  .profileHistoryButton,
+  .profileLogoutButton {
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
   .profileAvatar {
     width: 50px;
     height: 50px;
@@ -8943,11 +9003,11 @@ body:has(.publicInvitationWrapper) {
   }
 
   .bottomNav {
-    left: 10px;
-    right: 10px;
-    width: auto;
+    left: 50%;
+    right: auto;
+    width: min(390px, calc(100% - 20px));
     min-height: var(--bottom-nav-height);
-    transform: none;
+    transform: translateX(-50%);
   }
 
   .bottomNav a {
@@ -9195,9 +9255,13 @@ body:has(.publicInvitationWrapper) {
   color: #5c5070;
   font-weight: 600;
   min-width: 0;
+  background: transparent;
+  cursor: text;
+}
+
+.slugInputWrapper input:disabled {
   background: #f7f5fa;
-  cursor: default;
-  user-select: all;
+  cursor: not-allowed;
 }
 
 .slugStatusIcon {
@@ -9507,10 +9571,15 @@ body:has(.publicInvitationWrapper) {
   position: relative;
 }
 
-.profileLogoutButton {
+.profileHeaderButtons {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.profileLogoutButton {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -9529,6 +9598,29 @@ body:has(.publicInvitationWrapper) {
 .profileLogoutButton:hover {
   background: rgba(220, 38, 38, 0.1);
   border-color: rgba(220, 38, 38, 0.2);
+  transform: translateY(-1px);
+}
+
+.profileHistoryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(140, 76, 243, 0.05);
+  border: 1px solid rgba(140, 76, 243, 0.1);
+  border-radius: 10px;
+  color: #8c4cf3;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: unset;
+  text-decoration: none;
+}
+
+.profileHistoryButton:hover {
+  background: rgba(140, 76, 243, 0.1);
+  border-color: rgba(140, 76, 243, 0.2);
   transform: translateY(-1px);
 }
 
@@ -9787,3 +9879,747 @@ body:has(.publicInvitationWrapper) {
     zoom: 1.06;
   }
 }
+
+@media (max-width: 767px) {
+  .templateGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .templateCard {
+    display: block;
+    border-radius: 16px;
+  }
+
+  .templateCardLink {
+    display: block;
+  }
+
+  .templatePreviewContainer {
+    height: 100px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .templatePreview {
+    height: 100%;
+    min-height: auto;
+    padding: 12px;
+  }
+
+  .templateInfo {
+    display: block;
+    padding: 14px;
+  }
+
+  .templateText {
+    gap: 4px;
+  }
+
+  .templatePopularity {
+    font-size: 9px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.03em;
+  }
+
+  .templateText h2 {
+    font-size: 17px;
+    line-height: 1.18;
+    margin-top: 2px;
+    white-space: normal;
+  }
+
+  .templateMood {
+    font-size: 13px;
+    line-height: 1.35;
+    margin-top: 1px;
+    white-space: normal;
+  }
+
+  .templateFeatureChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .templateFeatureChips span {
+    min-height: 24px;
+    padding-inline: 9px;
+    font-size: 10px;
+    border-radius: 4px;
+  }
+}
+
+/* Razorpay Payment modal styles in PublishModal */
+.publishModalLoadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  gap: 12px;
+  color: #7c6f8a;
+  font-size: 14px;
+}
+
+.publishTemplateSummary {
+  background: #fdfbff;
+  border: 1px solid rgba(140, 76, 243, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.templateNameLabel {
+  color: #7c6f8a;
+  font-weight: 500;
+}
+
+.templateNameVal {
+  color: #1f1235;
+  font-weight: 700;
+}
+
+.pricingDetailBlock {
+  border-top: 1px dashed rgba(140, 76, 243, 0.12);
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.freePricingLabel {
+  font-size: 14px;
+  color: #5c5070;
+}
+
+.freePricingLabel strong {
+  color: #16a34a;
+  font-weight: 800;
+  font-size: 15px;
+  margin-left: 4px;
+}
+
+.premiumPricingLabel {
+  font-size: 14px;
+  color: #5c5070;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.premiumPricingLabel strong {
+  color: #8c4cf3;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.premiumPricingLabel .oneTimeText {
+  font-size: 11px;
+  color: #9b8ab0;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.alreadyPaidStatusTag {
+  background: #f0fdf4;
+  border: 1px solid rgba(22, 163, 74, 0.15);
+  color: #16a34a;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.includedFeaturesList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.includedFeaturesList .featuresTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #9b8ab0;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.includedFeaturesList ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.includedFeaturesList li {
+  font-size: 12px;
+  color: #5c5070;
+  font-weight: 600;
+}
+
+.payAndPublishBtn {
+  background: linear-gradient(135deg, #8c4cf3 0%, #7030d9 100%) !important;
+  box-shadow: 0 4px 14px rgba(140, 76, 243, 0.35) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+.payAndPublishBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #995cff 0%, #7d3deb 100%) !important;
+  transform: translateY(-1px);
+}
+
+.publishSuccessBanner {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.publishSuccessBanner .successSubtitle {
+  font-size: 13px;
+  color: #7c6f8a;
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .publishModalPanel {
+    width: 100%;
+    margin-top: auto;
+    border-radius: 24px 24px 0 0;
+    max-height: 92vh;
+  }
+  
+  .publishModalOverlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+}
+
+/* Payments / Transaction History page styles */
+.paymentsPage {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.backToDashboardBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(140, 76, 243, 0.13);
+  color: #6b4fa8;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 5px 11px 5px 8px;
+  border-radius: 999px;
+  width: fit-content;
+  transition: background 0.18s, box-shadow 0.18s, color 0.18s;
+  box-shadow: 0 1px 6px rgba(140, 76, 243, 0.07);
+  letter-spacing: 0.01em;
+}
+
+.backToDashboardBtn:hover {
+  background: rgba(140, 76, 243, 0.07);
+  color: #5a30a0;
+  box-shadow: 0 3px 10px rgba(140, 76, 243, 0.12);
+}
+
+.paymentsHeader {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255,255,255,0.95), transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(140, 76, 243, 0.07), transparent 40%),
+    linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(248,244,255,0.92) 50%, rgba(243,248,255,0.9) 100%);
+  border: 1px solid rgba(225, 213, 232, 0.7);
+  border-radius: 20px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 30px rgba(31, 18, 53, 0.04), 0 1px 0 rgba(255,255,255,0.8) inset;
+}
+
+.paymentsHeader::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 76, 243, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.paymentsHeaderBody {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.paymentsHeaderIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #8c4cf3, #6d39cf);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex: 0 0 auto;
+  box-shadow: 0 8px 20px rgba(140, 76, 243, 0.28);
+}
+
+.paymentsHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.paymentsHeader h1 {
+  font-size: 21px;
+  font-weight: 800;
+  color: #1f1235;
+  margin: 0;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.paymentsHeader p {
+  font-size: 13px;
+  color: #8c7aa8;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.paymentsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.paymentsErrorCard {
+  background: #fdf2f2;
+  border: 1.5px solid rgba(220, 38, 38, 0.18);
+  border-radius: 16px;
+  padding: 16px;
+  color: #c81e1e;
+  font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.paymentsErrorCard strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.paymentsErrorCard p {
+  margin: 0;
+  color: #9b5a5a;
+}
+
+.paymentsEmptyState {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(140, 76, 243, 0.04) 0%, transparent 60%),
+    #fff;
+  border: 1.5px dashed rgba(140, 76, 243, 0.18);
+  border-radius: 24px;
+  padding: 56px 24px 48px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.paymentsEmptyState .emptyIconWrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(140,76,243,0.08), rgba(109,57,207,0.04));
+  border: 1.5px solid rgba(140,76,243,0.12);
+  display: grid;
+  place-items: center;
+  color: #b89edf;
+  margin-bottom: 6px;
+}
+
+.paymentsEmptyState h2 {
+  font-size: 19px;
+  font-weight: 800;
+  color: #1f1235;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.paymentsEmptyState p {
+  font-size: 14px;
+  color: #8c7aa8;
+  max-width: 360px;
+  margin: 0 0 4px;
+  line-height: 1.6;
+}
+
+.emptyStateCTA {
+  background: linear-gradient(135deg, #8c4cf3, #6d39cf);
+  color: #fff;
+  padding: 11px 26px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.22s;
+  box-shadow: 0 6px 18px rgba(140, 76, 243, 0.28);
+  margin-top: 4px;
+}
+
+.emptyStateCTA:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(140, 76, 243, 0.34);
+}
+
+.paymentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.paymentRowCard {
+  background: #fff;
+  border: 1px solid rgba(225, 213, 232, 0.65);
+  border-radius: 18px;
+  box-shadow: 0 2px 12px rgba(31, 18, 53, 0.04), 0 1px 0 rgba(255,255,255,0.9) inset;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.paymentRowCard:hover {
+  box-shadow: 0 8px 28px rgba(31, 18, 53, 0.08);
+  transform: translateY(-1px);
+}
+
+.paymentRowMain {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid rgba(225, 213, 232, 0.3);
+}
+
+.paymentRowDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paymentTitleBlock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.paymentTitleBlock h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f1235;
+  margin: 0;
+}
+
+.paymentStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.paymentStatusBadge.paid {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.paymentStatusBadge.failed {
+  background: #fdf2f2;
+  color: #dc2626;
+}
+
+.paymentStatusBadge.cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.paymentStatusBadge.refunded {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.paymentStatusBadge.pending {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.paymentInvitationName {
+  font-size: 13px;
+  color: #7c6f8a;
+  margin: 0;
+}
+
+.paymentInvitationName strong {
+  color: #5c5070;
+}
+
+.paymentRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: #9b8ab0;
+  margin-top: 4px;
+}
+
+.paymentRowMeta > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paymentRefKey code {
+  background: #f7f5fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #5c5070;
+  font-size: 11px;
+}
+
+.paymentRowAmount {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.paymentRowAmount span {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1f1235;
+}
+
+.paymentRowAmount p {
+  font-size: 11px;
+  color: #9b8ab0;
+  margin: 0;
+  font-weight: 700;
+}
+
+.paymentRowFooter {
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fdfcff;
+  border-radius: 0 0 20px 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.paymentLinkAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #8c4cf3;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.paymentLinkAction:hover {
+  color: #7030d9;
+}
+
+.invoiceArchitectureLabel {
+  font-size: 11px;
+  color: #9b8ab0;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .paymentsPage {
+    padding: 20px 16px 48px;
+    gap: 16px;
+  }
+
+  .paymentsHeader {
+    padding: 20px;
+  }
+
+  .paymentsHeaderIcon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .paymentsHeader h1 {
+    font-size: 19px;
+  }
+  
+  .paymentRowMain {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .paymentRowAmount {
+    text-align: left;
+  }
+}
+
+/* Event Completion Lifecycle Overlays */
+.pastelWeddingPage.eventCompleted .weddingCard {
+  opacity: 0.68;
+  position: relative;
+  pointer-events: none;
+}
+
+.pastelWeddingPage.eventCompleted .weddingCard a,
+.pastelWeddingPage.eventCompleted .weddingCard button {
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+
+.invitationCompletedOverlay {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.invitationCompletedBadge {
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border-radius: 99px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.rsvpCompletedMsg {
+  text-align: center;
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(2px);
+}
+
+.rsvpCompletedMsg .rsvpTitle {
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.rsvpCompletedMsg .rsvpCompletedSubText {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.profileStatus.completed {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.profileInviteActions button.btnDuplicate,
+.profileInviteActions button.btnArchive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.profileInviteActions button.btnDuplicate:hover,
+.profileInviteActions button.btnArchive:hover {
+  background: #e2e8f0 !important;
+}
+
+.profileInviteActions .btnAnalytics {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1px solid #ffe4e6;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.profileInviteActions .btnAnalytics:hover {
+  background: #ffe4e6;
+}
+
+

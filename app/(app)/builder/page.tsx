@@ -22,6 +22,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import PublishModal from "@/components/PublishModal";
+import MajorChangeModal from "@/components/MajorChangeModal";
 import { useToast } from "@/components/Toast";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { templates } from "@/data/templates";
@@ -64,6 +65,7 @@ function BuilderContent() {
     const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
     const [saveState, setSaveState] = useState("Creating draft...");
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+    const [majorChangeError, setMajorChangeError] = useState<string | null>(null);
     const [leaveModalOpen, setLeaveModalOpen] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
@@ -76,10 +78,11 @@ function BuilderContent() {
     const isNewDraft = useRef(true);
     const initialInvitation = useRef<InvitationData | null>(null);
     const openedFromExistingInvitation = useRef(false);
+    const builderBackLabel = useRef("Templates");
+    const builderBackTarget = useRef("/templates");
     const currentBuilderPath = `/builder${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
     const isPersistedDraft = invitation.id !== "default-draft-placeholder-id";
     const isEditingPublished = openedFromExistingInvitation.current && invitation.status === "published";
-    const backTarget = openedFromExistingInvitation.current ? "/profile" : "/templates";
 
     useEffect(() => {
         if (!mobileEditorOpen) return;
@@ -177,9 +180,11 @@ function BuilderContent() {
 
                 if (typeof window !== "undefined") {
                     sessionStorage.setItem(`vilique-new-draft-${draft.id}`, "true");
+                    sessionStorage.setItem(`vilique-builder-back-target-${draft.id}`, builderBackTarget.current);
+                    sessionStorage.setItem(`vilique-builder-back-label-${draft.id}`, builderBackLabel.current);
                 }
                 setInvitation(nextInvitation);
-                router.replace(`/builder?id=${draft.id}`);
+                router.replace(`/builder?id=${draft.id}`, { scroll: false });
                 return nextInvitation;
             })
             .finally(() => {
@@ -200,6 +205,8 @@ function BuilderContent() {
                 isNewDraft.current = false;
                 if (typeof window !== "undefined") {
                     sessionStorage.removeItem(`vilique-new-draft-${source.id}`);
+                    sessionStorage.removeItem(`vilique-builder-back-target-${source.id}`);
+                    sessionStorage.removeItem(`vilique-builder-back-label-${source.id}`);
                 }
             }
             return source;
@@ -219,6 +226,8 @@ function BuilderContent() {
                 isNewDraft.current = false;
                 if (typeof window !== "undefined") {
                     sessionStorage.removeItem(`vilique-new-draft-${source.id}`);
+                    sessionStorage.removeItem(`vilique-builder-back-target-${source.id}`);
+                    sessionStorage.removeItem(`vilique-builder-back-label-${source.id}`);
                 }
             }
             initialInvitation.current = source;
@@ -252,12 +261,7 @@ function BuilderContent() {
     }
 
     function navigateBackToList() {
-        if (openedFromExistingInvitation.current && typeof window !== "undefined" && window.history.length > 1) {
-            router.back();
-            return;
-        }
-
-        router.push(backTarget);
+        router.replace(builderBackTarget.current);
     }
 
     async function saveAndPreview() {
@@ -383,13 +387,29 @@ function BuilderContent() {
         hasLoadedDraft.current = true;
 
         const existingId = searchParams.get("id");
-        openedFromExistingInvitation.current = !!existingId;
         const templateKey = searchParams.get("template") || "pastel-floral-wedding";
+        const openedFromProfile = searchParams.get("from") === "profile";
+        const openedFromTemplateDetails = searchParams.get("from") === "template-details";
 
-        const isSessionNewDraft = existingId && typeof window !== "undefined"
+        const isSessionNewDraft = !openedFromProfile && existingId && typeof window !== "undefined"
             ? sessionStorage.getItem(`vilique-new-draft-${existingId}`) === "true"
             : !existingId;
         isNewDraft.current = !!isSessionNewDraft;
+        openedFromExistingInvitation.current = openedFromProfile || (!!existingId && !isSessionNewDraft);
+
+        if (openedFromExistingInvitation.current) {
+            builderBackLabel.current = "Profile";
+            builderBackTarget.current = "/profile";
+        } else if (existingId && typeof window !== "undefined") {
+            builderBackLabel.current = sessionStorage.getItem(`vilique-builder-back-label-${existingId}`) || "Templates";
+            builderBackTarget.current = sessionStorage.getItem(`vilique-builder-back-target-${existingId}`) || "/templates";
+        } else if (openedFromTemplateDetails) {
+            builderBackLabel.current = "Templates";
+            builderBackTarget.current = `/templates/${templateKey}`;
+        } else {
+            builderBackLabel.current = "Templates";
+            builderBackTarget.current = "/templates";
+        }
 
         async function loadDraft() {
             if (existingId) {
@@ -443,7 +463,12 @@ function BuilderContent() {
             }
 
             const result = await response.json().catch(() => ({}));
-            setSaveState(result.error || "Save failed");
+            if (response.status === 409 && result.code === "MAJOR_CHANGE_DETECTED") {
+                setMajorChangeError(result.error || "A major change has been detected.");
+                setSaveState("Save blocked");
+            } else {
+                setSaveState(result.error || "Save failed");
+            }
         }, 650);
 
         return () => window.clearTimeout(timeout);
@@ -456,6 +481,15 @@ function BuilderContent() {
     return (
         <main className="builderShell">
             <AuthRequiredModal next={currentBuilderPath} />
+            <MajorChangeModal
+                isOpen={!!majorChangeError}
+                error={majorChangeError || ""}
+                invitationId={invitation.id}
+                onClose={() => {
+                    setMajorChangeError(null);
+                    window.location.reload();
+                }}
+            />
 
             <header className="builderTopbar">
                 <button
@@ -464,7 +498,7 @@ function BuilderContent() {
                     onClick={() => setLeaveModalOpen(true)}
                 >
                     <ChevronLeft size={20} aria-hidden="true" />
-                    <span>{openedFromExistingInvitation.current ? "Profile" : "Templates"}</span>
+                    <span>{builderBackLabel.current}</span>
                 </button>
 
                 <div className="builderTitle">
@@ -628,6 +662,8 @@ function BuilderContent() {
                     isNewDraft.current = false;
                     if (typeof window !== "undefined" && invitation.id) {
                         sessionStorage.removeItem(`vilique-new-draft-${invitation.id}`);
+                        sessionStorage.removeItem(`vilique-builder-back-target-${invitation.id}`);
+                        sessionStorage.removeItem(`vilique-builder-back-label-${invitation.id}`);
                     }
                     setInvitation((prev) => ({
                         ...prev,

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, Heart, Search } from "lucide-react";
+import { Heart, Search } from "lucide-react";
+import AppLogo from "@/components/AppLogo";
 import type { InvitationCategory } from "@/types/invitation";
 
 type TemplateItem = {
@@ -13,7 +14,9 @@ type TemplateItem = {
     gradient: string;
     description: string;
     mood: string;
+    badge: "Free" | "Premium";
     popularity: "Featured" | "Popular" | "Newest";
+    features: string[];
     palette: string[];
 };
 
@@ -57,6 +60,12 @@ export default function TemplatesCatalog({ templates }: Props) {
         <>
             <section className="marketHeroPanel" aria-label="Template marketplace">
                 <header className="marketHeader">
+                    <div className="templatesAppHeader" aria-label="Vilique">
+                        <Link href="/templates" className="templatesBrand">
+                            <AppLogo size={34} />
+                        </Link>
+                    </div>
+
                     <div className="marketHeaderTop">
                         <div>
                             <p className="eyebrow">Template Marketplace</p>
@@ -94,21 +103,43 @@ export default function TemplatesCatalog({ templates }: Props) {
 
             {filteredTemplates.length ? (
                 <section className="templateGrid">
-                    {filteredTemplates.map((template) => (
-                        <article className="templateCard" key={template.id}>
-                            <div className="templatePreviewContainer">
-                                <Link href={`/templates/${template.id}`} aria-label={`View ${template.name}`}>
-                                    <div
-                                        className="templatePreview templatePreviewReference"
-                                        style={{ background: template.gradient }}
-                                    >
-                                        <div className="templateReferenceCard">
-                                            <small>WEDDING INVITATION</small>
-                                            <strong>Maya & Arjun</strong>
-                                            <span>FEB 14 · 05:30 PM</span>
+                    {filteredTemplates.map((template) => {
+                        const details = [template.popularity, categoryLabels[template.category], template.badge];
+                        const featureChips = template.features.slice(0, 3);
+
+                        return (
+                            <article className="templateCard" key={template.id}>
+                                <Link
+                                    href={`/templates/${template.id}`}
+                                    className="templateCardLink"
+                                    aria-label={`View ${template.name}`}
+                                >
+                                    <div className="templatePreviewContainer">
+                                        <div
+                                            className="templatePreview templatePreviewReference"
+                                            style={{ background: template.gradient }}
+                                        >
+                                            <div className="templateReferenceCard">
+                                                <small>WEDDING INVITATION</small>
+                                                <strong>Maya & Arjun</strong>
+                                                <span>FEB 14 · 05:30 PM</span>
+                                            </div>
+                                            <i className="templateFlower flowerOne" />
+                                            <i className="templateFlower flowerTwo" />
                                         </div>
-                                        <i className="templateFlower flowerOne" />
-                                        <i className="templateFlower flowerTwo" />
+                                    </div>
+
+                                    <div className="templateInfo">
+                                        <div className="templateText">
+                                            <p className="templatePopularity">{details.join(" · ")}</p>
+                                            <h2>{template.name}</h2>
+                                            <span className="templateMood">{template.mood}</span>
+                                            <div className="templateFeatureChips" aria-label={`${template.name} features`}>
+                                                {featureChips.map((feature) => (
+                                                    <span key={feature}>{feature}</span>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 </Link>
 
@@ -119,30 +150,9 @@ export default function TemplatesCatalog({ templates }: Props) {
                                 >
                                     <Heart size={16} aria-hidden="true" />
                                 </button>
-                            </div>
-
-                            <div className="templateInfo">
-                                <div className="templateText">
-                                    <p className="templatePopularity">{template.popularity}</p>
-                                    <h2>{template.name}</h2>
-                                    <span className="templateMood">{template.mood}</span>
-                                </div>
-
-                                <div className="templateFooter">
-                                    <div className="paletteDots" aria-label={`${template.name} color palette`}>
-                                        {template.palette.slice(0, 4).map((color) => (
-                                            <i key={color} style={{ backgroundColor: color }} />
-                                        ))}
-                                    </div>
-
-                                    <Link href={`/templates/${template.id}`}>
-                                        <Eye size={16} aria-hidden="true" />
-                                        Details
-                                    </Link>
-                                </div>
-                            </div>
-                        </article>
-                    ))}
+                            </article>
+                        );
+                    })}
                 </section>
             ) : (
                 <section className="templateNoResults">

@@ -1,11 +1,13 @@
+import { unstable_cache } from "next/cache";
 import { templates } from "@/data/templates";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
+import { createPublicServerClient } from "@/lib/supabase/public-server";
 import { createClient } from "@/lib/supabase/server";
 import { mapInvitationRow, mapTemplateRow } from "@/features/invitations/mappers";
 
-export async function getActiveTemplates() {
-    try {
-        const supabase = await createClient();
+const getCachedActiveTemplates = unstable_cache(
+    async () => {
+        const supabase = createPublicServerClient();
         const { data, error } = await supabase
             .from("invitation_templates")
             .select("*")
@@ -18,6 +20,17 @@ export async function getActiveTemplates() {
         const implementedRows = data.filter((row) => implementedTemplateIds.has(row.template_key));
 
         return implementedRows.length ? implementedRows.map(mapTemplateRow) : templates;
+    },
+    ["active-invitation-templates"],
+    {
+        tags: ["invitation-templates"],
+        revalidate: 300,
+    }
+);
+
+export async function getActiveTemplates() {
+    try {
+        return await getCachedActiveTemplates();
     } catch {
         return templates;
     }

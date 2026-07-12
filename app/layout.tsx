@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { siteConfig } from "@/lib/config/site";
+import StableDocumentTitle from "@/components/StableDocumentTitle";
 import { ToastProvider } from "@/components/Toast";
 
 export const metadata: Metadata = {
@@ -61,6 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <StableDocumentTitle />
         <ToastProvider>
           {children}
         </ToastProvider>

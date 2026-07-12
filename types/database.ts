@@ -44,6 +44,12 @@ export type Database = {
                     is_active: boolean;
                     created_at: string;
                     updated_at: string;
+                    price_paise: number;
+                    currency: string;
+                    is_free: boolean;
+                    slug: string;
+                    is_paid: boolean;
+                    metadata: Json;
                 };
                 Insert: {
                     id?: string;
@@ -57,6 +63,12 @@ export type Database = {
                     is_active?: boolean;
                     created_at?: string;
                     updated_at?: string;
+                    price_paise?: number;
+                    currency?: string;
+                    is_free?: boolean;
+                    slug?: string;
+                    is_paid?: boolean;
+                    metadata?: Json;
                 };
                 Update: Partial<Database["public"]["Tables"]["invitation_templates"]["Insert"]>;
                 Relationships: [];
@@ -88,6 +100,20 @@ export type Database = {
                     published_at: string | null;
                     created_at: string;
                     updated_at: string;
+                    payment_status: "unpaid" | "paid" | "refunded";
+                    lifecycle_status: "draft" | "published" | "completed" | "archived" | "unpublished";
+                    original_category: string | null;
+                    original_primary_name: string | null;
+                    original_secondary_name: string | null;
+                    original_event_date: string | null;
+                    original_template_id: string | null;
+                    first_published_at: string | null;
+                    completed_at: string | null;
+                    archived_at: string | null;
+                    event_timezone: string;
+                    change_risk_status: "low" | "medium" | "high";
+                    identity_snapshot: Json | null;
+                    identity_fingerprint: string | null;
                 };
                 Insert: {
                     id?: string;
@@ -115,6 +141,20 @@ export type Database = {
                     published_at?: string | null;
                     created_at?: string;
                     updated_at?: string;
+                    payment_status?: "unpaid" | "paid" | "refunded";
+                    lifecycle_status?: "draft" | "published" | "completed" | "archived" | "unpublished";
+                    original_category?: string | null;
+                    original_primary_name?: string | null;
+                    original_secondary_name?: string | null;
+                    original_event_date?: string | null;
+                    original_template_id?: string | null;
+                    first_published_at?: string | null;
+                    completed_at?: string | null;
+                    archived_at?: string | null;
+                    event_timezone?: string;
+                    change_risk_status?: "low" | "medium" | "high";
+                    identity_snapshot?: Json | null;
+                    identity_fingerprint?: string | null;
                 };
                 Update: Partial<Database["public"]["Tables"]["invitations"]["Insert"]>;
                 Relationships: [
@@ -218,6 +258,149 @@ export type Database = {
                         referencedRelation: "invitations";
                         referencedColumns: ["id"];
                     },
+                ];
+            };
+            payments: {
+                Row: {
+                    id: string;
+                    user_id: string;
+                    invitation_id: string;
+                    template_id: string | null;
+                    provider: string;
+                    provider_order_id: string | null;
+                    provider_payment_id: string | null;
+                    provider_signature: string | null;
+                    amount_paise: number;
+                    currency: string;
+                    status: "created" | "attempted" | "authorized" | "paid" | "failed" | "cancelled" | "refunded" | "partially_refunded";
+                    failure_code: string | null;
+                    failure_description: string | null;
+                    receipt: string | null;
+                    metadata: Json;
+                    paid_at: string | null;
+                    refunded_at: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    user_id: string;
+                    invitation_id: string;
+                    template_id?: string | null;
+                    provider?: string;
+                    provider_order_id?: string | null;
+                    provider_payment_id?: string | null;
+                    provider_signature?: string | null;
+                    amount_paise: number;
+                    currency?: string;
+                    status: "created" | "attempted" | "authorized" | "paid" | "failed" | "cancelled" | "refunded" | "partially_refunded";
+                    failure_code?: string | null;
+                    failure_description?: string | null;
+                    receipt?: string | null;
+                    metadata?: Json;
+                    paid_at?: string | null;
+                    refunded_at?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
+                Relationships: [
+                    {
+                        foreignKeyName: "payments_user_id_fkey";
+                        columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "payments_invitation_id_fkey";
+                        columns: ["invitation_id"];
+                        isOneToOne: false;
+                        referencedRelation: "invitations";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "payments_template_id_fkey";
+                        columns: ["template_id"];
+                        isOneToOne: false;
+                        referencedRelation: "invitation_templates";
+                        referencedColumns: ["id"];
+                    }
+                ];
+            };
+            webhook_events: {
+                Row: {
+                    id: string;
+                    provider: string;
+                    provider_event_id: string;
+                    event_type: string;
+                    payload: Json;
+                    processing_status: "pending" | "processed" | "failed";
+                    processed_at: string | null;
+                    error_message: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    provider?: string;
+                    provider_event_id: string;
+                    event_type: string;
+                    payload?: Json;
+                    processing_status?: "pending" | "processed" | "failed";
+                    processed_at?: string | null;
+                    error_message?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: Partial<Database["public"]["Tables"]["webhook_events"]["Insert"]>;
+                Relationships: [];
+            };
+            invitation_change_audit: {
+                Row: {
+                    id: string;
+                    invitation_id: string;
+                    user_id: string;
+                    change_type: string;
+                    risk_level: "low" | "medium" | "high";
+                    previous_values: Json;
+                    proposed_values: Json;
+                    decision: "allowed" | "warned" | "blocked" | "duplicated" | "manually_approved";
+                    reason: string | null;
+                    created_at: string;
+                    reviewed_at: string | null;
+                    reviewed_by: string | null;
+                };
+                Insert: {
+                    id?: string;
+                    invitation_id: string;
+                    user_id: string;
+                    change_type: string;
+                    risk_level: "low" | "medium" | "high";
+                    previous_values?: Json;
+                    proposed_values?: Json;
+                    decision: "allowed" | "warned" | "blocked" | "duplicated" | "manually_approved";
+                    reason?: string | null;
+                    created_at?: string;
+                    reviewed_at?: string | null;
+                    reviewed_by?: string | null;
+                };
+                Update: Partial<Database["public"]["Tables"]["invitation_change_audit"]["Insert"]>;
+                Relationships: [
+                    {
+                        foreignKeyName: "invitation_change_audit_invitation_id_fkey";
+                        columns: ["invitation_id"];
+                        isOneToOne: false;
+                        referencedRelation: "invitations";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "invitation_change_audit_user_id_fkey";
+                        columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    }
                 ];
             };
         };

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import LoadingButton from "@/components/ui/LoadingButton";
 
 type Props = {
     isOpen: boolean;
@@ -100,15 +101,16 @@ export default function ConfirmModal({
                             >
                                 {cancelText}
                             </button>
-                            <button
+                            <LoadingButton
                                 type="button"
                                 className="modalBtnConfirm"
                                 onClick={onConfirm}
-                                disabled={isPending}
+                                isLoading={isPending}
+                                loadingLabel={`${confirmText}...`}
                                 style={confirmStyle}
                             >
-                                {isPending ? `${confirmText}…` : confirmText}
-                            </button>
+                                {confirmText}
+                            </LoadingButton>
                         </div>
                     </motion.section>
                 </div>
