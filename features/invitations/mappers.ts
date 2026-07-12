@@ -81,6 +81,9 @@ export function mapInvitationRow(row: InvitationRowWithTemplate): InvitationData
         firstPublishedAt: row.first_published_at || undefined,
         completedAt: row.completed_at || undefined,
         archivedAt: row.archived_at || undefined,
+        eventStatus: row.event_status,
+        eventChangeScore: row.event_change_score,
+        publishVersion: row.publish_version,
     };
 }
 

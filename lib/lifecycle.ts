@@ -1,3 +1,7 @@
+import { parseInvitationDateParts } from "@/lib/invitationDate";
+
+type EventPhase = "upcoming" | "in_progress" | "completed";
+
 /**
  * Checks whether an event has completed based on its date, time range,
  * timezone, and a grace period (in hours).
@@ -8,74 +12,93 @@ export function isEventCompleted(
         eventTime?: string | null;
         eventTimezone?: string | null;
     },
-    graceHours: number = 6
+    graceHours: number = 0,
+    now: Date = new Date()
 ): boolean {
-    if (!invitation.eventDate) return false;
+    return getEventPhase(invitation, graceHours, now) === "completed";
+}
+
+export function getEventPhase(
+    invitation: {
+        eventDate: string | null;
+        eventTime?: string | null;
+        eventTimezone?: string | null;
+    },
+    graceHours: number = 0,
+    now: Date = new Date()
+): EventPhase {
+    if (!invitation.eventDate) return "upcoming";
 
     const timezone = invitation.eventTimezone || "Asia/Kolkata";
-    const dateStr = invitation.eventDate;
+    const dateParts = parseInvitationDateParts(invitation.eventDate);
+    if (!dateParts) return "upcoming";
 
-    let timeStr = "";
-    if (invitation.eventTime) {
-        const parts = invitation.eventTime.split("-");
-        // Get the end time if it exists (e.g. "09:00 PM" in "05:30 PM - 09:00 PM"),
-        // otherwise get the start time.
-        timeStr = parts[1]?.trim() || parts[0]?.trim() || "";
-    }
-
-    // Default to the end of the day if no time range is specified
-    if (!timeStr) {
-        timeStr = "23:59:59";
-    }
+    const { startTime, endTime } = parseEventTimeRange(invitation.eventTime);
 
     try {
-        const [year, month, day] = dateStr.split("-").map(Number);
-        let hours = 23;
-        let minutes = 59;
-        let seconds = 59;
+        const { year, month, day } = dateParts;
+        const nowInTimezone = getNowInTimezone(timezone, now);
+        const targetLocalStart = new Date(year, month - 1, day, startTime.hours, startTime.minutes, startTime.seconds);
+        const targetLocalEnd = new Date(year, month - 1, day, endTime.hours, endTime.minutes, endTime.seconds);
 
-        if (timeStr !== "23:59:59") {
-            const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-            if (match) {
-                let h = parseInt(match[1], 10);
-                const m = parseInt(match[2], 10);
-                const period = match[3]?.toUpperCase();
-
-                if (period === "PM" && h < 12) h += 12;
-                if (period === "AM" && h === 12) h = 0;
-
-                hours = h;
-                minutes = m;
-                seconds = 0;
-            }
-        }
-
-        // Construct target end time in the specified timezone
-        // We can do this accurately in vanilla JS by parsing the current time in the invitation's timezone,
-        // and comparing it to a local date representation.
-        const nowInTimezoneStr = new Date().toLocaleString("en-US", { timeZone: timezone });
-        const nowInTimezone = new Date(nowInTimezoneStr);
-
-        const targetLocalEnd = new Date(year, month - 1, day, hours, minutes, seconds);
+        if (nowInTimezone.getTime() < targetLocalStart.getTime()) return "upcoming";
 
         const diffMs = nowInTimezone.getTime() - targetLocalEnd.getTime();
         const graceMs = graceHours * 60 * 60 * 1000;
 
-        return diffMs > graceMs;
-    } catch (e) {
-        // Fallback to local system time comparison if timezone formatting fails
-        const parts = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-        let h = 23;
-        let m = 59;
-        if (parts) {
-            h = parseInt(parts[1], 10);
-            m = parseInt(parts[2], 10);
-            if (parts[3]?.toUpperCase() === "PM" && h < 12) h += 12;
-            if (parts[3]?.toUpperCase() === "AM" && h === 12) h = 0;
-        }
-        const eventEnd = new Date(dateStr);
-        eventEnd.setHours(h, m, 0, 0);
+        return diffMs > graceMs ? "completed" : "in_progress";
+    } catch {
+        const eventStart = new Date(dateParts.year, dateParts.month - 1, dateParts.day, startTime.hours, startTime.minutes, startTime.seconds);
+        const eventEnd = new Date(dateParts.year, dateParts.month - 1, dateParts.day, endTime.hours, endTime.minutes, endTime.seconds);
+        const now = Date.now();
 
-        return Date.now() > eventEnd.getTime() + graceHours * 60 * 60 * 1000;
+        if (now < eventStart.getTime()) return "upcoming";
+        return now > eventEnd.getTime() + graceHours * 60 * 60 * 1000 ? "completed" : "in_progress";
     }
+}
+
+function getNowInTimezone(timezone: string, now: Date) {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hour12: false,
+    });
+    const nowParts = formatter.formatToParts(now);
+    const partValues = Object.fromEntries(nowParts.map((p) => [p.type, p.value]));
+
+    return new Date(
+        parseInt(partValues.year, 10),
+        parseInt(partValues.month, 10) - 1,
+        parseInt(partValues.day, 10),
+        parseInt(partValues.hour, 10) % 24,
+        parseInt(partValues.minute, 10),
+        parseInt(partValues.second, 10)
+    );
+}
+
+function parseEventTimeRange(value: string | null | undefined) {
+    const [rawStart = "", rawEnd = ""] = (value || "").split(/\s*[-–—]\s*/).map((part) => part.trim());
+    const startTime = parseTime(rawStart, { hours: 0, minutes: 0, seconds: 0 });
+    const endTime = parseTime(rawEnd || rawStart, { hours: 23, minutes: 59, seconds: 59 });
+
+    return { startTime, endTime };
+}
+
+function parseTime(value: string, fallback: { hours: number; minutes: number; seconds: number }) {
+    const match = value.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!match) return fallback;
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const period = match[3]?.toUpperCase();
+
+    if (period === "PM" && hours < 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+
+    return { hours, minutes, seconds: 0 };
 }

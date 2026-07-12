@@ -1,5 +1,9 @@
 import { useCallback, useState } from "react";
 
+type RazorpayWindow = Window & {
+    Razorpay?: unknown;
+};
+
 export function useRazorpay() {
     const [isLoading, setIsLoading] = useState(false);
 
@@ -9,7 +13,7 @@ export function useRazorpay() {
                 resolve(false);
                 return;
             }
-            if ((window as any).Razorpay) {
+            if ((window as RazorpayWindow).Razorpay) {
                 resolve(true);
                 return;
             }

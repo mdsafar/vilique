@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { LogOut, AlertTriangle, History } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import ConfirmModal from "./ConfirmModal";
@@ -13,11 +14,12 @@ type Props = {
         avatarUrl: string | null;
     } | null;
     activePublishedCount: number;
+    totalSpent: number;
     initials: string;
     greeting: string;
 };
 
-export default function ProfileCard({ profile, activePublishedCount, initials, greeting }: Props) {
+export default function ProfileCard({ profile, activePublishedCount, totalSpent, initials, greeting }: Props) {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const { showToast } = useToast();
@@ -45,12 +47,18 @@ export default function ProfileCard({ profile, activePublishedCount, initials, g
     return (
         <article className="profileCard">
             <div className="profileCardMain">
-                <div
-                    className="profileAvatar"
-                    style={profile?.avatarUrl ? { backgroundImage: `url(${profile.avatarUrl})` } : undefined}
-                    aria-hidden="true"
-                >
-                    {profile?.avatarUrl ? null : initials}
+                <div className="profileAvatar" aria-hidden="true">
+                    <span>{initials}</span>
+                    {profile?.avatarUrl ? (
+                        <Image
+                            src={profile.avatarUrl}
+                            alt=""
+                            fill
+                            sizes="66px"
+                            unoptimized
+                            referrerPolicy="no-referrer"
+                        />
+                    ) : null}
                 </div>
 
                 <div className="profileDetails">
@@ -94,7 +102,7 @@ export default function ProfileCard({ profile, activePublishedCount, initials, g
                     </div>
                     <div className="rateDetails">
                         <span className="rateLabel">Total Spent:</span>
-                        <strong className="rateValue">₹{activePublishedCount * 20}</strong>
+                        <strong className="rateValue">₹{totalSpent}</strong>
                     </div>
                 </div>
                 <p className="usageDisclaimer">One-time publishing total for invitations hosted live indefinitely.</p>

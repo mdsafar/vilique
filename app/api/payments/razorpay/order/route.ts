@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { razorpay } from "@/lib/razorpay";
+import { Json } from "@/types/database";
 import crypto from "crypto";
 
 const orderInputSchema = z.object({
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
                 currency: currency,
                 status: "created",
                 receipt: receipt,
-                metadata: order as any,
+                metadata: order as unknown as Json,
             });
 
         if (insertError) {
@@ -156,7 +157,7 @@ export async function POST(request: Request) {
             name: "Vilique Premium Publication",
             description: `Publishing: ${template.name}`,
         });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Unhandled error creating Razorpay order:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

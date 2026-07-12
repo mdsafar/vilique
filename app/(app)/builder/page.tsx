@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
     AlertTriangle,
     CalendarDays,
-    ChevronDown,
+    Check,
     ChevronLeft,
     Clock3,
+    Copy,
     Eye,
     Loader2,
     Pause,
@@ -25,12 +26,48 @@ import PublishModal from "@/components/PublishModal";
 import MajorChangeModal from "@/components/MajorChangeModal";
 import { useToast } from "@/components/Toast";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
+import { normalizeInvitationDateValue, parseInvitationDateParts } from "@/lib/invitationDate";
+import { getPublicInvitationUrl } from "@/lib/config/site";
 import { templates } from "@/data/templates";
 import TemplateRenderer from "@/components/TemplateRenderer";
 import type { InvitationData } from "@/types/invitation";
 
 type EditorTab = "content" | "event" | "contact" | "sound";
 type PreviewScreen = "invite" | "thanks";
+type PublishSuccessDetails = {
+    slug: string;
+    publishedAt?: string | null;
+};
+
+function formatSaveError(error: unknown): string {
+    if (!error) return "Save failed";
+    if (typeof error === "string") return error;
+    if (typeof error === "object") {
+        const result = error as {
+            fieldErrors?: Record<string, unknown>;
+            formErrors?: unknown;
+            message?: unknown;
+        };
+
+        if (result.fieldErrors && typeof result.fieldErrors === "object") {
+            const keys = Object.keys(result.fieldErrors);
+            if (keys.length > 0) {
+                const firstField = keys[0];
+                const fieldMsgs = result.fieldErrors[firstField];
+                if (Array.isArray(fieldMsgs) && fieldMsgs.length > 0) {
+                    return `${firstField}: ${fieldMsgs[0]}`;
+                }
+            }
+        }
+        if (Array.isArray(result.formErrors) && result.formErrors.length > 0) {
+            return String(result.formErrors[0]);
+        }
+        if (typeof result.message === "string") {
+            return result.message;
+        }
+    }
+    return "Save failed";
+}
 
 const editorTabs: { id: EditorTab; label: string }[] = [
     { id: "content", label: "Content" },
@@ -70,6 +107,7 @@ function BuilderContent() {
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [publishSuccessDetails, setPublishSuccessDetails] = useState<PublishSuccessDetails | null>(null);
     const [previewScrolledToBottom, setPreviewScrolledToBottom] = useState(false);
     const previewViewportRef = useRef<HTMLDivElement>(null);
     const lastSavedPayload = useRef("");
@@ -114,9 +152,8 @@ function BuilderContent() {
     );
 
     const buildSavePayload = useCallback((source: InvitationData = invitation) => {
-        const safeEventDate = isValidDateValue(source.eventDate)
-            ? source.eventDate
-            : toDateInputValue(new Date());
+        const normalizedEventDate = normalizeInvitationDateValue(source.eventDate);
+        const safeEventDate = normalizedEventDate || toDateInputValue(new Date());
 
         return JSON.stringify({
             slug: source.slug,
@@ -235,7 +272,7 @@ function BuilderContent() {
         }
 
         const result = await response.json().catch(() => ({}));
-        setSaveState(result.error || "Save failed");
+        setSaveState(formatSaveError(result.error));
         return null;
     }
 
@@ -372,15 +409,27 @@ function BuilderContent() {
 
         function handleScroll() {
             if (!viewport) return;
-            const isBottom =
-                viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 12;
+            const isScrollable = viewport.scrollHeight > viewport.clientHeight + 4;
+            const isBottom = !isScrollable || (viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 24);
             setPreviewScrolledToBottom(isBottom);
         }
 
         viewport.addEventListener("scroll", handleScroll, { passive: true });
         handleScroll();
-        return () => viewport.removeEventListener("scroll", handleScroll);
-    }, []);
+
+        const observer = new ResizeObserver(() => {
+            handleScroll();
+        });
+        observer.observe(viewport);
+        if (viewport.firstElementChild) {
+            observer.observe(viewport.firstElementChild);
+        }
+
+        return () => {
+            viewport.removeEventListener("scroll", handleScroll);
+            observer.disconnect();
+        };
+    }, [invitation, previewScreen, activeTab]);
 
     useEffect(() => {
         if (hasLoadedDraft.current) return;
@@ -467,7 +516,7 @@ function BuilderContent() {
                 setMajorChangeError(result.error || "A major change has been detected.");
                 setSaveState("Save blocked");
             } else {
-                setSaveState(result.error || "Save failed");
+                setSaveState(formatSaveError(result.error));
             }
         }, 650);
 
@@ -535,6 +584,7 @@ function BuilderContent() {
                             <span>
                                 <Smartphone size={15} aria-hidden="true" />
                                 Live preview
+                                <span className="liveDot" />
                             </span>
                             <div className="previewMeta">
                                 <div className="previewScreenToggle" aria-label="Preview screen">
@@ -553,11 +603,10 @@ function BuilderContent() {
                                         Thanks
                                     </button>
                                 </div>
-                                <b>390px</b>
                             </div>
                         </div>
 
-                        <div className="previewDevice">
+                        <div className={`previewDevice${!previewScrolledToBottom ? " hasScrollCue" : ""}`}>
                             <div className="previewViewport" ref={previewViewportRef}>
                                 <div className="previewScaleFrame">
                                     <TemplateRenderer
@@ -569,11 +618,8 @@ function BuilderContent() {
                                     />
                                 </div>
                             </div>
-                            {!previewScrolledToBottom && (
-                                <div className="previewScrollHint" aria-hidden="true">
-                                    <ChevronDown size={16} />
-                                </div>
-                            )}
+                            <span className="previewScrollFade" aria-hidden="true" />
+                            <span className="templatePreviewScrollCue" aria-hidden="true" />
                         </div>
                     </div>
                 </section>
@@ -674,11 +720,92 @@ function BuilderContent() {
                     }));
                     setSaveState(updatedInvitation.status === "published" ? "Published" : "Saved");
                     if (updatedInvitation.status === "published") {
-                        navigateBackToList();
+                        setIsPublishModalOpen(false);
+                        setPublishSuccessDetails({
+                            slug: updatedInvitation.slug,
+                            publishedAt: updatedInvitation.published_at,
+                        });
                     }
                 }}
             />
+
+            <PublishSuccessModal
+                details={publishSuccessDetails}
+                title={invitation.title}
+                onViewProfile={() => router.push("/profile")}
+            />
         </main>
+    );
+}
+
+function PublishSuccessModal({
+    details,
+    title,
+    onViewProfile,
+}: {
+    details: PublishSuccessDetails | null;
+    title: string;
+    onViewProfile: () => void;
+}) {
+    const [copied, setCopied] = useState(false);
+
+    if (!details) return null;
+
+    const publicUrl = getPublicInvitationUrl(details.slug);
+    const publishedDate = details.publishedAt
+        ? new Intl.DateTimeFormat("en-IN", {
+            dateStyle: "medium",
+            timeStyle: "short",
+        }).format(new Date(details.publishedAt))
+        : "Just now";
+
+    function copyLink() {
+        navigator.clipboard.writeText(publicUrl).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1800);
+        });
+    }
+
+    return createPortal(
+        <AnimatePresence>
+            <div className="publishSuccessOverlay" role="dialog" aria-modal="true" aria-label="Invitation published">
+                <motion.div
+                    className="publishSuccessLockedBackdrop"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                />
+                <motion.div
+                    className="publishSuccessPanel"
+                    initial={{ opacity: 0, scale: 0.96, y: 18 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 18 }}
+                    transition={{ type: "spring", duration: 0.42 }}
+                >
+                    <div className="publishSuccessIcon">
+                        <Check size={24} strokeWidth={3} />
+                    </div>
+                    <div className="publishSuccessCopy">
+                        <p>Payment successful</p>
+                        <h2>Your invitation is live</h2>
+                        <span>{title} was published {publishedDate}.</span>
+                    </div>
+
+                    <div className="publishSuccessLinkBox">
+                        <span>{publicUrl}</span>
+                        <button type="button" onClick={copyLink}>
+                            {copied ? <Check size={16} /> : <Copy size={16} />}
+                            {copied ? "Copied" : "Copy link"}
+                        </button>
+                    </div>
+
+                    <button className="publishSuccessProfileBtn" type="button" onClick={onViewProfile}>
+                        View in Profile
+                    </button>
+                </motion.div>
+            </div>
+        </AnimatePresence>,
+        document.body
     );
 }
 
@@ -944,6 +1071,41 @@ function EditorForm({
     updateMusicFile: (file: File | null) => void;
 }) {
     const { startTime, endTime } = parseTimeRange(invitation.eventTime);
+    const [activePicker, setActivePicker] = useState<"date" | "startTime" | "endTime" | null>(null);
+    const now = useMinuteNow(activeTab === "event");
+    const selectedDate = parseDateValue(invitation.eventDate) || now;
+    const minEventDate = getMinimumEventDate(now);
+    const minEventDateValue = toDateInputValue(minEventDate);
+    const selectedDateTime = startOfDate(selectedDate).getTime();
+    const minEventDateTime = startOfDate(minEventDate).getTime();
+    const minTimeMinutes = isSameDate(selectedDate, minEventDate) ? getNextSelectableMinute(now) : null;
+    const maxStartTimeMinutes = 23 * 60 + 58;
+    const endMinTimeMinutes = getMinimumEndTimeMinutes(startTime, minTimeMinutes);
+
+    useEffect(() => {
+        if (activeTab !== "event") return;
+
+        if (selectedDateTime < minEventDateTime) {
+            updateField("eventDate", minEventDateValue);
+            return;
+        }
+
+        let nextStartTime = startTime;
+        let nextEndTime = endTime;
+
+        if (!nextStartTime || !isSelectableTime(nextStartTime, minTimeMinutes, maxStartTimeMinutes)) {
+            nextStartTime = fromMinutes(Math.min(Math.max(minTimeMinutes ?? 0, toMinutes(nextStartTime || "00:00")), maxStartTimeMinutes));
+        }
+
+        const minEndMinutes = getMinimumEndTimeMinutes(nextStartTime, minTimeMinutes);
+        if (!nextEndTime || !isSelectableTime(nextEndTime, minEndMinutes, null)) {
+            nextEndTime = getPreferredEndTime(nextStartTime, minEndMinutes);
+        }
+
+        if (nextStartTime !== startTime || nextEndTime !== endTime) {
+            updateField("eventTime", formatTimeRange(nextStartTime, nextEndTime));
+        }
+    }, [activeTab, endTime, maxStartTimeMinutes, minEventDateTime, minEventDateValue, minTimeMinutes, selectedDateTime, startTime, updateField]);
 
     if (activeTab === "content") {
         return (
@@ -979,6 +1141,8 @@ function EditorForm({
                     <DatePickerField
                         value={invitation.eventDate}
                         onChange={(value) => updateField("eventDate", value)}
+                        isOpen={activePicker === "date"}
+                        onToggle={(open) => setActivePicker(open ? "date" : null)}
                     />
                 </label>
 
@@ -986,7 +1150,11 @@ function EditorForm({
                     <span>Start Time</span>
                     <TimePickerField
                         value={startTime}
-                        onChange={(value) => updateField("eventTime", formatTimeRange(value, endTime))}
+                        onChange={(value) => updateField("eventTime", normalizeTimeRangeForStart(value, endTime, minTimeMinutes))}
+                        minTimeMinutes={minTimeMinutes}
+                        maxTimeMinutes={maxStartTimeMinutes}
+                        isOpen={activePicker === "startTime"}
+                        onToggle={(open) => setActivePicker(open ? "startTime" : null)}
                     />
                 </label>
 
@@ -995,6 +1163,10 @@ function EditorForm({
                     <TimePickerField
                         value={endTime}
                         onChange={(value) => updateField("eventTime", formatTimeRange(startTime, value))}
+                        minTimeMinutes={endMinTimeMinutes}
+                        maxTimeMinutes={null}
+                        isOpen={activePicker === "endTime"}
+                        onToggle={(open) => setActivePicker(open ? "endTime" : null)}
                     />
                 </label>
 
@@ -1138,47 +1310,86 @@ function EditorForm({
 function DatePickerField({
     value,
     onChange,
+    isOpen,
+    onToggle,
 }: {
     value: string;
     onChange: (value: string) => void;
+    isOpen: boolean;
+    onToggle: (open: boolean) => void;
 }) {
-    const [open, setOpen] = useState(false);
-    const fallbackDate = useMemo(() => new Date(), []);
-    const selectedDate = parseDateValue(value) || fallbackDate;
+    const now = useMinuteNow(isOpen);
+    const minDate = useMemo(() => getMinimumEventDate(now), [now]);
+    const selectedDate = parseDateValue(value) || minDate;
     const [visibleMonth, setVisibleMonth] = useState(() => selectedDate || new Date());
+    const minVisibleMonth = startOfMonth(minDate);
+    const canGoPreviousMonth = startOfMonth(visibleMonth).getTime() > minVisibleMonth.getTime();
     const calendarDays = getCalendarDays(visibleMonth);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isValidDateValue(value)) {
-            onChange(toDateInputValue(fallbackDate));
+            onChange(toDateInputValue(minDate));
         }
-    }, [fallbackDate, onChange, value]);
+    }, [minDate, onChange, value]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                onToggle(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [isOpen, onToggle]);
 
     function selectDate(date: Date) {
+        if (isPastDate(date, minDate)) return;
         onChange(toDateInputValue(date));
         setVisibleMonth(date);
-        setOpen(false);
+        onToggle(false);
+    }
+
+    function goToPreviousMonth() {
+        if (!canGoPreviousMonth) return;
+        setVisibleMonth((current) => {
+            const previousMonth = startOfMonth(addMonths(current, -1));
+            return previousMonth.getTime() < minVisibleMonth.getTime() ? minVisibleMonth : previousMonth;
+        });
+    }
+
+    function toggleOpen(open: boolean) {
+        if (open && startOfMonth(visibleMonth).getTime() < minVisibleMonth.getTime()) {
+            setVisibleMonth(minVisibleMonth);
+        }
+        onToggle(open);
     }
 
     return (
-        <div className="customPicker">
+        <div className="customPicker" ref={containerRef}>
             <button
                 className="customPickerTrigger"
                 type="button"
-                onClick={() => setOpen((current) => !current)}
+                onClick={() => toggleOpen(!isOpen)}
             >
                 <span>{formatDisplayDate(selectedDate)}</span>
                 <CalendarDays size={18} aria-hidden="true" />
             </button>
 
-            {open ? (
+            {isOpen ? (
                 <div className="customPickerPopover datePickerPopover">
                     <div className="customPickerHeader">
                         <strong>
                             {visibleMonth.toLocaleString("en", { month: "long", year: "numeric" })}
                         </strong>
                         <div>
-                            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))} aria-label="Previous month">
+                            <button
+                                type="button"
+                                onClick={goToPreviousMonth}
+                                aria-label="Previous month"
+                                disabled={!canGoPreviousMonth}
+                            >
                                 <ChevronLeft size={17} aria-hidden="true" />
                             </button>
                             <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} aria-label="Next month">
@@ -1194,10 +1405,16 @@ function DatePickerField({
                         {calendarDays.map((date) => {
                             const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
                             const isSelected = selectedDate ? isSameDate(date, selectedDate) : false;
+                            const isDisabled = isPastDate(date, minDate);
 
                             return (
                                 <button
-                                    className={isSelected ? "selected" : !isCurrentMonth ? "muted" : undefined}
+                                    className={[
+                                        isSelected ? "selected" : "",
+                                        !isCurrentMonth ? "muted" : "",
+                                        isDisabled ? "disabled" : "",
+                                    ].filter(Boolean).join(" ") || undefined}
+                                    disabled={isDisabled}
                                     key={date.toISOString()}
                                     type="button"
                                     onClick={() => selectDate(date)}
@@ -1209,7 +1426,7 @@ function DatePickerField({
                     </div>
 
                     <div className="customPickerFooter single">
-                        <button type="button" onClick={() => selectDate(new Date())}>Today</button>
+                        <button type="button" onClick={() => onToggle(false)}>Done</button>
                     </div>
                 </div>
             ) : null}
@@ -1220,50 +1437,83 @@ function DatePickerField({
 function TimePickerField({
     value,
     onChange,
+    minTimeMinutes,
+    maxTimeMinutes,
+    isOpen,
+    onToggle,
 }: {
     value: string;
     onChange: (value: string) => void;
+    minTimeMinutes: number | null;
+    maxTimeMinutes: number | null;
+    isOpen: boolean;
+    onToggle: (open: boolean) => void;
 }) {
-    const [open, setOpen] = useState(false);
     const parsed = parseTimeInputParts(value);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     function updateTime(next: Partial<ReturnType<typeof parseTimeInputParts>>) {
-        onChange(toTimeInputFromParts({ ...parsed, ...next }));
+        const nextValue = toTimeInputFromParts({ ...parsed, ...next });
+        if (!isSelectableTime(nextValue, minTimeMinutes, maxTimeMinutes)) return;
+        onChange(nextValue);
     }
 
+    useEffect(() => {
+        if (!isOpen) return;
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                onToggle(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [isOpen, onToggle]);
+
     return (
-        <div className="customPicker">
+        <div className="customPicker" ref={containerRef}>
             <button
                 className="customPickerTrigger"
                 type="button"
-                onClick={() => setOpen((current) => !current)}
+                onClick={() => onToggle(!isOpen)}
             >
                 <span>{value ? fromTimeInputValue(value) : "Select time"}</span>
                 <Clock3 size={18} aria-hidden="true" />
             </button>
 
-            {open ? (
+            {isOpen ? (
                 <div className="customPickerPopover timePickerPopover">
                     <div className="timePickerColumns">
-                        <PickerColumn
-                            values={Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))}
-                            selected={parsed.hour}
-                            onSelect={(hour) => updateTime({ hour })}
-                        />
-                        <PickerColumn
-                            values={Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))}
-                            selected={parsed.minute}
-                            onSelect={(minute) => updateTime({ minute })}
-                        />
-                        <PickerColumn
-                            values={["AM", "PM"]}
-                            selected={parsed.period}
-                            onSelect={(period) => updateTime({ period: period as "AM" | "PM" })}
-                        />
+                        <div className="timePickerColGroup">
+                            <span className="timePickerColLabel">Hour</span>
+                            <PickerColumn
+                                values={Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))}
+                                selected={parsed.hour}
+                                isDisabled={(hour) => !isSelectableTime(toTimeInputFromParts({ ...parsed, hour }), minTimeMinutes, maxTimeMinutes)}
+                                onSelect={(hour) => updateTime({ hour })}
+                            />
+                        </div>
+                        <div className="timePickerColGroup">
+                            <span className="timePickerColLabel">Min</span>
+                            <PickerColumn
+                                values={Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))}
+                                selected={parsed.minute}
+                                isDisabled={(minute) => !isSelectableTime(toTimeInputFromParts({ ...parsed, minute }), minTimeMinutes, maxTimeMinutes)}
+                                onSelect={(minute) => updateTime({ minute })}
+                            />
+                        </div>
+                        <div className="timePickerColGroup">
+                            <span className="timePickerColLabel">Period</span>
+                            <PickerColumn
+                                values={["AM", "PM"]}
+                                selected={parsed.period}
+                                isDisabled={(period) => !isSelectableTime(toTimeInputFromParts({ ...parsed, period: period as "AM" | "PM" }), minTimeMinutes, maxTimeMinutes)}
+                                onSelect={(period) => updateTime({ period: period as "AM" | "PM" })}
+                            />
+                        </div>
                     </div>
 
                     <div className="customPickerFooter single">
-                        <button type="button" onClick={() => setOpen(false)}>Done</button>
+                        <button type="button" onClick={() => onToggle(false)}>Done</button>
                     </div>
                 </div>
             ) : null}
@@ -1274,24 +1524,34 @@ function TimePickerField({
 function PickerColumn({
     values,
     selected,
+    isDisabled,
     onSelect,
 }: {
     values: string[];
     selected: string;
+    isDisabled?: (value: string) => boolean;
     onSelect: (value: string) => void;
 }) {
     return (
         <div className="timePickerColumn">
-            {values.map((value) => (
-                <button
-                    className={value === selected ? "selected" : undefined}
-                    key={value}
-                    type="button"
-                    onClick={() => onSelect(value)}
-                >
-                    {value}
-                </button>
-            ))}
+            {values.map((value) => {
+                const disabled = isDisabled?.(value) || false;
+
+                return (
+                    <button
+                        className={[
+                            value === selected ? "selected" : "",
+                            disabled ? "disabled" : "",
+                        ].filter(Boolean).join(" ") || undefined}
+                        disabled={disabled}
+                        key={value}
+                        type="button"
+                        onClick={() => onSelect(value)}
+                    >
+                        {value}
+                    </button>
+                );
+            })}
         </div>
     );
 }
@@ -1334,15 +1594,93 @@ function toTimeInputFromParts({
     return `${String(hours).padStart(2, "0")}:${minute}`;
 }
 
+function useMinuteNow(enabled: boolean) {
+    const [now, setNow] = useState(() => new Date());
+
+    useEffect(() => {
+        if (!enabled) return;
+        const interval = window.setInterval(() => {
+            setNow(new Date());
+        }, 30000);
+
+        return () => window.clearInterval(interval);
+    }, [enabled]);
+
+    return now;
+}
+
+function startOfDate(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function startOfMonth(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function isPastDate(date: Date, minDate: Date) {
+    return startOfDate(date).getTime() < minDate.getTime();
+}
+
+function getNextSelectableMinute(date: Date) {
+    const nextMinute = new Date(date.getTime() + 60 * 1000);
+    return nextMinute.getHours() * 60 + nextMinute.getMinutes();
+}
+
+function getMinimumEventDate(date: Date) {
+    const nextMinute = new Date(date.getTime() + 60 * 1000);
+    if (nextMinute.getHours() * 60 + nextMinute.getMinutes() > 23 * 60 + 58) {
+        return startOfDate(new Date(nextMinute.getFullYear(), nextMinute.getMonth(), nextMinute.getDate() + 1));
+    }
+    return startOfDate(nextMinute);
+}
+
+function toMinutes(value: string) {
+    const [hours = "0", minutes = "0"] = value.split(":");
+    return Number(hours) * 60 + Number(minutes);
+}
+
+function fromMinutes(value: number) {
+    const clamped = Math.max(0, Math.min(value, 23 * 60 + 59));
+    const hours = Math.floor(clamped / 60);
+    const minutes = clamped % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function isSelectableTime(value: string, minTimeMinutes: number | null, maxTimeMinutes: number | null = null) {
+    const minutes = toMinutes(value);
+    if (minTimeMinutes !== null && minutes < minTimeMinutes) return false;
+    if (maxTimeMinutes !== null && minutes > maxTimeMinutes) return false;
+    return true;
+}
+
+function getMinimumEndTimeMinutes(startTime: string, minTimeMinutes: number | null) {
+    const startEndMinimum = startTime ? Math.min(toMinutes(startTime) + 1, 23 * 60 + 59) : null;
+    if (startEndMinimum === null) return minTimeMinutes;
+    if (minTimeMinutes === null) return startEndMinimum;
+    return Math.max(startEndMinimum, minTimeMinutes);
+}
+
+function getPreferredEndTime(startTime: string, minEndTimeMinutes: number | null) {
+    const preferredEndMinutes = startTime ? toMinutes(startTime) + 60 : 21 * 60;
+    return fromMinutes(Math.max(minEndTimeMinutes ?? 0, preferredEndMinutes));
+}
+
+function normalizeTimeRangeForStart(startTime: string, endTime: string, minTimeMinutes: number | null) {
+    const minEndTimeMinutes = getMinimumEndTimeMinutes(startTime, minTimeMinutes);
+    const nextEndTime = endTime && isSelectableTime(endTime, minEndTimeMinutes)
+        ? endTime
+        : getPreferredEndTime(startTime, minEndTimeMinutes);
+    return formatTimeRange(startTime, nextEndTime);
+}
+
 function parseDateValue(value: string) {
-    if (!value) return null;
-    const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) return null;
-    return new Date(year, month - 1, day);
+    const parts = parseInvitationDateParts(value);
+    if (!parts) return null;
+    return new Date(parts.year, parts.month - 1, parts.day);
 }
 
 function isValidDateValue(value: string) {
-    return parseDateValue(value) !== null;
+    return normalizeInvitationDateValue(value) !== null;
 }
 
 function toDateInputValue(date: Date) {
@@ -1380,7 +1718,13 @@ function isSameDate(left: Date, right: Date) {
 }
 
 function normalizeInvitationDate<T extends InvitationData>(invitation: T): T {
-    if (isValidDateValue(invitation.eventDate)) return invitation;
+    const normalizedEventDate = normalizeInvitationDateValue(invitation.eventDate);
+    if (normalizedEventDate) {
+        return {
+            ...invitation,
+            eventDate: normalizedEventDate,
+        };
+    }
 
     return {
         ...invitation,

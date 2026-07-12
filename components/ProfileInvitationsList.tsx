@@ -23,7 +23,7 @@ import {
 import { deleteInvitation } from "@/app/(app)/profile/actions";
 import { InvitationData } from "@/types/invitation";
 import { getPublicInvitationUrl } from "@/lib/config/site";
-import { isEventCompleted } from "@/lib/lifecycle";
+import { getEventPhase } from "@/lib/lifecycle";
 import ConfirmModal from "./ConfirmModal";
 import { AlertTriangle } from "lucide-react";
 import { useToast } from "./Toast";
@@ -181,11 +181,13 @@ function InvitationRow({
     const { showToast } = useToast();
 
 
-    const completed = invitation.lifecycleStatus === "completed" || isEventCompleted({
+    const eventPhase = getEventPhase({
         eventDate: invitation.eventDate,
         eventTime: invitation.eventTime,
         eventTimezone: invitation.eventTimezone,
     });
+    const completed = invitation.lifecycleStatus === "completed" || eventPhase === "completed";
+    const inProgress = !completed && eventPhase === "in_progress";
 
     const isPublished = invitation.status === "published";
     const isSample = invitation.id.startsWith("sample-");
@@ -212,7 +214,7 @@ function InvitationRow({
             const data = await res.json();
             showToast("Invitation duplicated successfully!", "success");
             router.push(`/builder?id=${data.id}`);
-        } catch (e) {
+        } catch {
             showToast("Failed to duplicate invitation", "error");
         } finally {
             setIsDuplicating(false);
@@ -290,6 +292,11 @@ function InvitationRow({
                     {completed ? (
                         <span className="profileStatus completed">
                             Event Completed
+                        </span>
+                    ) : inProgress ? (
+                        <span className="profileStatus published">
+                            <span className="pulseDot" />
+                            Event Started
                         </span>
                     ) : (
                         <span className={`profileStatus ${isPublished ? "published" : "draft"}`}>

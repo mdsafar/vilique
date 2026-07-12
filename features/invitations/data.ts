@@ -140,23 +140,18 @@ export async function getDashboardData() {
         .filter((invitation) => templateCollectsDetailedRsvps(invitation.templateId))
         .map((invitation) => invitation.id);
 
-    const [rsvpRowsResult, viewResult, viewRowsResult] = invitationIds.length
-        ? await Promise.all([
-              rsvpEligibleInvitationIds.length
-                  ? supabase.from("rsvps").select("invitation_id").in("invitation_id", rsvpEligibleInvitationIds)
-                  : Promise.resolve({ data: [] }),
-              supabase
-                  .from("invitation_events")
-                  .select("id", { count: "exact", head: true })
-                  .in("invitation_id", invitationIds)
-                  .eq("event_type", "view"),
-              supabase
-                  .from("invitation_events")
-                  .select("invitation_id")
-                  .in("invitation_id", invitationIds)
-                  .eq("event_type", "view"),
-          ])
-        : [{ data: [] }, { count: 0 }, { data: [] }];
+    const [rsvpRowsResult, viewResult, viewRowsResult, paymentsResult] = await Promise.all([
+        invitationIds.length && rsvpEligibleInvitationIds.length
+            ? supabase.from("rsvps").select("invitation_id").in("invitation_id", rsvpEligibleInvitationIds)
+            : Promise.resolve({ data: [] as { invitation_id: string }[] }),
+        invitationIds.length
+            ? supabase.from("invitation_events").select("id", { count: "exact", head: true }).in("invitation_id", invitationIds).eq("event_type", "view")
+            : Promise.resolve({ count: 0 }),
+        invitationIds.length
+            ? supabase.from("invitation_events").select("invitation_id").in("invitation_id", invitationIds).eq("event_type", "view")
+            : Promise.resolve({ data: [] as { invitation_id: string }[] }),
+        supabase.from("payments").select("amount_paise").eq("user_id", user.id).eq("status", "paid"),
+    ]);
 
     const invitationStats = Object.fromEntries(
         invitations.map((invitation) => [
@@ -171,6 +166,7 @@ export async function getDashboardData() {
         ])
     );
     const totalRsvps = (rsvpRowsResult.data || []).length;
+    const totalSpent = (paymentsResult.data || []).reduce((sum, p) => sum + p.amount_paise, 0) / 100;
 
     return {
         profile: {
@@ -188,6 +184,7 @@ export async function getDashboardData() {
         views: viewResult.count || 0,
         rsvps: totalRsvps,
         invitationStats,
+        totalSpent,
     };
 }
 

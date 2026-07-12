@@ -120,6 +120,7 @@ export default async function ProfilePage() {
                 <ProfileCard
                     profile={profile}
                     activePublishedCount={activePublishedCount}
+                    totalSpent={dashboard.totalSpent || 0}
                     initials={initials}
                     greeting={greeting}
                 />

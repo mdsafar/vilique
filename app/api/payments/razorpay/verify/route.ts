@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyRazorpaySignature, razorpay } from "@/lib/razorpay";
 import { publishInvitationAfterPayment } from "@/features/invitations/publish";
 import { getPublicInvitationUrl } from "@/lib/config/site";
+import { Json } from "@/types/database";
 
 const verifyInputSchema = z.object({
     invitationId: z.string().uuid(),
@@ -68,8 +69,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
         }
 
-        // 11. Idempotency Check: if payment is already paid and invitation is published, return existing result
+        // Idempotency: a paid payment belongs only to this invitation. If it is already
+        // published, return the existing link; otherwise retry publishing this invitation.
         if (localPayment.status === "paid") {
+            if (invite.status !== "published") {
+                const publishResult = await publishInvitationAfterPayment({
+                    userId: user.id,
+                    invitationId,
+                    customSlug,
+                });
+
+                return NextResponse.json({
+                    status: "success",
+                    publicUrl: publishResult.publicUrl,
+                    slug: publishResult.slug,
+                });
+            }
+
             const publicUrl = getPublicInvitationUrl(invite.slug);
             return NextResponse.json({
                 status: "success",
@@ -125,8 +141,8 @@ export async function POST(request: Request) {
                 paid_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 metadata: {
-                    ...((localPayment.metadata as Record<string, any>) || {}),
-                    payment_details: providerPayment as any,
+                    ...((localPayment.metadata as Record<string, Json>) || {}),
+                    payment_details: providerPayment as unknown as Json,
                 },
             })
             .eq("id", localPayment.id);
@@ -149,16 +165,17 @@ export async function POST(request: Request) {
                 publicUrl: publishResult.publicUrl,
                 slug: publishResult.slug,
             });
-        } catch (publishErr: any) {
+        } catch (publishErr: unknown) {
             console.error("Verification marked payment as PAID but publishing service failed:", publishErr);
+            const message = publishErr instanceof Error ? publishErr.message : "Payment completed, but template publishing failed. Please try publishing again.";
             // Re-verify that payment is still recorded as PAID. Return success block indicating recovery required.
             return NextResponse.json({
                 status: "paymentPaidPublishFailed",
-                error: publishErr.message || "Payment completed, but template publishing failed. Please try publishing again.",
+                error: message,
                 message: "Your payment was verified. However, we could not launch your invitation (e.g. customized link is taken). Please edit your public link and click Publish Now to retry.",
             });
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Unhandled error verifying Razorpay payment:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

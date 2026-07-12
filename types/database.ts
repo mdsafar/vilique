@@ -114,6 +114,12 @@ export type Database = {
                     change_risk_status: "low" | "medium" | "high";
                     identity_snapshot: Json | null;
                     identity_fingerprint: string | null;
+                    event_snapshot: Json | null;
+                    event_change_score: number;
+                    event_status: "draft" | "published" | "completed" | "archived" | "unpublished";
+                    first_payment_id: string | null;
+                    publish_version: number;
+                    first_publish_version: number | null;
                 };
                 Insert: {
                     id?: string;
@@ -155,6 +161,12 @@ export type Database = {
                     change_risk_status?: "low" | "medium" | "high";
                     identity_snapshot?: Json | null;
                     identity_fingerprint?: string | null;
+                    event_snapshot?: Json | null;
+                    event_change_score?: number;
+                    event_status?: "draft" | "published" | "completed" | "archived" | "unpublished";
+                    first_payment_id?: string | null;
+                    publish_version?: number;
+                    first_publish_version?: number | null;
                 };
                 Update: Partial<Database["public"]["Tables"]["invitations"]["Insert"]>;
                 Relationships: [
@@ -396,6 +408,49 @@ export type Database = {
                     },
                     {
                         foreignKeyName: "invitation_change_audit_user_id_fkey";
+                        columns: ["user_id"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    }
+                ];
+            };
+            invitation_change_log: {
+                Row: {
+                    id: string;
+                    invitation_id: string;
+                    user_id: string;
+                    before: Json;
+                    after: Json;
+                    risk: "low" | "medium" | "high";
+                    score: number;
+                    decision: "allowed" | "warned" | "blocked" | "duplicated" | "manually_approved";
+                    reason: string | null;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    invitation_id: string;
+                    user_id: string;
+                    before?: Json;
+                    after?: Json;
+                    risk: "low" | "medium" | "high";
+                    score?: number;
+                    decision: "allowed" | "warned" | "blocked" | "duplicated" | "manually_approved";
+                    reason?: string | null;
+                    created_at?: string;
+                };
+                Update: Partial<Database["public"]["Tables"]["invitation_change_log"]["Insert"]>;
+                Relationships: [
+                    {
+                        foreignKeyName: "invitation_change_log_invitation_id_fkey";
+                        columns: ["invitation_id"];
+                        isOneToOne: false;
+                        referencedRelation: "invitations";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "invitation_change_log_user_id_fkey";
                         columns: ["user_id"];
                         isOneToOne: false;
                         referencedRelation: "users";

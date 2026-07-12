@@ -6,7 +6,8 @@ import Image from "next/image";
 import { MapPinned, Phone } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
-import { isEventCompleted } from "@/lib/lifecycle";
+import { getEventPhase } from "@/lib/lifecycle";
+import { parseInvitationDateParts } from "@/lib/invitationDate";
 import { InvitationData } from "@/types/invitation";
 
 type Props = {
@@ -75,23 +76,41 @@ export default function PastelFloralWedding({
     const pathname = usePathname();
 
     const eventDate = useMemo(
-        () => parseEventDate(invitation.eventDate, invitation.eventTime),
-        [invitation.eventDate, invitation.eventTime]
+        () => parseEventDate(invitation.eventDate, invitation.eventTime, invitation.eventTimezone),
+        [invitation.eventDate, invitation.eventTime, invitation.eventTimezone]
     );
 
     const eventParts = useMemo(
-        () => formatEventParts(eventDate, invitation.eventTime),
-        [eventDate, invitation.eventTime]
+        () => formatEventParts(eventDate, invitation.eventTime, invitation.eventTimezone),
+        [eventDate, invitation.eventTime, invitation.eventTimezone]
     );
 
-    const countdown = useCountdown(eventDate);
+    const { countdown, isStarted, now } = useCountdown(eventDate);
     const completed = useMemo(() => {
-        return invitation.lifecycleStatus === 'completed' || isEventCompleted({
+        return invitation.lifecycleStatus === 'completed' || getEventPhase({
             eventDate: invitation.eventDate,
             eventTime: invitation.eventTime,
             eventTimezone: invitation.eventTimezone,
-        });
-    }, [invitation.lifecycleStatus, invitation.eventDate, invitation.eventTime, invitation.eventTimezone]);
+        }, 0, new Date(now)) === "completed";
+    }, [invitation.lifecycleStatus, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
+    const eventPhase = useMemo(() => {
+        if (completed) return "completed";
+        return getEventPhase({
+            eventDate: invitation.eventDate,
+            eventTime: invitation.eventTime,
+            eventTimezone: invitation.eventTimezone,
+        }, 0, new Date(now));
+    }, [completed, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
+    const inProgress = eventPhase === "in_progress";
+
+    const countdownTitle = useMemo(() => {
+        const isWedding = invitation.category === "wedding";
+        if (completed) return "EVENT COMPLETED";
+        if (inProgress || isStarted) {
+            return isWedding ? "WEDDING IN PROGRESS" : "EVENT IN PROGRESS";
+        }
+        return isWedding ? "COUNTDOWN TO WEDDING" : "COUNTDOWN TO EVENT";
+    }, [completed, inProgress, isStarted, invitation.category]);
 
     const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl || invitation.defaultMusicUrl) : null;
     const tickUrl = enableAudio ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
@@ -269,6 +288,8 @@ export default function PastelFloralWedding({
                         onAccept={handleAccept}
                         onDecline={handleDecline}
                         completed={completed}
+                        inProgress={inProgress}
+                        countdownTitle={countdownTitle}
                     />
                 ) : (
                     <ThanksCard
@@ -277,6 +298,8 @@ export default function PastelFloralWedding({
                         countdown={countdown}
                         onEvent={onEvent}
                         completed={completed}
+                        inProgress={inProgress}
+                        countdownTitle={countdownTitle}
                     />
                 )}
             </div>
@@ -292,6 +315,8 @@ function InviteCard({
     onAccept,
     onDecline,
     completed,
+    inProgress,
+    countdownTitle,
 }: {
     invitation: InvitationData;
     eventParts: ReturnType<typeof formatEventParts>;
@@ -300,6 +325,8 @@ function InviteCard({
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
     onDecline: () => void;
     completed: boolean;
+    inProgress: boolean;
+    countdownTitle: string;
 }) {
     return (
         <section className={`weddingCard inviteScreen active ${isAccepting ? "accepting" : ""} ${completed ? "completed" : ""}`}>
@@ -335,11 +362,13 @@ function InviteCard({
 
             <div className="goldLine dividerHeart">❤</div>
             <p className="countdownTitle">
-                {completed ? "EVENT COMPLETED" : "COUNTDOWN TO WEDDING"}
+                {countdownTitle}
             </p>
-            <CountdownGrid countdown={completed ? { days: "00", hours: "00", mins: "00", secs: "00" } : countdown} />
+            {!completed && !inProgress ? <CountdownGrid countdown={countdown} /> : null}
 
-            {!completed ? (
+            {inProgress ? (
+                <EventInProgressMessage category={invitation.category} />
+            ) : !completed ? (
                 <>
                     <p className="rsvpTitle">WILL YOU ATTEND?</p>
                     <div className="rsvpButtons">
@@ -370,12 +399,16 @@ function ThanksCard({
     countdown,
     onEvent,
     completed,
+    inProgress,
+    countdownTitle,
 }: {
     invitation: InvitationData;
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
     onEvent?: (eventType: AnalyticsEventType) => void;
     completed: boolean;
+    inProgress: boolean;
+    countdownTitle: string;
 }) {
     return (
         <section className={`weddingCard thanksCard active ${completed ? "completed" : ""}`}>
@@ -419,11 +452,23 @@ function ThanksCard({
 
             <div className="goldLine dividerHeart">❤</div>
             <p className="countdownTitle">
-                {completed ? "EVENT COMPLETED" : "COUNTDOWN TO WEDDING"}
+                {countdownTitle}
             </p>
-            <CountdownGrid countdown={completed ? { days: "00", hours: "00", mins: "00", secs: "00" } : countdown} />
+            {!completed && !inProgress ? <CountdownGrid countdown={countdown} /> : null}
+            {inProgress ? <EventInProgressMessage category={invitation.category} /> : null}
             <WeddingBrandCredit />
         </section>
+    );
+}
+
+function EventInProgressMessage({ category }: { category: string }) {
+    const label = category === "wedding" ? "The wedding has already started." : "The function has already started.";
+
+    return (
+        <div className="eventInProgressMessage">
+            <strong>Hurry up!</strong>
+            <span>{label} Please reach the venue and join the celebration.</span>
+        </div>
     );
 }
 
@@ -551,18 +596,22 @@ function DeclineModal({
     );
 }
 
-function useCountdown(eventDate: Date): CountdownValue {
-    const [now, setNow] = useState(eventDate.getTime());
+function useCountdown(eventDate: Date) {
+    const [now, setNow] = useState(() => Date.now());
+    const eventTime = eventDate.getTime();
 
     useEffect(() => {
         const interval = window.setInterval(() => {
             setNow(Date.now());
-        }, 250);
+        }, 500);
 
         return () => window.clearInterval(interval);
-    }, []);
+    }, [eventTime]);
 
-    return getCountdown(eventDate, now);
+    const countdown = getCountdown(eventDate, now);
+    const isStarted = eventTime <= now;
+
+    return { countdown, isStarted, now };
 }
 
 function getCountdown(eventDate: Date, now = Date.now()): CountdownValue {
@@ -580,20 +629,96 @@ function getCountdown(eventDate: Date, now = Date.now()): CountdownValue {
     };
 }
 
-function parseEventDate(date: string, time: string) {
-    const startTime = time.match(/\d{1,2}:\d{2}\s*(AM|PM)?/i)?.[0] || "00:00";
-    return new Date(`${date} ${startTime}`);
+function getUtcTimeInTimezone(
+    year: number,
+    monthIndex: number,
+    day: number,
+    hours: number,
+    minutes: number,
+    timezone: string
+): number {
+    const localDate = new Date(year, monthIndex, day, hours, minutes, 0);
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hour12: false,
+    });
+
+    let guess = localDate.getTime();
+    for (let i = 0; i < 3; i++) {
+        const parts = formatter.formatToParts(new Date(guess));
+        const pv = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+
+        const gYear = parseInt(pv.year, 10);
+        const gMonth = parseInt(pv.month, 10) - 1;
+        const gDay = parseInt(pv.day, 10);
+        const gHour = parseInt(pv.hour, 10) % 24;
+        const gMin = parseInt(pv.minute, 10);
+
+        const actualLocal = new Date(year, monthIndex, day, hours, minutes, 0);
+        const formatLocal = new Date(gYear, gMonth, gDay, gHour, gMin, 0);
+
+        const diff = formatLocal.getTime() - actualLocal.getTime();
+        if (diff === 0) break;
+        guess -= diff;
+    }
+    return guess;
 }
 
-function formatEventParts(eventDate: Date, eventTime: string) {
+function parseEventDate(
+    dateStr: string | null | undefined,
+    timeStr: string | null | undefined,
+    timezone: string = "Asia/Kolkata"
+): Date {
+    const dateParts = parseInvitationDateParts(dateStr);
+    if (!dateParts) return new Date();
+    const { year, month, day } = dateParts;
+
+    let hours = 0;
+    let minutes = 0;
+
+    if (timeStr) {
+        const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+        if (match) {
+            let h = parseInt(match[1], 10);
+            const m = parseInt(match[2], 10);
+            const period = match[3]?.toUpperCase();
+
+            if (period === "PM" && h < 12) h += 12;
+            if (period === "AM" && h === 12) h = 0;
+
+            hours = h;
+            minutes = m;
+        }
+    }
+
+    const utcMs = getUtcTimeInTimezone(year, month - 1, day, hours, minutes, timezone);
+    return new Date(utcMs);
+}
+
+function formatEventParts(eventDate: Date, eventTime: string, timezone: string = "Asia/Kolkata") {
     const [startTime = "", endTime = ""] = eventTime.split("-").map((part) => part.trim());
 
+    const formatter = (options: Intl.DateTimeFormatOptions) =>
+        new Intl.DateTimeFormat("en-US", { ...options, timeZone: timezone });
+
+    const day = formatter({ day: "2-digit" }).format(eventDate);
+    const month = formatter({ month: "long" }).format(eventDate).toUpperCase();
+    const monthShort = formatter({ month: "short" }).format(eventDate).toUpperCase();
+    const weekday = formatter({ weekday: "long" }).format(eventDate);
+    const year = formatter({ year: "numeric" }).format(eventDate);
+
     return {
-        day: String(eventDate.getDate()).padStart(2, "0"),
-        month: eventDate.toLocaleString("en", { month: "long" }).toUpperCase(),
-        monthShort: eventDate.toLocaleString("en", { month: "short" }).toUpperCase(),
-        weekday: eventDate.toLocaleString("en", { weekday: "long" }),
-        year: String(eventDate.getFullYear()),
+        day,
+        month,
+        monthShort,
+        weekday,
+        year,
         startTime: startTime.replace(/\s+/g, " "),
         endTime: endTime ? `– ${endTime.replace(/\s+/g, " ")}` : "",
     };

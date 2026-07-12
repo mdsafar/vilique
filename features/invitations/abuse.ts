@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { parseInvitationDateParts } from "@/lib/invitationDate";
 
 /**
  * Normalizes text by lowercasing, removing punctuation, honorifics,
@@ -53,12 +54,19 @@ export function generateEventFingerprint({
     return crypto.createHash("sha256").update(parts.join("::")).digest("hex");
 }
 
-type Snapshot = {
+export type EventIdentitySnapshot = {
     original_category: string;
     original_primary_name: string;
     original_secondary_name?: string | null;
     original_event_date: string;
-    original_template_id: string;
+    original_template_id: string | null;
+    original_venue_name?: string | null;
+    original_venue_address?: string | null;
+    original_message?: string | null;
+    owner_id?: string | null;
+    first_published_at?: string | null;
+    first_payment_id?: string | null;
+    first_publish_version?: number | null;
 };
 
 type Proposed = {
@@ -67,6 +75,17 @@ type Proposed = {
     secondaryName?: string | null;
     eventDate?: string | null;
     templateId?: string | null;
+    venueName?: string | null;
+    venueAddress?: string | null;
+    message?: string | null;
+};
+
+export type EventChangeRisk = {
+    riskLevel: "low" | "medium" | "high";
+    decision: "allowed" | "warned" | "blocked" | "duplicated" | "manually_approved";
+    score: number;
+    reason: string;
+    signals: string[];
 };
 
 /**
@@ -75,23 +94,17 @@ type Proposed = {
  * or major (silently recycling the payment for a completely different event).
  */
 export function assessChangeRisk(
-    snapshot: Snapshot,
+    snapshot: EventIdentitySnapshot,
     proposed: Proposed
-): {
-    riskLevel: "low" | "medium" | "high";
-    decision: "allowed" | "warned" | "blocked" | "duplicated" | "manually_approved";
-    reason: string;
-} {
-    // 1. Check category change
+): EventChangeRisk {
+    let score = 0;
+    const signals: string[] = [];
+
     if (proposed.category && proposed.category !== snapshot.original_category) {
-        return {
-            riskLevel: "high",
-            decision: "blocked",
-            reason: `Changing event category from '${snapshot.original_category}' to '${proposed.category}' constitutes a different event type.`,
-        };
+        score += isRelatedCategory(snapshot.original_category, proposed.category) ? 30 : 55;
+        signals.push(`Category changed from '${snapshot.original_category}' to '${proposed.category}'.`);
     }
 
-    // 2. Check names change
     if (proposed.primaryName !== undefined || proposed.secondaryName !== undefined) {
         const origP = normalizeText(snapshot.original_primary_name);
         const origS = normalizeText(snapshot.original_secondary_name || "");
@@ -99,54 +112,133 @@ export function assessChangeRisk(
         const propP = normalizeText(proposed.primaryName !== undefined ? proposed.primaryName : snapshot.original_primary_name);
         const propS = normalizeText(proposed.secondaryName !== undefined ? proposed.secondaryName : (snapshot.original_secondary_name || ""));
 
-        const origTokens = [...origP.split(" "), ...origS.split(" ")].filter((t) => t.length > 2);
-        const propTokens = [...propP.split(" "), ...propS.split(" ")].filter((t) => t.length > 2);
+        const nameSimilarity = tokenSimilarity([origP, origS].join(" "), [propP, propS].join(" "));
 
-        // Direct comparison if no long tokens exist
-        if (origTokens.length === 0 || propTokens.length === 0) {
-            const origCombined = [origP, origS].filter(Boolean).sort().join("|");
-            const propCombined = [propP, propS].filter(Boolean).sort().join("|");
-            if (origCombined !== propCombined) {
-                return {
-                    riskLevel: "high",
-                    decision: "blocked",
-                    reason: "Host name has been completely replaced.",
-                };
-            }
-        } else {
-            // Check if there is at least one overlapping token (e.g. Arjun is still Arjun)
-            const hasSharedToken = origTokens.some((ot) => propTokens.includes(ot));
-            if (!hasSharedToken) {
-                return {
-                    riskLevel: "high",
-                    decision: "blocked",
-                    reason: "Both host/couple names have been completely replaced with unrelated names.",
-                };
+        if (nameSimilarity < 0.2) {
+            score += 45;
+            signals.push("Host/couple names appear completely replaced.");
+        } else if (nameSimilarity < 0.55) {
+            score += 25;
+            signals.push("Host/couple names changed significantly.");
+        } else if (nameSimilarity < 0.9) {
+            score += 8;
+            signals.push("Host/couple names changed slightly.");
+        }
+    }
+
+    if (proposed.eventDate && proposed.eventDate !== snapshot.original_event_date) {
+        const diffDays = getDateDiffDays(snapshot.original_event_date, proposed.eventDate);
+
+        if (diffDays !== null) {
+            if (diffDays > 365) {
+                score += 28;
+                signals.push("Event date moved by more than one year.");
+            } else if (diffDays > 180) {
+                score += 22;
+                signals.push("Event date moved by more than six months.");
+            } else if (diffDays > 90) {
+                score += 12;
+                signals.push("Event date moved by more than three months.");
+            } else if (diffDays > 30) {
+                score += 5;
+                signals.push("Event date moved by more than one month.");
             }
         }
     }
 
-    // 3. Check extreme date change (legitimate rescheduling is allowed, but changing dates after completion or moving by months is flagged)
-    if (proposed.eventDate && proposed.eventDate !== snapshot.original_event_date) {
-        const origDate = new Date(snapshot.original_event_date);
-        const propDate = new Date(proposed.eventDate);
-
-        if (!isNaN(origDate.getTime()) && !isNaN(propDate.getTime())) {
-            const diffDays = Math.abs(propDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24);
-            // Flag rescheduling changes that shift the event by more than 90 days
-            if (diffDays > 90) {
-                return {
-                    riskLevel: "medium",
-                    decision: "warned",
-                    reason: "Rescheduling shifts the event date by more than 90 days. Please verify this is the same event.",
-                };
-            }
+    const venueOriginal = [snapshot.original_venue_name, snapshot.original_venue_address].filter(Boolean).join(" ");
+    const venueProposed = [proposed.venueName, proposed.venueAddress].filter((value) => value !== undefined).join(" ");
+    if (venueOriginal && venueProposed) {
+        const venueSimilarity = tokenSimilarity(venueOriginal, venueProposed);
+        if (venueSimilarity < 0.2) {
+            score += 22;
+            signals.push("Venue appears completely replaced.");
+        } else if (venueSimilarity < 0.5) {
+            score += 10;
+            signals.push("Venue changed significantly.");
         }
+    }
+
+    if (snapshot.original_message && proposed.message !== undefined) {
+        const messageSimilarity = tokenSimilarity(snapshot.original_message, proposed.message || "");
+        if (messageSimilarity < 0.15) {
+            score += 15;
+            signals.push("Invitation wording/content appears mostly replaced.");
+        } else if (messageSimilarity < 0.45) {
+            score += 6;
+            signals.push("Invitation wording/content changed substantially.");
+        }
+    }
+
+    if ((proposed.templateId || snapshot.original_template_id) && proposed.templateId && proposed.templateId !== snapshot.original_template_id) {
+        score += 20;
+        signals.push("Template changed after first publish.");
+    }
+
+    if (signals.length >= 3) score += 10;
+    if (signals.length >= 4) score += 10;
+
+    if (score >= 70) {
+        return {
+            riskLevel: "high",
+            decision: "blocked",
+            score,
+            reason: "This looks like a different event. Your purchase covers one published event. Create a new invitation for this event.",
+            signals,
+        };
+    }
+
+    if (score >= 35) {
+        return {
+            riskLevel: "medium",
+            decision: "warned",
+            score,
+            reason: "This looks like a major update to your invitation.",
+            signals,
+        };
     }
 
     return {
         riskLevel: "low",
         decision: "allowed",
-        reason: "Changes classify as minor details corrections (spelling, date shift, template, theme, maps, etc.).",
+        score,
+        reason: "Changes classify as same-event corrections or legitimate rescheduling.",
+        signals,
     };
+}
+
+function tokenSimilarity(left: string | null | undefined, right: string | null | undefined) {
+    const leftTokens = new Set(normalizeText(left).split(" ").filter((token) => token.length > 2));
+    const rightTokens = new Set(normalizeText(right).split(" ").filter((token) => token.length > 2));
+
+    if (leftTokens.size === 0 && rightTokens.size === 0) return 1;
+    if (leftTokens.size === 0 || rightTokens.size === 0) return 0;
+
+    let intersection = 0;
+    leftTokens.forEach((token) => {
+        if (rightTokens.has(token)) intersection += 1;
+    });
+
+    const union = new Set([...leftTokens, ...rightTokens]).size;
+    return union === 0 ? 1 : intersection / union;
+}
+
+function getDateDiffDays(left: string, right: string) {
+    const leftParts = parseInvitationDateParts(left);
+    const rightParts = parseInvitationDateParts(right);
+    if (!leftParts || !rightParts) return null;
+
+    const leftDate = Date.UTC(leftParts.year, leftParts.month - 1, leftParts.day);
+    const rightDate = Date.UTC(rightParts.year, rightParts.month - 1, rightParts.day);
+    return Math.abs(rightDate - leftDate) / (1000 * 60 * 60 * 24);
+}
+
+function isRelatedCategory(left: string, right: string) {
+    const relatedPairs = new Set([
+        "wedding:engagement",
+        "engagement:wedding",
+        "party:birthday",
+        "birthday:party",
+    ]);
+    return relatedPairs.has(`${left}:${right}`);
 }

@@ -43,6 +43,7 @@ export async function POST(request: Request) {
             .from("invitations")
             .update({
                 lifecycle_status: "completed",
+                event_status: "completed",
                 completed_at: new Date().toISOString()
             })
             .in("id", completedIds);

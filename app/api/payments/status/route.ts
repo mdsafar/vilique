@@ -52,7 +52,7 @@ export async function GET(request: Request) {
             currency: template.currency,
             alreadyPaid: !!payment,
         });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Error fetching payment status:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

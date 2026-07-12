@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 import { verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publishInvitationAfterPayment } from "@/features/invitations/publish";
+import { Json } from "@/types/database";
+
+type RazorpayEntity = {
+    id?: string;
+    order_id?: string;
+    payment_id?: string;
+    amount?: number;
+    error_code?: string;
+    error_description?: string;
+};
+
+type RazorpayWebhookPayload = {
+    id?: string;
+    event?: string;
+    payload?: {
+        order?: { entity?: RazorpayEntity };
+        payment?: { entity?: RazorpayEntity };
+        refund?: { entity?: RazorpayEntity };
+    };
+};
 
 export async function POST(request: Request) {
     try {
@@ -22,7 +42,7 @@ export async function POST(request: Request) {
         }
 
         // Parse the body
-        const payload = JSON.parse(rawBody);
+        const payload = JSON.parse(rawBody) as RazorpayWebhookPayload;
         const eventId = payload.id;
         const eventType = payload.event;
 
@@ -39,7 +59,7 @@ export async function POST(request: Request) {
                 provider: "razorpay",
                 provider_event_id: eventId,
                 event_type: eventType,
-                payload: payload,
+                payload: payload as Json,
                 processing_status: "pending",
             })
             .select()
@@ -58,7 +78,8 @@ export async function POST(request: Request) {
         // 2. Process webhook event
         try {
             if (eventType === "order.paid" || eventType === "payment.captured") {
-                const entity = eventType === "order.paid" ? payload.payload.order.entity : payload.payload.payment.entity;
+                const entity = eventType === "order.paid" ? payload.payload?.order?.entity : payload.payload?.payment?.entity;
+                if (!entity) throw new Error("Missing payment/order entity");
                 const orderId = eventType === "order.paid" ? entity.id : entity.order_id;
                 const paymentId = eventType === "order.paid" ? null : entity.id;
 
@@ -81,8 +102,8 @@ export async function POST(request: Request) {
                                     paid_at: new Date().toISOString(),
                                     updated_at: new Date().toISOString(),
                                     metadata: {
-                                        ...((localPayment.metadata as Record<string, any>) || {}),
-                                        webhook_details: payload,
+                                        ...((localPayment.metadata as Record<string, Json>) || {}),
+                                        webhook_details: payload as Json,
                                     },
                                 })
                                 .eq("id", localPayment.id);
@@ -98,9 +119,10 @@ export async function POST(request: Request) {
                                     invitationId: localPayment.invitation_id,
                                 });
                                 console.log(`Successfully reconciled and published invitation ${localPayment.invitation_id} via webhook event ${eventId}`);
-                            } catch (publishError: any) {
+                            } catch (publishError: unknown) {
                                 // Keep payment status as paid, but log the error (user can manually retry publishing)
-                                console.error(`Webhook reconciled payment to paid, but publishing failed: ${publishError.message}`);
+                                const message = publishError instanceof Error ? publishError.message : "Unknown publish error";
+                                console.error(`Webhook reconciled payment to paid, but publishing failed: ${message}`);
                             }
                         }
                     } else {
@@ -108,7 +130,8 @@ export async function POST(request: Request) {
                     }
                 }
             } else if (eventType === "payment.failed") {
-                const paymentEntity = payload.payload.payment.entity;
+                const paymentEntity = payload.payload?.payment?.entity;
+                if (!paymentEntity) throw new Error("Missing payment entity");
                 const orderId = paymentEntity.order_id;
                 const failureCode = paymentEntity.error_code || "UNKNOWN";
                 const failureDesc = paymentEntity.error_description || "Payment failed";
@@ -130,17 +153,18 @@ export async function POST(request: Request) {
                                 failure_description: failureDesc,
                                 updated_at: new Date().toISOString(),
                                 metadata: {
-                                    ...((localPayment.metadata as Record<string, any>) || {}),
-                                    webhook_details: payload,
+                                    ...((localPayment.metadata as Record<string, Json>) || {}),
+                                    webhook_details: payload as Json,
                                 },
                             })
                             .eq("id", localPayment.id);
                     }
                 }
             } else if (eventType === "refund.created" || eventType === "refund.processed") {
-                const refundEntity = payload.payload.refund.entity;
+                const refundEntity = payload.payload?.refund?.entity;
+                if (!refundEntity) throw new Error("Missing refund entity");
                 const paymentId = refundEntity.payment_id;
-                const amountRefunded = refundEntity.amount;
+                const amountRefunded = refundEntity.amount || 0;
 
                 if (paymentId) {
                     const { data: localPayment } = await supabaseAdmin
@@ -158,8 +182,8 @@ export async function POST(request: Request) {
                                 refunded_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString(),
                                 metadata: {
-                                    ...((localPayment.metadata as Record<string, any>) || {}),
-                                    refund_details: payload,
+                                    ...((localPayment.metadata as Record<string, Json>) || {}),
+                                    refund_details: payload as Json,
                                 },
                             })
                             .eq("id", localPayment.id);
@@ -188,21 +212,22 @@ export async function POST(request: Request) {
                 .eq("id", insertedEvent.id);
 
             return NextResponse.json({ received: true });
-        } catch (processError: any) {
+        } catch (processError: unknown) {
             console.error(`Error processing webhook event: ${eventId}`, processError);
+            const message = processError instanceof Error ? processError.message : "Processing error";
 
             await supabaseAdmin
                 .from("webhook_events")
                 .update({
                     processing_status: "failed",
-                    error_message: processError.message || "Processing error",
+                    error_message: message,
                 })
                 .eq("id", insertedEvent.id);
 
             // Return 500 so Razorpay retries if it's a temporary database connection crash
             return NextResponse.json({ error: "Event processing failed" }, { status: 500 });
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Webhook route unhandled crash:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

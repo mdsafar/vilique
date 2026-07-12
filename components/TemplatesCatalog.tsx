@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import AppLogo from "@/components/AppLogo";
 import type { InvitationCategory } from "@/types/invitation";
 
@@ -41,6 +41,10 @@ const categoryLabels: Record<InvitationCategory | "all", string> = {
 export default function TemplatesCatalog({ templates }: Props) {
     const [searchTerm, setSearchTerm] = useState("");
     const [activeCategory, setActiveCategory] = useState<InvitationCategory | "all">("all");
+    const todayLabel = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "2-digit",
+    }).format(new Date()).toUpperCase();
     const categories = ["all", ...Array.from(new Set(templates.map((template) => template.category)))] as const;
     const query = searchTerm.trim().toLowerCase();
     const filteredTemplates = templates.filter((template) => {
@@ -122,7 +126,7 @@ export default function TemplatesCatalog({ templates }: Props) {
                                             <div className="templateReferenceCard">
                                                 <small>WEDDING INVITATION</small>
                                                 <strong>Maya & Arjun</strong>
-                                                <span>FEB 14 · 05:30 PM</span>
+                                                <span>{todayLabel} · 05:30 PM</span>
                                             </div>
                                             <i className="templateFlower flowerOne" />
                                             <i className="templateFlower flowerTwo" />
@@ -142,14 +146,6 @@ export default function TemplatesCatalog({ templates }: Props) {
                                         </div>
                                     </div>
                                 </Link>
-
-                                <button
-                                    type="button"
-                                    className="templateSaveBtn"
-                                    aria-label={`Save ${template.name}`}
-                                >
-                                    <Heart size={16} aria-hidden="true" />
-                                </button>
                             </article>
                         );
                     })}

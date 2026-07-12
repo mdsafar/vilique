@@ -33,51 +33,84 @@ export async function POST(request: Request, { params }: Context) {
     const newSlug = `${invite.slug}-${randomSuffix}`;
 
     // 3. Construct clean copy resetting all payments & snapshot credentials
-    const { data: newInvite, error: insertError } = await supabase
+    const duplicatePayload = {
+        user_id: user.id,
+        template_id: invite.template_id,
+        slug: newSlug,
+        category: invite.category,
+        title: `${invite.title} (Copy)`,
+        primary_name: invite.primary_name,
+        secondary_name: invite.secondary_name,
+        event_date: invite.event_date,
+        event_time: invite.event_time,
+        venue_name: invite.venue_name,
+        venue_address: invite.venue_address,
+        map_link: invite.map_link,
+        phone: invite.phone,
+        whatsapp: invite.whatsapp,
+        message: invite.message,
+        music_url: invite.music_url,
+        cover_image_url: invite.cover_image_url,
+        gallery_urls: invite.gallery_urls,
+        theme: invite.theme,
+        sections: invite.sections,
+        status: "draft" as const,
+        lifecycle_status: "draft" as const,
+        payment_status: "unpaid" as const,
+        published_at: null,
+        first_published_at: null,
+        completed_at: null,
+        archived_at: null,
+        event_status: "draft" as const,
+        event_snapshot: null,
+        event_change_score: 0,
+        first_payment_id: null,
+        publish_version: 0,
+        first_publish_version: null,
+        original_category: null,
+        original_primary_name: null,
+        original_secondary_name: null,
+        original_event_date: null,
+        original_template_id: null,
+        identity_snapshot: null,
+        identity_fingerprint: null,
+        change_risk_status: "low" as const,
+    };
+
+    let { data: newInvite, error: insertError } = await supabase
         .from("invitations")
-        .insert({
-            user_id: user.id,
-            template_id: invite.template_id,
-            slug: newSlug,
-            category: invite.category,
-            title: `${invite.title} (Copy)`,
-            primary_name: invite.primary_name,
-            secondary_name: invite.secondary_name,
-            event_date: invite.event_date,
-            event_time: invite.event_time,
-            venue_name: invite.venue_name,
-            venue_address: invite.venue_address,
-            map_link: invite.map_link,
-            phone: invite.phone,
-            whatsapp: invite.whatsapp,
-            message: invite.message,
-            music_url: invite.music_url,
-            cover_image_url: invite.cover_image_url,
-            gallery_urls: invite.gallery_urls,
-            theme: invite.theme,
-            sections: invite.sections,
-            status: "draft",
-            lifecycle_status: "draft",
-            payment_status: "unpaid",
-            published_at: null,
-            first_published_at: null,
-            completed_at: null,
-            archived_at: null,
-            original_category: null,
-            original_primary_name: null,
-            original_secondary_name: null,
-            original_event_date: null,
-            original_template_id: null,
-            identity_snapshot: null,
-            identity_fingerprint: null,
-            change_risk_status: "low"
-        })
+        .insert(duplicatePayload)
         .select("id, slug")
         .single();
+
+    if (isSchemaCacheColumnError(insertError)) {
+        const retry = await supabase
+            .from("invitations")
+            .insert(stripNewEntitlementColumns(duplicatePayload))
+            .select("id, slug")
+            .single();
+        newInvite = retry.data;
+        insertError = retry.error;
+    }
 
     if (insertError || !newInvite) {
         return NextResponse.json({ error: insertError?.message || "Failed to duplicate invitation" }, { status: 400 });
     }
 
     return NextResponse.json(newInvite, { status: 201 });
+}
+
+function isSchemaCacheColumnError(error: { code?: string; message?: string } | null) {
+    return error?.code === "PGRST204" || !!error?.message?.includes("schema cache");
+}
+
+function stripNewEntitlementColumns<T extends Record<string, unknown>>(value: T) {
+    const legacyValue = { ...value };
+    delete legacyValue.event_status;
+    delete legacyValue.event_snapshot;
+    delete legacyValue.event_change_score;
+    delete legacyValue.first_payment_id;
+    delete legacyValue.publish_version;
+    delete legacyValue.first_publish_version;
+    return legacyValue;
 }

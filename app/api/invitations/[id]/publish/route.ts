@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: Context) {
         }
 
         // Get input (custom slug if provided)
-        const body = await request.json().catch(() => ({}));
+        const body = await request.json().catch(() => ({})) as { slug?: string };
         const customSlug = body.slug?.toLowerCase().trim() || "";
 
         const result = await publishInvitationAfterPayment({
@@ -35,9 +35,8 @@ export async function POST(request: Request, { params }: Context) {
             published_at: result.publishedAt,
             publicUrl: result.publicUrl,
         });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Error publishing invitation:", err);
-        return NextResponse.json({ error: err.message || "Failed to publish invitation" }, { status: 400 });
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to publish invitation" }, { status: 400 });
     }
 }
-

@@ -3,6 +3,9 @@ import { getPublishedInvitationBySlug } from "@/features/invitations/data";
 import PublicInviteExperience from "@/components/PublicInviteExperience";
 import { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type Props = {
     params: Promise<{
         slug: string;

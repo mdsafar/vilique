@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, Receipt, ExternalLink, Calendar, HelpCircle, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Receipt, ExternalLink, Calendar, HelpCircle, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { formatPaiseToCurrency } from "@/lib/currency";
@@ -32,6 +32,99 @@ export default async function PaymentHistoryPage() {
         `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+
+    const paymentCards = (payments || []).map((payment) => {
+        const template = payment.invitation_templates as { name?: string } | null;
+        const invitation = payment.invitations as { title?: string; slug?: string } | null;
+        const templateName = template?.name || "Premium Design";
+        const invitationTitle = invitation?.title || "Deleted Invitation";
+        const slug = invitation?.slug;
+        const publicUrl = slug ? getPublicInvitationUrl(slug) : null;
+        const dateString = new Date(payment.created_at).toLocaleDateString("en-IN", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+
+        let statusText = "Pending";
+        let statusClass = "pending";
+        let StatusIcon = HelpCircle;
+
+        if (payment.status === "paid") {
+            statusText = "Paid";
+            statusClass = "paid";
+            StatusIcon = CheckCircle2;
+        } else if (payment.status === "failed") {
+            statusText = "Failed";
+            statusClass = "failed";
+            StatusIcon = AlertTriangle;
+        } else if (payment.status === "refunded") {
+            statusText = "Refunded";
+            statusClass = "refunded";
+            StatusIcon = RefreshCw;
+        } else if (payment.status === "cancelled") {
+            statusText = "Cancelled";
+            statusClass = "cancelled";
+            StatusIcon = AlertTriangle;
+        } else if (payment.status === "partially_refunded") {
+            statusText = "Part. Refunded";
+            statusClass = "refunded";
+            StatusIcon = RefreshCw;
+        }
+
+        return (
+            <article className="paymentRowCard" key={payment.id}>
+                <div className="paymentRowMain">
+                    <div className="paymentRowDetails">
+                        <div className="paymentTitleBlock">
+                            <h3>{templateName}</h3>
+                            <span className={`paymentStatusBadge ${statusClass}`}>
+                                <StatusIcon size={12} />
+                                <span>{statusText}</span>
+                            </span>
+                        </div>
+                        <p className="paymentInvitationName">
+                            For: <strong>{invitationTitle}</strong>
+                        </p>
+                    </div>
+
+                    <div className="paymentRowMeta">
+                        <div className="paymentMetaItem">
+                            <Calendar size={13} className="metaIcon" />
+                            <span>{dateString}</span>
+                        </div>
+                        {payment.receipt && (
+                            <div className="paymentMetaItem refCode">
+                                <span className="refLabel">Ref:</span>
+                                <code>{payment.receipt}</code>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="paymentRowAmount">
+                        <span className="amountVal">{formatPaiseToCurrency(payment.amount_paise, payment.currency)}</span>
+                        <span className="currencyLabel">{payment.currency}</span>
+                    </div>
+                </div>
+
+                <div className="paymentRowFooter">
+                    {publicUrl && payment.status === "paid" ? (
+                        <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="paymentLinkAction">
+                            <ExternalLink size={13} />
+                            <span>View Invitation Site</span>
+                        </a>
+                    ) : (
+                        <span className="paymentNoAction">-</span>
+                    )}
+                    <span className="invoiceArchitectureLabel">
+                        Invoice ready for download
+                    </span>
+                </div>
+            </article>
+        );
+    });
 
     return (
         <main className="paymentsPage">
@@ -75,93 +168,7 @@ export default async function PaymentHistoryPage() {
                     </div>
                 ) : (
                     <div className="paymentsList">
-                        {payments?.map((payment) => {
-                            const templateName = (payment.invitation_templates as any)?.name || "Premium Design";
-                            const invitationTitle = (payment.invitations as any)?.title || "Untitled Invitation";
-                            const slug = (payment.invitations as any)?.slug;
-                            const publicUrl = slug ? getPublicInvitationUrl(slug) : null;
-                            const dateString = new Date(payment.created_at).toLocaleDateString("en-IN", {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            });
-
-                            // Status tags configurations
-                            let statusText = "Pending";
-                            let statusClass = "pending";
-                            let StatusIcon = HelpCircle;
-
-                            if (payment.status === "paid") {
-                                statusText = "Paid";
-                                statusClass = "paid";
-                                StatusIcon = CheckCircle2;
-                            } else if (payment.status === "failed") {
-                                statusText = "Failed";
-                                statusClass = "failed";
-                                StatusIcon = AlertTriangle;
-                            } else if (payment.status === "refunded") {
-                                statusText = "Refunded";
-                                statusClass = "refunded";
-                                StatusIcon = RefreshCw;
-                            } else if (payment.status === "cancelled") {
-                                statusText = "Cancelled";
-                                statusClass = "cancelled";
-                                StatusIcon = AlertTriangle;
-                            } else if (payment.status === "partially_refunded") {
-                                statusText = "Part. Refunded";
-                                statusClass = "refunded";
-                                StatusIcon = RefreshCw;
-                            }
-
-                            return (
-                                <article className="paymentRowCard" key={payment.id}>
-                                    <div className="paymentRowMain">
-                                        <div className="paymentRowDetails">
-                                            <div className="paymentTitleBlock">
-                                                <h3>{templateName}</h3>
-                                                <span className={`paymentStatusBadge ${statusClass}`}>
-                                                    <StatusIcon size={12} />
-                                                    <span>{statusText}</span>
-                                                </span>
-                                            </div>
-                                            <p className="paymentInvitationName">
-                                                For: <strong>{invitationTitle}</strong>
-                                            </p>
-                                            <div className="paymentRowMeta">
-                                                <span>
-                                                    <Calendar size={12} />
-                                                    <span>{dateString}</span>
-                                                </span>
-                                                {payment.receipt && (
-                                                    <span className="paymentRefKey">
-                                                        Ref: <code>{payment.receipt}</code>
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="paymentRowAmount">
-                                            <span>{formatPaiseToCurrency(payment.amount_paise, payment.currency)}</span>
-                                            <p>{payment.currency}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="paymentRowFooter">
-                                        {publicUrl && payment.status === "paid" && (
-                                            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="paymentLinkAction">
-                                                <ExternalLink size={13} />
-                                                <span>View Invitation Site</span>
-                                            </a>
-                                        )}
-                                        <span className="invoiceArchitectureLabel">
-                                            Invoice ready for download
-                                        </span>
-                                    </div>
-                                </article>
-                            );
-                        })}
+                        {paymentCards}
                     </div>
                 )}
             </section>
