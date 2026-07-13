@@ -460,7 +460,16 @@ export type Database = {
             };
         };
         Views: Record<string, never>;
-        Functions: Record<string, never>;
+        Functions: {
+            update_invitation_with_identity_check: {
+                Args: {
+                    p_invitation_id: string;
+                    p_patch: Json;
+                    p_user_id: string;
+                };
+                Returns: Json;
+            };
+        };
         Enums: Record<string, never>;
         CompositeTypes: Record<string, never>;
     };

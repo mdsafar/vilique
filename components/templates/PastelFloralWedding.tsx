@@ -66,13 +66,14 @@ export default function PastelFloralWedding({
     const [declineOpen, setDeclineOpen] = useState(false);
     const [particles, setParticles] = useState<CelebrationParticle[]>([]);
     const [petals, setPetals] = useState<FallingPetal[]>([]);
-    const [hasStartedTick, setHasStartedTick] = useState(false);
     const [isSongPlaying, setIsSongPlaying] = useState(false);
     const songRef = useRef<HTMLAudioElement>(null);
     const tickRef = useRef<HTMLAudioElement>(null);
     const songTimeoutRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
     const audioSuspendedRef = useRef(false);
+    const shouldPlayCountdownTickRef = useRef(false);
+    const hasStartedTickRef = useRef(false);
     const pathname = usePathname();
 
     const eventDate = useMemo(
@@ -113,9 +114,19 @@ export default function PastelFloralWedding({
     }, [completed, inProgress, isStarted, invitation.category]);
 
     const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl || invitation.defaultMusicUrl) : null;
-    const tickUrl = enableAudio ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
+    const shouldPlayCountdownTick = enableAudio && !completed && !inProgress && !isStarted;
+    const tickUrl = shouldPlayCountdownTick ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
     const showAcceptedScreen = accepted || isAccepted;
+
+    useEffect(() => {
+        shouldPlayCountdownTickRef.current = shouldPlayCountdownTick;
+        if (!shouldPlayCountdownTick) {
+            stopAudio(tickRef.current);
+            stopAudio(activeTickAudio);
+            hasStartedTickRef.current = false;
+        }
+    }, [shouldPlayCountdownTick]);
 
     useEffect(() => {
         if (!accepted) {
@@ -142,7 +153,7 @@ export default function PastelFloralWedding({
         stopAudio(activeTickAudio);
         if (updateState && mountedRef.current) {
             setIsSongPlaying(false);
-            setHasStartedTick(false);
+            hasStartedTickRef.current = false;
         }
     }
 
@@ -169,13 +180,13 @@ export default function PastelFloralWedding({
     }, [pathname]);
 
     useEffect(() => {
-        if (!enableAudio || !tickUrl || hasStartedTick || isSongPlaying) return;
+        if (!shouldPlayCountdownTick || !tickUrl || isSongPlaying) return;
 
         const startFromGesture = (event: Event) => {
-            if (audioSuspendedRef.current) return;
+            if (audioSuspendedRef.current || hasStartedTickRef.current || !shouldPlayCountdownTickRef.current) return;
             const target = event.target as Element | null;
             if (target?.closest(".rsvpAcceptBtn")) return;
-            setHasStartedTick(true);
+            hasStartedTickRef.current = true;
             playTick(tickRef.current);
         };
 
@@ -189,7 +200,7 @@ export default function PastelFloralWedding({
                 document.removeEventListener(eventName, startFromGesture)
             );
         };
-    }, [enableAudio, hasStartedTick, isSongPlaying, tickUrl]);
+    }, [isSongPlaying, shouldPlayCountdownTick, tickUrl]);
 
     useEffect(() => {
         const onVisibilityChange = () => {
@@ -198,14 +209,14 @@ export default function PastelFloralWedding({
                 return;
             }
 
-            if (enableAudio && hasStartedTick && !isSongPlaying) {
+            if (shouldPlayCountdownTick && hasStartedTickRef.current && !isSongPlaying) {
                 playTick(tickRef.current);
             }
         };
 
         document.addEventListener("visibilitychange", onVisibilityChange);
         return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-    }, [enableAudio, hasStartedTick, isSongPlaying]);
+    }, [isSongPlaying, shouldPlayCountdownTick]);
 
     function handleAccept(event: MouseEvent<HTMLButtonElement>) {
         event.stopPropagation();
@@ -238,7 +249,8 @@ export default function PastelFloralWedding({
                         setIsSongPlaying(value);
                     }
                 },
-                musicDuration
+                musicDuration,
+                () => shouldPlayCountdownTickRef.current
             );
             onEvent?.("music_play");
         }
@@ -377,8 +389,11 @@ function InviteCard({
                 </>
             ) : (
                 <div className="rsvpCompletedMsg">
-                    <p className="rsvpTitle">RSVP CLOSED</p>
-                    <p className="rsvpCompletedSubText">This event has concluded. Thank you!</p>
+                    <span className="rsvpCompletedIcon" aria-hidden="true">✓</span>
+                    <div>
+                        <p className="rsvpTitle">RSVP CLOSED</p>
+                        <p className="rsvpCompletedSubText">This event has concluded. Thank you!</p>
+                    </div>
                 </div>
             )}
             <WeddingBrandCredit />
@@ -455,12 +470,18 @@ function ThanksCard({
 }
 
 function EventInProgressMessage({ category }: { category: string }) {
-    const label = category === "wedding" ? "The wedding has already started." : "The function has already started.";
+    const title = category === "wedding" ? "WEDDING STARTED" : "EVENT STARTED";
+    const label = category === "wedding"
+        ? "The wedding has started. Please join the celebration at the venue."
+        : "The event has started. Please join the celebration at the venue.";
 
     return (
         <div className="eventInProgressMessage">
-            <strong>Hurry up!</strong>
-            <span>{label} Please reach the venue and join the celebration.</span>
+            <span className="eventInProgressIcon" aria-hidden="true">✓</span>
+            <div>
+                <strong>{title}</strong>
+                <span>{label}</span>
+            </div>
         </div>
     );
 }
@@ -751,7 +772,8 @@ function playCelebrationSong(
     song: HTMLAudioElement | null,
     tick: HTMLAudioElement | null,
     setIsSongPlaying: (value: boolean) => void,
-    musicDuration: number
+    musicDuration: number,
+    shouldResumeTick: () => boolean
 ) {
     if (!song) return null;
 
@@ -769,7 +791,9 @@ function playCelebrationSong(
     void song.play().catch(() => {
         if (activeSongAudio !== song) return;
         setIsSongPlaying(false);
-        playTick(tick);
+        if (shouldResumeTick()) {
+            playTick(tick);
+        }
     });
 
     if (musicDuration > 0) {
@@ -777,7 +801,9 @@ function playCelebrationSong(
             if (activeSongAudio !== song) return;
             stopAudio(song);
             setIsSongPlaying(false);
-            playTick(tick);
+            if (shouldResumeTick()) {
+                playTick(tick);
+            }
         }, musicDuration * 1000);
     }
 

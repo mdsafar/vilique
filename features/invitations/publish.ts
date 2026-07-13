@@ -97,12 +97,13 @@ export async function publishInvitationAfterPayment({
         finalSlug = cleanSlug;
     }
 
+    const hasPublishedIdentity = Boolean(invite.first_published_at);
     const firstPublishedAt = invite.first_published_at || new Date().toISOString();
-    const originalCategory = invite.original_category || invite.category;
-    const originalPrimaryName = invite.original_primary_name || invite.primary_name;
-    const originalSecondaryName = invite.original_secondary_name || invite.secondary_name;
-    const originalEventDate = invite.original_event_date || invite.event_date;
-    const originalTemplateId = invite.original_template_id || templateId;
+    const originalCategory = hasPublishedIdentity ? invite.original_category || invite.category : invite.category;
+    const originalPrimaryName = hasPublishedIdentity ? invite.original_primary_name || invite.primary_name : invite.primary_name;
+    const originalSecondaryName = hasPublishedIdentity ? invite.original_secondary_name || invite.secondary_name : invite.secondary_name;
+    const originalEventDate = hasPublishedIdentity ? invite.original_event_date || invite.event_date : invite.event_date;
+    const originalTemplateId = hasPublishedIdentity ? invite.original_template_id || templateId : templateId;
     const nextPublishVersion = (invite.publish_version || 0) + 1;
     const firstPublishVersion = invite.first_publish_version || nextPublishVersion;
 
@@ -116,7 +117,7 @@ export async function publishInvitationAfterPayment({
         templateId: originalTemplateId || "",
     });
 
-    const storedSnapshot = (invite.identity_snapshot || invite.event_snapshot) as EventIdentitySnapshot | null;
+    const storedSnapshot = hasPublishedIdentity ? (invite.identity_snapshot || invite.event_snapshot) as EventIdentitySnapshot | null : null;
     const identitySnapshot: EventIdentitySnapshot = storedSnapshot || {
         original_category: originalCategory,
         original_primary_name: originalPrimaryName,

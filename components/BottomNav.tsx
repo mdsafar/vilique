@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, UserRound } from "lucide-react";
+import { LayoutGrid, Mail, UserRound } from "lucide-react";
 
 export default function BottomNav() {
     const pathname = usePathname();
@@ -11,10 +11,16 @@ export default function BottomNav() {
     const navItems = [
         { href: "/templates", label: "Templates", icon: LayoutGrid, active: pathname === "/" || pathname.startsWith("/templates") },
         {
+            href: "/invitations",
+            label: "Invitations",
+            icon: Mail,
+            active: pathname.startsWith("/invitations") || pathname.startsWith("/dashboard"),
+        },
+        {
             href: "/profile",
             label: "Profile",
             icon: UserRound,
-            active: pathname.startsWith("/profile") || pathname.startsWith("/dashboard"),
+            active: pathname.startsWith("/profile"),
         },
     ];
 

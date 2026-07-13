@@ -20,11 +20,13 @@ export async function POST(_request: Request, { params }: Context) {
         .from("invitations")
         .update({
             status: "draft",
+            lifecycle_status: "unpublished",
+            event_status: "unpublished",
             updated_at: new Date().toISOString(),
         })
         .eq("id", id)
         .eq("user_id", user.id)
-        .select("id, slug, status")
+        .select("id, slug, status, lifecycle_status, event_status")
         .single();
 
     if (error) {

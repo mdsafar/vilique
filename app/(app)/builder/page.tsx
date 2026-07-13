@@ -38,6 +38,26 @@ type PublishSuccessDetails = {
     slug: string;
     publishedAt?: string | null;
 };
+type BuilderFieldKey = "title" | "primaryName" | "eventDate" | "eventTime" | "venueName" | "message";
+type BuilderValidationErrors = Partial<Record<BuilderFieldKey, string>>;
+
+const requiredFieldTabs: Record<BuilderFieldKey, EditorTab> = {
+    title: "content",
+    primaryName: "content",
+    message: "content",
+    eventDate: "event",
+    eventTime: "event",
+    venueName: "event",
+};
+
+const requiredFieldLabels: Record<BuilderFieldKey, string> = {
+    title: "Title",
+    primaryName: "Primary name",
+    message: "Message",
+    eventDate: "Date",
+    eventTime: "Time",
+    venueName: "Venue name",
+};
 
 function formatSaveError(error: unknown): string {
     if (!error) return "Save failed";
@@ -69,12 +89,43 @@ function formatSaveError(error: unknown): string {
     return "Save failed";
 }
 
+function parseServerValidationErrors(fields: unknown): BuilderValidationErrors {
+    if (!fields || typeof fields !== "object") {
+        return { title: "Complete the required fields before updating." };
+    }
+
+    const errors: BuilderValidationErrors = {};
+    Object.entries(fields as Record<string, unknown>).forEach(([key, value]) => {
+        if (!(key in requiredFieldLabels)) return;
+        if (typeof value === "string" && value.trim()) {
+            errors[key as BuilderFieldKey] = value;
+        } else {
+            errors[key as BuilderFieldKey] = `${requiredFieldLabels[key as BuilderFieldKey]} is required.`;
+        }
+    });
+
+    return Object.keys(errors).length > 0 ? errors : { title: "Complete the required fields before updating." };
+}
+
+function validateRequiredFields(source: InvitationData) {
+    const nextErrors: BuilderValidationErrors = {};
+    if (!source.title.trim()) nextErrors.title = "Enter a title before updating.";
+    if (!source.primaryName.trim()) nextErrors.primaryName = "Enter the primary name before updating.";
+    if (!normalizeInvitationDateValue(source.eventDate)) nextErrors.eventDate = "Choose a valid event date.";
+    if (!source.eventTime.trim()) nextErrors.eventTime = "Choose an event time.";
+    if (!source.venueName.trim()) nextErrors.venueName = "Enter the venue name before updating.";
+    if (!source.message.trim()) nextErrors.message = "Enter an invitation message before updating.";
+    return nextErrors;
+}
+
 const editorTabs: { id: EditorTab; label: string }[] = [
     { id: "content", label: "Content" },
     { id: "event", label: "Event" },
     { id: "contact", label: "Contact" },
     { id: "sound", label: "Sound" },
 ];
+const weddingTemplateTitleOptions = ["Wedding Invitation", "Reception"] as const;
+const weddingTemplateDefaultTitle = weddingTemplateTitleOptions[0];
 
 let activeSoundPreviewAudio: HTMLAudioElement | null = null;
 let activeSoundPreviewStop: (() => void) | null = null;
@@ -107,10 +158,12 @@ function BuilderContent() {
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<BuilderValidationErrors>({});
     const [publishSuccessDetails, setPublishSuccessDetails] = useState<PublishSuccessDetails | null>(null);
     const [previewScrolledToBottom, setPreviewScrolledToBottom] = useState(false);
     const previewViewportRef = useRef<HTMLDivElement>(null);
     const lastSavedPayload = useRef("");
+    const lastSaveErrorToast = useRef("");
     const hasLoadedDraft = useRef(false);
     const createDraftPromise = useRef<Promise<InvitationData> | null>(null);
     const isNewDraft = useRef(true);
@@ -150,6 +203,13 @@ function BuilderContent() {
         () => templates.find((item) => item.id === invitation.templateId),
         [invitation.templateId]
     );
+    const displayedValidationErrors = useMemo(() => {
+        if (!isEditingPublished) return validationErrors;
+        return {
+            ...validateRequiredFields(invitation),
+            ...validationErrors,
+        };
+    }, [invitation, isEditingPublished, validationErrors]);
 
     const buildSavePayload = useCallback((source: InvitationData = invitation) => {
         const normalizedEventDate = normalizeInvitationDateValue(source.eventDate);
@@ -231,7 +291,34 @@ function BuilderContent() {
         return createDraftPromise.current;
     }
 
-    async function saveInvitation(options: { createIfNeeded?: boolean; isExplicitUserSave?: boolean } = {}) {
+    function showRequiredFieldErrors(errors: BuilderValidationErrors) {
+        const firstField = Object.keys(errors)[0] as BuilderFieldKey | undefined;
+        if (firstField) {
+            setActiveTab(requiredFieldTabs[firstField]);
+            const message = errors[firstField] || `${requiredFieldLabels[firstField]} is required.`;
+            setSaveState("Fix required fields");
+            showToast(message, "error");
+        }
+    }
+
+    const showSaveFailure = useCallback((message: string) => {
+        setSaveState(message);
+        if (lastSaveErrorToast.current !== message) {
+            lastSaveErrorToast.current = message;
+            showToast(message, "error");
+        }
+    }, [showToast]);
+
+    async function saveInvitation(options: { createIfNeeded?: boolean; isExplicitUserSave?: boolean; validateRequired?: boolean } = {}) {
+        if (options.validateRequired) {
+            const errors = validateRequiredFields(invitation);
+            setValidationErrors(errors);
+            if (Object.keys(errors).length > 0) {
+                showRequiredFieldErrors(errors);
+                return null;
+            }
+        }
+
         const source = options.createIfNeeded ? await ensureDraftExists() : invitation;
         if (source.id === "default-draft-placeholder-id") return null;
 
@@ -258,6 +345,8 @@ function BuilderContent() {
 
         if (response.ok) {
             lastSavedPayload.current = payload;
+            lastSaveErrorToast.current = "";
+            setValidationErrors({});
             setSaveState("Saved");
             if (options.isExplicitUserSave) {
                 isNewDraft.current = false;
@@ -272,7 +361,19 @@ function BuilderContent() {
         }
 
         const result = await response.json().catch(() => ({}));
-        setSaveState(formatSaveError(result.error));
+        if (result.code === "REQUIRED_FIELDS_MISSING") {
+            const serverErrors = parseServerValidationErrors(result.fields);
+            setValidationErrors(serverErrors);
+            showRequiredFieldErrors(serverErrors);
+            return null;
+        }
+        if (response.status === 409 && (result.code === "EVENT_IDENTITY_CHANGED" || result.code === "NEW_EVENT_DETECTED" || result.code === "PROTECTED_EVENT_IDENTITY")) {
+            const message = result.error || "This invitation is protected after publishing.";
+            setMajorChangeError(message);
+            showSaveFailure(message);
+            return null;
+        }
+        showSaveFailure(formatSaveError(result.error));
         return null;
     }
 
@@ -280,7 +381,7 @@ function BuilderContent() {
         setIsSavingDraft(true);
         const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
         if (saved) {
-            router.push("/profile");
+            router.push("/invitations");
         } else {
             setIsSavingDraft(false);
         }
@@ -288,7 +389,7 @@ function BuilderContent() {
 
     async function handleUpdateInvitation() {
         setIsPublishing(true);
-        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true, validateRequired: true });
         setIsPublishing(false);
         if (saved) {
             setSaveState(invitation.status === "published" ? "Updated" : "Saved");
@@ -314,7 +415,7 @@ function BuilderContent() {
     async function saveAndOpenPublish() {
         setIsPublishing(true);
         // Don't mark as explicit user save yet — user can still cancel out of the publish modal
-        const savedInvitation = await saveInvitation({ createIfNeeded: true });
+        const savedInvitation = await saveInvitation({ createIfNeeded: true, validateRequired: true });
         setIsPublishing(false);
         if (savedInvitation) {
             setIsPublishModalOpen(true);
@@ -342,6 +443,17 @@ function BuilderContent() {
     }
 
     function updateField(key: string, value: string) {
+        setValidationErrors((prev) => {
+            if (!(key in prev)) return prev;
+            const nextInvitation = { ...invitation, [key]: value };
+            const nextErrors = validateRequiredFields(nextInvitation);
+            if (nextErrors[key as BuilderFieldKey]) {
+                return { ...prev, [key]: nextErrors[key as BuilderFieldKey] };
+            }
+            const next = { ...prev };
+            delete next[key as BuilderFieldKey];
+            return next;
+        });
         setInvitation((prev) => ({
             ...prev,
             [key]: value,
@@ -438,17 +550,18 @@ function BuilderContent() {
         const existingId = searchParams.get("id");
         const templateKey = searchParams.get("template") || "pastel-floral-wedding";
         const openedFromProfile = searchParams.get("from") === "profile";
+        const openedFromInvitations = searchParams.get("from") === "invitations";
         const openedFromTemplateDetails = searchParams.get("from") === "template-details";
 
-        const isSessionNewDraft = !openedFromProfile && existingId && typeof window !== "undefined"
+        const isSessionNewDraft = !openedFromProfile && !openedFromInvitations && existingId && typeof window !== "undefined"
             ? sessionStorage.getItem(`vilique-new-draft-${existingId}`) === "true"
             : !existingId;
         isNewDraft.current = !!isSessionNewDraft;
-        openedFromExistingInvitation.current = openedFromProfile || (!!existingId && !isSessionNewDraft);
+        openedFromExistingInvitation.current = openedFromProfile || openedFromInvitations || (!!existingId && !isSessionNewDraft);
 
         if (openedFromExistingInvitation.current) {
-            builderBackLabel.current = "Profile";
-            builderBackTarget.current = "/profile";
+            builderBackLabel.current = "Invitations";
+            builderBackTarget.current = "/invitations";
         } else if (existingId && typeof window !== "undefined") {
             builderBackLabel.current = sessionStorage.getItem(`vilique-builder-back-label-${existingId}`) || "Templates";
             builderBackTarget.current = sessionStorage.getItem(`vilique-builder-back-target-${existingId}`) || "/templates";
@@ -496,9 +609,18 @@ function BuilderContent() {
         const payload = buildSavePayload(invitation);
 
         if (payload === lastSavedPayload.current) return;
+
         setSaveState("Saving...");
 
         const timeout = window.setTimeout(async () => {
+            if (isEditingPublished) {
+                const errors = validateRequiredFields(invitation);
+                if (Object.keys(errors).length > 0) {
+                    setSaveState("Fix required fields");
+                    return;
+                }
+            }
+
             const response = await fetch(`/api/invitations/${invitation.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -507,21 +629,27 @@ function BuilderContent() {
 
             if (response.ok) {
                 lastSavedPayload.current = payload;
+                lastSaveErrorToast.current = "";
+                setValidationErrors({});
                 setSaveState("Saved");
                 return;
             }
 
             const result = await response.json().catch(() => ({}));
-            if (response.status === 409 && result.code === "MAJOR_CHANGE_DETECTED") {
-                setMajorChangeError(result.error || "A major change has been detected.");
-                setSaveState("Save blocked");
+            if (result.code === "REQUIRED_FIELDS_MISSING") {
+                setValidationErrors(parseServerValidationErrors(result.fields));
+                setSaveState("Fix required fields");
+            } else if (response.status === 409 && (result.code === "MAJOR_CHANGE_DETECTED" || result.code === "EVENT_IDENTITY_CHANGED" || result.code === "NEW_EVENT_DETECTED" || result.code === "PROTECTED_EVENT_IDENTITY")) {
+                const message = result.error || "This invitation is protected after publishing.";
+                setMajorChangeError(message);
+                showSaveFailure(message);
             } else {
-                setSaveState(formatSaveError(result.error));
+                showSaveFailure(formatSaveError(result.error));
             }
         }, 650);
 
         return () => window.clearTimeout(timeout);
-    }, [buildSavePayload, invitation, isPersistedDraft]);
+    }, [buildSavePayload, invitation, isEditingPublished, isPersistedDraft, showSaveFailure]);
 
     if (isLoadingInvitation) {
         return <BuilderLoadingState />;
@@ -572,6 +700,7 @@ function BuilderContent() {
                     <EditorForm
                         activeTab={activeTab}
                         invitation={invitation}
+                        errors={displayedValidationErrors}
                         updateField={updateField}
                         updateTheme={updateTheme}
                         updateMusicFile={updateMusicFile}
@@ -657,6 +786,7 @@ function BuilderContent() {
                 <EditorForm
                     activeTab={activeTab}
                     invitation={invitation}
+                    errors={displayedValidationErrors}
                     updateField={updateField}
                     updateTheme={updateTheme}
                     updateMusicFile={updateMusicFile}
@@ -692,7 +822,7 @@ function BuilderContent() {
                 isOpen={leaveModalOpen}
                 mode={isEditingPublished ? "update" : "draft"}
                 onSave={async () => {
-                    const savedInvitation = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+                    const savedInvitation = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true, validateRequired: isEditingPublished });
                     if (savedInvitation) navigateBackToList();
                 }}
                 onDiscard={handleDiscard}
@@ -732,7 +862,7 @@ function BuilderContent() {
             <PublishSuccessModal
                 details={publishSuccessDetails}
                 title={invitation.title}
-                onViewProfile={() => router.push("/profile")}
+                onViewProfile={() => router.push("/invitations")}
             />
         </main>
     );
@@ -800,7 +930,7 @@ function PublishSuccessModal({
                     </div>
 
                     <button className="publishSuccessProfileBtn" type="button" onClick={onViewProfile}>
-                        View in Profile
+                        View in Invitations
                     </button>
                 </motion.div>
             </div>
@@ -1060,12 +1190,14 @@ function EditorTabs({
 function EditorForm({
     activeTab,
     invitation,
+    errors,
     updateField,
     updateTheme,
     updateMusicFile,
 }: {
     activeTab: EditorTab;
     invitation: ReturnType<typeof createDefaultInvitation>;
+    errors: BuilderValidationErrors;
     updateField: (key: string, value: string) => void;
     updateTheme: (key: keyof InvitationData["theme"], value: InvitationData["theme"][keyof InvitationData["theme"]]) => void;
     updateMusicFile: (file: File | null) => void;
@@ -1081,6 +1213,10 @@ function EditorForm({
     const minTimeMinutes = isSameDate(selectedDate, minEventDate) ? getNextSelectableMinute(now) : null;
     const maxStartTimeMinutes = 23 * 60 + 58;
     const endMinTimeMinutes = getMinimumEndTimeMinutes(startTime, minTimeMinutes);
+    const usesWeddingTitleDropdown = invitation.templateId === "pastel-floral-wedding";
+    const selectedWeddingTitle = weddingTemplateTitleOptions.includes(invitation.title as typeof weddingTemplateTitleOptions[number])
+        ? invitation.title
+        : weddingTemplateDefaultTitle;
 
     useEffect(() => {
         if (activeTab !== "event") return;
@@ -1107,17 +1243,37 @@ function EditorForm({
         }
     }, [activeTab, endTime, maxStartTimeMinutes, minEventDateTime, minEventDateValue, minTimeMinutes, selectedDateTime, startTime, updateField]);
 
+    useEffect(() => {
+        if (!usesWeddingTitleDropdown) return;
+        if (weddingTemplateTitleOptions.includes(invitation.title as typeof weddingTemplateTitleOptions[number])) return;
+        updateField("title", weddingTemplateDefaultTitle);
+    }, [invitation.title, updateField, usesWeddingTitleDropdown]);
+
     if (activeTab === "content") {
         return (
             <div className="editorForm">
-                <label>
+                <label className={errors.title ? "hasError" : ""}>
                     <span>Title</span>
-                    <input value={invitation.title} onChange={(e) => updateField("title", e.target.value)} maxLength={45} />
+                    {usesWeddingTitleDropdown ? (
+                        <select
+                            value={selectedWeddingTitle}
+                            onChange={(e) => updateField("title", e.target.value)}
+                            aria-invalid={!!errors.title}
+                        >
+                            {weddingTemplateTitleOptions.map((option) => (
+                                <option value={option} key={option}>{option}</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <input value={invitation.title} onChange={(e) => updateField("title", e.target.value)} maxLength={45} aria-invalid={!!errors.title} />
+                    )}
+                    {errors.title ? <small className="fieldError">{errors.title}</small> : null}
                 </label>
 
-                <label>
+                <label className={errors.primaryName ? "hasError" : ""}>
                     <span>Primary Name</span>
-                    <input value={invitation.primaryName} onChange={(e) => updateField("primaryName", e.target.value)} maxLength={25} />
+                    <input value={invitation.primaryName} onChange={(e) => updateField("primaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.primaryName} />
+                    {errors.primaryName ? <small className="fieldError">{errors.primaryName}</small> : null}
                 </label>
 
                 <label>
@@ -1125,9 +1281,10 @@ function EditorForm({
                     <input value={invitation.secondaryName || ""} onChange={(e) => updateField("secondaryName", e.target.value)} maxLength={25} />
                 </label>
 
-                <label>
+                <label className={errors.message ? "hasError" : ""}>
                     <span>Message</span>
-                    <textarea value={invitation.message} onChange={(e) => updateField("message", e.target.value)} maxLength={200} />
+                    <textarea value={invitation.message} onChange={(e) => updateField("message", e.target.value)} maxLength={200} aria-invalid={!!errors.message} />
+                    {errors.message ? <small className="fieldError">{errors.message}</small> : null}
                 </label>
             </div>
         );
@@ -1136,7 +1293,7 @@ function EditorForm({
     if (activeTab === "event") {
         return (
             <div className="editorForm">
-                <label>
+                <label className={errors.eventDate ? "hasError" : ""}>
                     <span>Date</span>
                     <DatePickerField
                         value={invitation.eventDate}
@@ -1144,9 +1301,10 @@ function EditorForm({
                         isOpen={activePicker === "date"}
                         onToggle={(open) => setActivePicker(open ? "date" : null)}
                     />
+                    {errors.eventDate ? <small className="fieldError">{errors.eventDate}</small> : null}
                 </label>
 
-                <label>
+                <label className={errors.eventTime ? "hasError" : ""}>
                     <span>Start Time</span>
                     <TimePickerField
                         value={startTime}
@@ -1156,6 +1314,7 @@ function EditorForm({
                         isOpen={activePicker === "startTime"}
                         onToggle={(open) => setActivePicker(open ? "startTime" : null)}
                     />
+                    {errors.eventTime ? <small className="fieldError">{errors.eventTime}</small> : null}
                 </label>
 
                 <label>
@@ -1170,9 +1329,10 @@ function EditorForm({
                     />
                 </label>
 
-                <label>
+                <label className={errors.venueName ? "hasError" : ""}>
                     <span>Venue Name</span>
-                    <input value={invitation.venueName} onChange={(e) => updateField("venueName", e.target.value)} maxLength={45} />
+                    <input value={invitation.venueName} onChange={(e) => updateField("venueName", e.target.value)} maxLength={45} aria-invalid={!!errors.venueName} />
+                    {errors.venueName ? <small className="fieldError">{errors.venueName}</small> : null}
                 </label>
 
                 <label>

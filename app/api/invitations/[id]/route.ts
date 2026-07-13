@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server";
-import { mapInvitationRow, toInvitationUpdate } from "@/features/invitations/mappers";
+import { mapInvitationRow } from "@/features/invitations/mappers";
 import { invitationUpdateSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assessChangeRisk } from "@/features/invitations/abuse";
-import { Database, Json } from "@/types/database";
+import { Json } from "@/types/database";
 
 type Context = {
     params: Promise<{ id: string }>;
+};
+
+type IdentityCheckedUpdateResult = {
+    blocked?: boolean;
+    validationError?: boolean;
+    code?: string;
+    reason?: string;
+    error?: string;
+    fields?: Record<string, string>;
+    id?: string;
+    slug?: string;
+    status?: string;
+    updated_at?: string;
+    change_risk_status?: string;
+    event_change_score?: number;
+    riskLevel?: string | null;
+    score?: number;
+    warning?: string | null;
 };
 
 export async function PATCH(request: Request, { params }: Context) {
@@ -26,133 +43,44 @@ export async function PATCH(request: Request, { params }: Context) {
         return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    // 1. Fetch current invitation to check snapshot & published status
-    const { data: invite, error: fetchError } = await supabase
-        .from("invitations")
-        .select("*")
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .single();
-
-    if (fetchError || !invite) {
-        return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
-    }
-
-    // 2. Perform abuse prevention checks if invitation was already published
-    const eventSnapshot = invite.event_snapshot || invite.identity_snapshot;
-    if (invite.first_published_at && eventSnapshot) {
-        const proposedValues = {
-            category: parsed.data.category !== undefined ? parsed.data.category : invite.category,
-            primaryName: parsed.data.primaryName !== undefined ? parsed.data.primaryName : invite.primary_name,
-            secondaryName: parsed.data.secondaryName !== undefined ? parsed.data.secondaryName : invite.secondary_name,
-            eventDate: parsed.data.eventDate !== undefined ? parsed.data.eventDate : invite.event_date,
-            venueName: parsed.data.venueName !== undefined ? parsed.data.venueName : invite.venue_name,
-            venueAddress: parsed.data.venueAddress !== undefined ? parsed.data.venueAddress : invite.venue_address,
-            message: parsed.data.message !== undefined ? parsed.data.message : invite.message,
-            templateId: invite.template_id || "", // read from existing database template_id
-        };
-
-        const risk = assessChangeRisk(eventSnapshot as Parameters<typeof assessChangeRisk>[0], proposedValues);
-
-        // Record the attempt in audit logs using admin key bypass to permit insert
-        const supabaseAdmin = createAdminClient();
-        await supabaseAdmin.from("invitation_change_audit").insert({
-            invitation_id: id,
-            user_id: user.id,
-            change_type: "update",
-            risk_level: risk.riskLevel,
-            previous_values: {
-                category: invite.category,
-                primaryName: invite.primary_name,
-                secondaryName: invite.secondary_name,
-                eventDate: invite.event_date,
-                templateId: invite.template_id,
-            },
-            proposed_values: proposedValues,
-            decision: risk.decision,
-            reason: `${risk.reason}${risk.signals.length ? ` Signals: ${risk.signals.join(" ")}` : ""}`,
-        });
-        await supabaseAdmin.from("invitation_change_log").insert({
-            invitation_id: id,
-            user_id: user.id,
-            before: {
-                category: invite.category,
-                primaryName: invite.primary_name,
-                secondaryName: invite.secondary_name,
-                eventDate: invite.event_date,
-                venueName: invite.venue_name,
-                venueAddress: invite.venue_address,
-                message: invite.message,
-                templateId: invite.template_id,
-            } as Json,
-            after: proposedValues as Json,
-            risk: risk.riskLevel,
-            score: risk.score,
-            decision: risk.decision,
-            reason: `${risk.reason}${risk.signals.length ? ` Signals: ${risk.signals.join(" ")}` : ""}`,
-        });
-
-        if (risk.decision === "blocked") {
-            return NextResponse.json({
-                code: "NEW_EVENT_DETECTED",
-                error: risk.reason,
-                riskLevel: risk.riskLevel,
-                score: risk.score,
-                signals: risk.signals,
-            }, { status: 409 });
-        }
-
-        const updatePayload = stripUndefined(toInvitationUpdate(parsed.data));
-        updatePayload.change_risk_status = risk.riskLevel;
-        updatePayload.event_change_score = risk.score;
-
-        let { data, error } = await supabase
-            .from("invitations")
-            .update(updatePayload)
-            .eq("id", id)
-            .eq("user_id", user.id)
-            .select("id, slug, status, updated_at, change_risk_status, event_change_score")
-            .single();
-
-        if (isSchemaCacheColumnError(error)) {
-            const retryPayload = { ...updatePayload };
-            delete retryPayload.event_change_score;
-            const retry = await supabase
-                .from("invitations")
-                .update(retryPayload)
-                .eq("id", id)
-                .eq("user_id", user.id)
-                .select("id, slug, status, updated_at, change_risk_status")
-                .single();
-            data = retry.data ? { ...retry.data, event_change_score: risk.score } : null;
-            error = retry.error;
-        }
-
-        if (error) {
-            return NextResponse.json({ error: error.message }, { status: 400 });
-        }
-
-        return NextResponse.json({
-            ...data,
-            riskLevel: risk.riskLevel,
-            warning: risk.decision === "warned" ? risk.reason : undefined,
-            signals: risk.signals,
-        });
-    }
-
-    const { data, error } = await supabase
-        .from("invitations")
-        .update(stripUndefined(toInvitationUpdate(parsed.data)))
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .select("id, slug, status, updated_at")
-        .single();
+    const supabaseAdmin = createAdminClient();
+    const { data, error } = await supabaseAdmin.rpc("update_invitation_with_identity_check", {
+        p_invitation_id: id,
+        p_patch: stripUndefined(parsed.data) as Json,
+        p_user_id: user.id,
+    });
 
     if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        if (error.code === "P0002") {
+            return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
+        }
+        console.error("Failed to update invitation with identity check:", error);
+        return getSafeUpdateErrorResponse(error);
     }
 
-    return NextResponse.json(data);
+    const result = data as IdentityCheckedUpdateResult | null;
+    if (!result) {
+        return NextResponse.json({ error: "Unable to save invitation changes." }, { status: 400 });
+    }
+
+    if (result.validationError) {
+        return NextResponse.json({
+            code: result.code || "REQUIRED_FIELDS_MISSING",
+            error: result.error || "Complete the required fields before updating.",
+            fields: result.fields || {},
+        }, { status: 400 });
+    }
+
+    if (result.blocked) {
+        return NextResponse.json({
+            code: result.code || "EVENT_IDENTITY_CHANGED",
+            error: result.reason || "This looks like a different event. Your purchase covers one published event.",
+            riskLevel: result.riskLevel || "high",
+            score: result.score,
+        }, { status: 409 });
+    }
+
+    return NextResponse.json(result);
 }
 
 export async function GET(_request: Request, { params }: Context) {
@@ -231,12 +159,59 @@ export async function DELETE(_request: Request, { params }: Context) {
     return NextResponse.json({ success: true });
 }
 
-function isSchemaCacheColumnError(error: { code?: string; message?: string } | null) {
-    return error?.code === "PGRST204" || !!error?.message?.includes("schema cache");
-}
-
-function stripUndefined(value: Database["public"]["Tables"]["invitations"]["Update"]) {
+function stripUndefined<T extends Record<string, unknown>>(value: T) {
     return Object.fromEntries(
         Object.entries(value).filter((entry) => entry[1] !== undefined)
-    ) as Database["public"]["Tables"]["invitations"]["Update"];
+    ) as T;
+}
+
+function getSafeUpdateErrorResponse(error: { code?: string; message?: string; details?: string | null }) {
+    const message = error.message || "";
+    const details = error.details || "";
+    const combined = `${message} ${details}`.toLowerCase();
+
+    if (
+        error.code === "PGRST202" ||
+        error.code === "42883" ||
+        combined.includes("update_invitation_with_identity_check") ||
+        combined.includes("could not find the function")
+    ) {
+        return NextResponse.json({
+            code: "SERVER_UPDATE_PROTECTION_NOT_READY",
+            error: "Unable to save invitation changes.",
+        }, { status: 503 });
+    }
+
+    if (
+        error.code === "P0001" &&
+        combined.includes("published invitations require")
+    ) {
+        return NextResponse.json({
+            code: "REQUIRED_FIELDS_MISSING",
+            error: "Complete the required fields before updating.",
+            fields: {
+                title: "Enter a title before updating.",
+                primaryName: "Enter the primary name before updating.",
+                eventDate: "Choose a valid event date.",
+                eventTime: "Choose an event time.",
+                venueName: "Enter the venue name before updating.",
+                message: "Enter an invitation message before updating.",
+            },
+        }, { status: 400 });
+    }
+
+    if (
+        error.code === "P0001" &&
+        (combined.includes("protected event identity") || combined.includes("server validation"))
+    ) {
+        return NextResponse.json({
+            code: "PROTECTED_EVENT_IDENTITY",
+            error: "This invitation is protected after publishing. Please reload and try your edit again.",
+        }, { status: 409 });
+    }
+
+    return NextResponse.json({
+        code: "INVITATION_SAVE_FAILED",
+        error: "Unable to save invitation changes.",
+    }, { status: 400 });
 }

@@ -37,6 +37,29 @@ export async function POST(request: Request, { params }: Context) {
         });
     } catch (err: unknown) {
         console.error("Error publishing invitation:", err);
-        return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to publish invitation" }, { status: 400 });
+        return NextResponse.json({ error: getSafePublishError(err) }, { status: 400 });
     }
+}
+
+function getSafePublishError(err: unknown) {
+    if (!(err instanceof Error)) return "Failed to publish invitation";
+
+    const allowedMessages = [
+        "Invitation not found",
+        "Unauthorized: You do not own this invitation",
+        "Cannot publish an archived invitation",
+        "Title is required to publish",
+        "Host/Couple name is required to publish",
+        "Event date is required to publish",
+        "Venue name is required to publish",
+        "Invitation message is required to publish",
+        "Template entitlement could not be verified",
+        "Payment required: Please complete payment before publishing",
+        "Payment entitlement mismatch. Please complete payment for this invitation.",
+        "Invalid slug format",
+        "The customized link is already taken",
+        "This looks like a different event. Your purchase covers one published event. Create a new invitation for this event.",
+    ];
+
+    return allowedMessages.includes(err.message) ? err.message : "Failed to publish invitation";
 }

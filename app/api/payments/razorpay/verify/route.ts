@@ -167,11 +167,10 @@ export async function POST(request: Request) {
             });
         } catch (publishErr: unknown) {
             console.error("Verification marked payment as PAID but publishing service failed:", publishErr);
-            const message = publishErr instanceof Error ? publishErr.message : "Payment completed, but template publishing failed. Please try publishing again.";
             // Re-verify that payment is still recorded as PAID. Return success block indicating recovery required.
             return NextResponse.json({
                 status: "paymentPaidPublishFailed",
-                error: message,
+                error: "Payment completed, but publishing is not ready yet.",
                 message: "Your payment was verified. However, we could not launch your invitation (e.g. customized link is taken). Please edit your public link and click Publish Now to retry.",
             });
         }

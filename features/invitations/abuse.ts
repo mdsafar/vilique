@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { parseInvitationDateParts } from "@/lib/invitationDate";
+import { parseInvitationDateParts } from "../../lib/invitationDate";
 
 /**
  * Normalizes text by lowercasing, removing punctuation, honorifics,
@@ -156,17 +156,6 @@ export function assessChangeRisk(
         } else if (venueSimilarity < 0.5) {
             score += 10;
             signals.push("Venue changed significantly.");
-        }
-    }
-
-    if (snapshot.original_message && proposed.message !== undefined) {
-        const messageSimilarity = tokenSimilarity(snapshot.original_message, proposed.message || "");
-        if (messageSimilarity < 0.15) {
-            score += 15;
-            signals.push("Invitation wording/content appears mostly replaced.");
-        } else if (messageSimilarity < 0.45) {
-            score += 6;
-            signals.push("Invitation wording/content changed substantially.");
         }
     }
 

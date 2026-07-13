@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Profile",
-    description: "View your Vilique profile, publishing summary, and account metrics.",
+    title: "Invitations",
+    description: "Manage, preview, and publish your Vilique invitation websites.",
 };
 
-export default function ProfileLayout({
+export default function InvitationsLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
