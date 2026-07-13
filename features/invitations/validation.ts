@@ -35,17 +35,22 @@ export const invitationUpdateSchema = z.object({
     galleryUrls: z.array(z.string().url()).optional(),
     theme: z.record(z.string(), z.unknown()).optional(),
     sections: z.record(z.string(), z.unknown()).optional(),
-    lifecycleStatus: z.enum(["draft", "published", "completed", "archived", "unpublished"]).optional(),
     eventTimezone: z.string().max(80).optional(),
 });
 
 export const rsvpCreateSchema = z.object({
     invitationId: z.string().uuid(),
-    guestName: z.string().min(1).max(100),
+    guestToken: z.string().min(16).max(160),
+    guestName: z.string().min(1).max(100).default("Guest"),
     guestPhone: z.string().max(32).optional(),
     status: rsvpStatusSchema,
     guestCount: z.coerce.number().int().min(1).max(10).default(1),
     message: z.string().max(400).optional(),
+});
+
+export const rsvpLookupSchema = z.object({
+    invitationId: z.string().uuid(),
+    guestToken: z.string().min(16).max(160),
 });
 
 export const wishCreateSchema = z.object({

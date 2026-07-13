@@ -185,20 +185,24 @@ export type Database = {
                     invitation_id: string;
                     guest_name: string;
                     guest_phone: string | null;
+                    guest_token: string;
                     status: "accepted" | "declined" | "maybe";
                     guest_count: number;
                     message: string | null;
                     created_at: string;
+                    updated_at: string;
                 };
                 Insert: {
                     id?: string;
                     invitation_id: string;
                     guest_name: string;
                     guest_phone?: string | null;
+                    guest_token: string;
                     status: "accepted" | "declined" | "maybe";
                     guest_count?: number;
                     message?: string | null;
                     created_at?: string;
+                    updated_at?: string;
                 };
                 Update: Partial<Database["public"]["Tables"]["rsvps"]["Insert"]>;
                 Relationships: [
@@ -461,6 +465,43 @@ export type Database = {
         };
         Views: Record<string, never>;
         Functions: {
+            get_public_rsvp: {
+                Args: {
+                    p_invitation_id: string;
+                    p_guest_token: string;
+                };
+                Returns: {
+                    id: string;
+                    status: "accepted" | "declined" | "maybe";
+                    guest_name: string;
+                    guest_phone: string | null;
+                    guest_count: number;
+                    message: string | null;
+                    created_at: string;
+                    updated_at: string;
+                }[];
+            };
+            upsert_public_rsvp: {
+                Args: {
+                    p_invitation_id: string;
+                    p_guest_token: string;
+                    p_status: "accepted" | "declined" | "maybe";
+                    p_guest_name?: string;
+                    p_guest_phone?: string | null;
+                    p_guest_count?: number;
+                    p_message?: string | null;
+                };
+                Returns: {
+                    id: string;
+                    status: "accepted" | "declined" | "maybe";
+                    guest_name: string;
+                    guest_phone: string | null;
+                    guest_count: number;
+                    message: string | null;
+                    created_at: string;
+                    updated_at: string;
+                }[];
+            };
             update_invitation_with_identity_check: {
                 Args: {
                     p_invitation_id: string;

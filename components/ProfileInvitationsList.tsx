@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
     CalendarDays,
     Clock,
+    RefreshCw,
     Eye,
     BarChart3,
     PencilLine,
@@ -24,14 +25,32 @@ import {
     Sparkles,
     CheckCircle2,
     WifiOff,
+    Wifi,
     Lock,
 } from "lucide-react";
 import { deleteInvitation } from "@/app/(app)/profile/actions";
 import { InvitationData } from "@/types/invitation";
 import { getPublicInvitationUrl } from "@/lib/config/site";
-import { parseInvitationDateParts } from "@/lib/invitationDate";
+import { getEventPhase, isInvitationCompleted } from "@/lib/lifecycle";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
+import { useNavigationState } from "./NavigationStateProvider";
+import { useSWRConfig } from "swr";
+
+interface DashboardData {
+    profile: {
+        email: string;
+        name: string;
+        avatarUrl: string | null;
+    } | null;
+    invitations: InvitationData[];
+    published: number;
+    drafts: number;
+    views: number;
+    rsvps: number;
+    invitationStats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
+    totalSpent: number;
+}
 
 interface ProfileInvitationsListProps {
     initialInvitations: InvitationData[];
@@ -42,10 +61,13 @@ export default function ProfileInvitationsList({
     initialInvitations,
     invitationStats,
 }: ProfileInvitationsListProps) {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "completed" | "draft">("all");
+    const {
+        invitationsSearch: searchTerm,
+        setInvitationsSearch: setSearchTerm,
+        invitationsFilter: statusFilter,
+        setInvitationsFilter: setStatusFilter,
+    } = useNavigationState();
 
-    // Dynamic filtering
     const filteredInvitations = initialInvitations.filter((item) => {
         const lifecycleStatus = getInvitationLifecycleStatus(item);
         const matchesStatus = statusFilter === "all" ||
@@ -53,15 +75,13 @@ export default function ProfileInvitationsList({
             (statusFilter === "upcoming" && lifecycleStatus === "live_today");
 
         const combinedText = `
-            ${item.title} 
-            ${item.primaryName} 
-            ${item.secondaryName || ""} 
+            ${item.title}
+            ${item.primaryName}
+            ${item.secondaryName || ""}
             ${item.category}
         `.toLowerCase();
 
-        const matchesSearch = combinedText.includes(searchTerm.toLowerCase());
-
-        return matchesStatus && matchesSearch;
+        return matchesStatus && combinedText.includes(searchTerm.toLowerCase());
     });
 
     const lifecycleCounts = initialInvitations.reduce(
@@ -75,19 +95,20 @@ export default function ProfileInvitationsList({
         { upcoming: 0, completed: 0, draft: 0 }
     );
 
-    const handleClearSearch = () => {
-        setSearchTerm("");
-    };
-
+    const handleClearSearch = () => setSearchTerm("");
     const handleResetAll = () => {
         setSearchTerm("");
         setStatusFilter("all");
     };
 
     return (
-        <div className="profileInvitationsContainer">
-            {/* Search & Filter Bar */}
-            <div className="profileControls">
+        <>
+            <header className="profileControls">
+                <div>
+                    <h2>Your invitations</h2>
+                    <p>Manage and track all your invitation websites</p>
+                </div>
+
                 <div className="profileSearchWrapper">
                     <Search className="searchIcon" size={18} aria-hidden="true" />
                     <input
@@ -108,8 +129,10 @@ export default function ProfileInvitationsList({
                         </button>
                     )}
                 </div>
+            </header>
 
-                <div className="profileFilterTabs">
+            <div className="profileInvitationsContainer">
+                <nav className="profileFilterTabs" aria-label="Invitation filters">
                     <button
                         type="button"
                         className={`filterTabBtn ${statusFilter === "all" ? "active" : ""}`}
@@ -138,10 +161,8 @@ export default function ProfileInvitationsList({
                     >
                         Drafts <span className="drf">{lifecycleCounts.draft}</span>
                     </button>
-                </div>
-            </div>
+                </nav>
 
-            {/* Invitations Render Area */}
             {filteredInvitations.length ? (
                 <div className="profileInvitationList">
                     {filteredInvitations.map((invitation) => (
@@ -179,6 +200,7 @@ export default function ProfileInvitationsList({
                 </div>
             )}
         </div>
+        </>
     );
 }
 
@@ -190,11 +212,15 @@ function InvitationRow({
 }) {
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isOfflineOpen, setIsOfflineOpen] = useState(false);
+    const [isOnlineOpen, setIsOnlineOpen] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isTakingOffline, setIsTakingOffline] = useState(false);
+    const [isMakingOnline, setIsMakingOnline] = useState(false);
     const router = useRouter();
     const { showToast } = useToast();
+    const { mutate } = useSWRConfig();
 
     const lifecycleStatus = getInvitationLifecycleStatus(invitation);
     const isDraft = lifecycleStatus === "draft";
@@ -203,14 +229,16 @@ function InvitationRow({
     const isCompleted = lifecycleStatus === "completed";
     const isOffline = lifecycleStatus === "offline";
     const isPublic = isUpcoming || isLiveToday || isCompleted;
+    const hasAnalyticsAccess = Boolean(invitation.firstPublishedAt || invitation.publishedAt);
 
     const isSample = invitation.id.startsWith("sample-");
     const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}&from=invitations`;
+    const analyticsHref = `/invitations/${invitation.id}/analytics`;
     const previewHref = isSample
         ? "/templates"
         : isPublic
             ? `/i/${invitation.slug}`
-            : `/builder/preview?id=${invitation.id}`;
+            : `/builder/preview?id=${invitation.id}&from=invitations`;
     const publicUrl = getPublicInvitationUrl(invitation.slug);
 
     const handleEdit = () => {
@@ -220,26 +248,70 @@ function InvitationRow({
 
     async function handleDeleteConfirm() {
         setIsDeleting(true);
+        const originalData = await mutate("/api/profile/dashboard");
+
+        mutate("/api/profile/dashboard", (current?: DashboardData) => {
+            if (!current) return current;
+            const updatedInvitations = current.invitations.filter((item) => item.id !== invitation.id);
+            const isDraftState = invitation.status === "draft";
+            return {
+                ...current,
+                invitations: updatedInvitations,
+                published: current.published - (isDraftState ? 0 : 1),
+                drafts: current.drafts - (isDraftState ? 1 : 0),
+            };
+        }, { revalidate: false });
+
         try {
             const formData = new FormData();
             formData.append("id", invitation.id);
             const result = await deleteInvitation(formData);
             if (!result?.ok) {
                 showToast(result?.error || "Failed to delete invitation", "error");
+                mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
             showToast(isDraft ? "Draft deleted." : "Invitation deleted.", "success");
+            mutate("/api/profile/dashboard");
         } catch (error) {
             showToast(error instanceof Error ? error.message : "Failed to delete invitation", "error");
+            mutate("/api/profile/dashboard", originalData, { revalidate: false });
         } finally {
             setIsDeleting(false);
             setIsDeleteOpen(false);
         }
     }
 
-    async function handleTakeOffline() {
+    function handleTakeOfflineClick() {
+        setIsOfflineOpen(true);
+    }
+
+    async function handleTakeOfflineConfirm() {
         if (isTakingOffline) return;
         setIsTakingOffline(true);
+        const originalData = await mutate("/api/profile/dashboard");
+
+        mutate("/api/profile/dashboard", (current?: DashboardData) => {
+            if (!current) return current;
+            const updatedInvitations = current.invitations.map((item) => {
+                if (item.id === invitation.id) {
+                    return {
+                        ...item,
+                        status: "draft" as const,
+                        lifecycleStatus: "unpublished" as const,
+                        eventStatus: "unpublished" as const,
+                    };
+                }
+                return item;
+            });
+            return {
+                ...current,
+                invitations: updatedInvitations,
+                published: current.published - 1,
+                drafts: current.drafts + 1,
+            };
+        }, { revalidate: false });
+
         try {
             const response = await fetch(`/api/invitations/${invitation.id}/unpublish`, {
                 method: "POST",
@@ -247,14 +319,68 @@ function InvitationRow({
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
                 showToast(result.error || "Unable to take invitation offline.", "error");
+                mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
             showToast("Invitation taken offline.", "success");
-            router.refresh();
+            mutate("/api/profile/dashboard");
         } catch {
             showToast("Unable to take invitation offline.", "error");
+            mutate("/api/profile/dashboard", originalData, { revalidate: false });
         } finally {
             setIsTakingOffline(false);
+            setIsOfflineOpen(false);
+        }
+    }
+
+    function handleMakeOnlineClick() {
+        setIsOnlineOpen(true);
+    }
+
+    async function handleMakeOnlineConfirm() {
+        if (isMakingOnline) return;
+        setIsMakingOnline(true);
+        const originalData = await mutate("/api/profile/dashboard");
+
+        mutate("/api/profile/dashboard", (current?: DashboardData) => {
+            if (!current) return current;
+            const updatedInvitations = current.invitations.map((item) => {
+                if (item.id === invitation.id) {
+                    return {
+                        ...item,
+                        status: "published" as const,
+                        lifecycleStatus: "published" as const,
+                        eventStatus: "published" as const,
+                    };
+                }
+                return item;
+            });
+            return {
+                ...current,
+                invitations: updatedInvitations,
+                published: current.published + 1,
+                drafts: current.drafts - 1,
+            };
+        }, { revalidate: false });
+
+        try {
+            const response = await fetch(`/api/invitations/${invitation.id}/publish`, {
+                method: "POST",
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                showToast(result.error || "Unable to make invitation online.", "error");
+                mutate("/api/profile/dashboard", originalData, { revalidate: false });
+                return;
+            }
+            showToast("Invitation is online again.", "success");
+            mutate("/api/profile/dashboard");
+        } catch {
+            showToast("Unable to make invitation online.", "error");
+            mutate("/api/profile/dashboard", originalData, { revalidate: false });
+        } finally {
+            setIsMakingOnline(false);
+            setIsOnlineOpen(false);
         }
     }
 
@@ -273,6 +399,7 @@ function InvitationRow({
             <div className="profileInviteInfo">
                 <div className="profileInviteDetails">
                     <div className="profileInviteHeader">
+                        <p className="inviteType">{invitation.title}</p>
                         <span className={`profileStatus ${lifecycleStatus}`}>
                             {getLifecycleStatusIcon(lifecycleStatus)}
                             {getLifecycleStatusLabel(lifecycleStatus)}
@@ -280,7 +407,6 @@ function InvitationRow({
                         {isSample && <span className="sampleLabel">Sample Template</span>}
                     </div>
 
-                    <p className="inviteType">{invitation.title}</p>
                     <h3>{getDisplayNames(invitation)}</h3>
                     <p className="inviteMessage">
                         {getDashboardInviteSummary(lifecycleStatus)}
@@ -297,7 +423,10 @@ function InvitationRow({
                                 {formatEventTimeRange(invitation.eventTime)}
                             </span>
                         ) : null}
-                        <span>Updated {formatDate(invitation.updatedAt)}</span>
+                        <span>
+                            <RefreshCw size={14} aria-hidden="true" />
+                            Updated {formatDate(invitation.updatedAt)}
+                        </span>
                     </div>
 
                 </div>
@@ -327,8 +456,8 @@ function InvitationRow({
                 </div>
             ) : null}
 
-            <div className="profileInviteActions">
-                {isDraft || isOffline ? (
+            <div className={`profileInviteActions ${isCompleted ? "profileInviteActions--two" : isOffline || hasAnalyticsAccess ? "profileInviteActions--four" : ""}`}>
+                {isDraft ? (
                     <>
                         <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
                             <Eye size={14} aria-hidden="true" />
@@ -364,6 +493,63 @@ function InvitationRow({
                             </button>
                         )}
                     </>
+                ) : isOffline ? (
+                    <>
+                        <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
+                            <Eye size={14} aria-hidden="true" />
+                            <span>Preview</span>
+                        </Link>
+                        <button
+                            type="button"
+                            className="profileActionBtn"
+                            onClick={handleEdit}
+                            disabled={isEditing}
+                        >
+                            {isEditing ? (
+                                <>
+                                    <Loader2 size={14} className="spinner" aria-hidden="true" />
+                                    <span>Editing...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <PencilLine size={14} aria-hidden="true" />
+                                    <span>Edit</span>
+                                </>
+                            )}
+                        </button>
+                        {hasAnalyticsAccess ? (
+                            <Link href={analyticsHref} className="profileActionBtn">
+                                <BarChart3 size={14} aria-hidden="true" />
+                                <span>Analytics</span>
+                            </Link>
+                        ) : null}
+                        <button
+                            type="button"
+                            className="profileActionBtn profileActionBtn--online"
+                            onClick={handleMakeOnlineClick}
+                            disabled={isMakingOnline}
+                        >
+                            {isMakingOnline ? (
+                                <Loader2 size={14} className="spinner" aria-hidden="true" />
+                            ) : (
+                                <Wifi size={14} aria-hidden="true" />
+                            )}
+                            <span>Go Live</span>
+                        </button>
+                        {/* Keep for future use:
+                        {!isSample && (
+                            <button
+                                type="button"
+                                className="profileActionBtn profileActionBtn--danger"
+                                onClick={() => setIsDeleteOpen(true)}
+                                aria-label={`Delete invitation ${invitation.title}`}
+                            >
+                                <Trash2 size={14} aria-hidden="true" />
+                                <span>Delete</span>
+                            </button>
+                        )}
+                        */}
+                    </>
                 ) : isUpcoming || isLiveToday ? (
                     <>
                         <a href={previewHref} target="_blank" rel="noreferrer" className="profileActionBtn profileActionBtn--primary">
@@ -388,10 +574,16 @@ function InvitationRow({
                                 </>
                             )}
                         </button>
+                        {hasAnalyticsAccess ? (
+                            <Link href={analyticsHref} className="profileActionBtn">
+                                <BarChart3 size={14} aria-hidden="true" />
+                                <span>Analytics</span>
+                            </Link>
+                        ) : null}
                         <button
                             type="button"
                             className="profileActionBtn profileActionBtn--offline"
-                            onClick={handleTakeOffline}
+                            onClick={handleTakeOfflineClick}
                             disabled={isTakingOffline}
                         >
                             {isTakingOffline ? (
@@ -402,52 +594,87 @@ function InvitationRow({
                             <span>Take Offline</span>
                         </button>
                     </>
-                ) : (
-                    <>
-                        <a href={previewHref} target="_blank" rel="noreferrer" className="profileActionBtn profileActionBtn--primary">
-                            <Eye size={14} aria-hidden="true" />
-                            <span>View</span>
-                        </a>
-                        <Link href={""} className="profileActionBtn">
-                            <BarChart3 size={14} aria-hidden="true" />
-                            <span>Analytics</span>
-                        </Link>
-                        <button
-                            type="button"
-                            className="profileActionBtn profileActionBtn--danger"
-                            onClick={() => setIsDeleteOpen(true)}
-                            aria-label={`Delete invitation ${invitation.title}`}
-                        >
-                            <Trash2 size={14} aria-hidden="true" />
-                            <span>Delete</span>
-                        </button>
-                    </>
-                )}
+	                ) : (
+	                    <>
+	                        <a href={previewHref} target="_blank" rel="noreferrer" className="profileActionBtn profileActionBtn--primary">
+	                            <Eye size={14} aria-hidden="true" />
+	                            <span>View</span>
+	                        </a>
+	                        <Link href={analyticsHref} className="profileActionBtn">
+	                            <BarChart3 size={14} aria-hidden="true" />
+	                            <span>Analytics</span>
+	                        </Link>
+	                    </>
+	                )}
             </div>
             {!isSample ? (
-                <ConfirmModal
-                    isOpen={isDeleteOpen}
-                    onClose={() => setIsDeleteOpen(false)}
-                    onConfirm={handleDeleteConfirm}
-                    isPending={isDeleting}
-                    title={isDraft ? "Delete Draft" : "Delete Invitation"}
-                    message={
-                        <>
-                            Are you sure you want to delete <strong>{invitation.title}</strong>? This action is permanent and cannot be undone.
-                        </>
-                    }
-                    confirmText={isDraft ? "Delete Draft" : "Delete Invitation"}
-                    confirmStyle={{
-                        background: "#dc2626",
-                        color: "#fff",
-                        boxShadow: "0 4px 12px rgba(220, 38, 38, 0.2)",
-                    }}
-                    icon={
-                        <span className="modalWarningIcon" style={{ color: "#ef4444", background: "rgba(239, 68, 68, 0.1)" }}>
-                            <AlertTriangle size={24} />
-                        </span>
-                    }
-                />
+                <>
+                    <ConfirmModal
+                        isOpen={isDeleteOpen}
+                        onClose={() => setIsDeleteOpen(false)}
+                        onConfirm={handleDeleteConfirm}
+                        isPending={isDeleting}
+                        title={isDraft ? "Delete Draft" : "Delete Invitation"}
+                        message={
+                            isDraft ? (
+                                <p style={{ margin: 0, lineHeight: "1.5" }}>
+                                    Are you sure you want to delete the draft <strong>{invitation.title}</strong>? This action is permanent and cannot be undone.
+                                </p>
+                            ) : (
+                                <p style={{ margin: 0, lineHeight: "1.5" }}>
+                                    Are you sure you want to delete <strong>{invitation.title}</strong>? This will permanently delete your website, guest RSVPs, and wishes. This action cannot be undone.
+                                </p>
+                            )
+                        }
+                        confirmText={isDraft ? "Delete Draft" : "Delete Invitation"}
+                        confirmClassName="modalBtnConfirm--red-pastel"
+                        icon={
+                            <span className="modalWarningIcon" style={{ color: "#be123c", background: "rgba(255, 241, 242, 0.9)" }}>
+                                <AlertTriangle size={24} />
+                            </span>
+                        }
+                    />
+
+                    <ConfirmModal
+                        isOpen={isOfflineOpen}
+                        onClose={() => setIsOfflineOpen(false)}
+                        onConfirm={handleTakeOfflineConfirm}
+                        isPending={isTakingOffline}
+                        title="Take Invitation Offline"
+                        message={
+                            <p style={{ margin: 0, lineHeight: "1.5" }}>
+                                Are you sure you want to take <strong>{invitation.title}</strong> offline? This disables the public page and guest RSVPs. You can republish it online at any time.
+                            </p>
+                        }
+                        confirmText="Take Offline"
+                        confirmClassName="modalBtnConfirm--orange-pastel"
+                        icon={
+                            <span className="modalWarningIcon" style={{ color: "#b45309", background: "rgba(255, 251, 235, 0.9)" }}>
+                                <WifiOff size={24} />
+                            </span>
+                        }
+                    />
+
+                    <ConfirmModal
+                        isOpen={isOnlineOpen}
+                        onClose={() => setIsOnlineOpen(false)}
+                        onConfirm={handleMakeOnlineConfirm}
+                        isPending={isMakingOnline}
+                        title="Publish Invitation"
+                        message={
+                            <p style={{ margin: 0, lineHeight: "1.5" }}>
+                                Are you sure you want to make <strong>{invitation.title}</strong> live? This activates the public page and allows guests to view details and RSVP.
+                            </p>
+                        }
+                        confirmText="Go Live"
+                        confirmClassName="modalBtnConfirm--green-pastel"
+                        icon={
+                            <span className="modalWarningIcon" style={{ color: "#047857", background: "rgba(236, 253, 245, 0.9)" }}>
+                                <Wifi size={24} />
+                            </span>
+                        }
+                    />
+                </>
             ) : null}
         </article>
     );
@@ -456,6 +683,10 @@ function InvitationRow({
 type DashboardLifecycleStatus = "draft" | "upcoming" | "live_today" | "completed" | "offline";
 
 function getInvitationLifecycleStatus(invitation: InvitationData): DashboardLifecycleStatus {
+    if (isInvitationCompleted(invitation)) {
+        return "completed";
+    }
+
     if (invitation.lifecycleStatus === "unpublished" || invitation.eventStatus === "unpublished") {
         return "offline";
     }
@@ -464,15 +695,9 @@ function getInvitationLifecycleStatus(invitation: InvitationData): DashboardLife
         return "draft";
     }
 
-    const eventDate = parseInvitationDateParts(invitation.eventDate);
-    if (!eventDate) return "upcoming";
-
-    const today = getTodayParts(invitation.eventTimezone);
-    const eventValue = toDateNumber(eventDate);
-    const todayValue = toDateNumber(today);
-
-    if (eventValue > todayValue) return "upcoming";
-    if (eventValue === todayValue) return "live_today";
+    const phase = getEventPhase(invitation);
+    if (phase === "upcoming") return "upcoming";
+    if (phase === "in_progress") return "live_today";
     return "completed";
 }
 
@@ -510,7 +735,7 @@ function getLifecycleStatusIcon(status: DashboardLifecycleStatus) {
 function getDashboardInviteSummary(status: DashboardLifecycleStatus) {
     switch (status) {
         case "draft":
-            return "Complete details, preview, then publish when ready.";
+            return "Complete details, then publish when ready.";
         case "upcoming":
             return "Public invite is live and ready for guests.";
         case "live_today":
@@ -536,25 +761,6 @@ function getInvitationArtClass(invitation: InvitationData) {
     if (category.includes("graduation")) return "profileInviteRow--graduation";
     if (category.includes("wedding")) return "profileInviteRow--wedding";
     return "profileInviteRow--default";
-}
-
-function getTodayParts(timezone?: string | null) {
-    const formatter = new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone || "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    });
-    const parts = Object.fromEntries(formatter.formatToParts(new Date()).map((part) => [part.type, part.value]));
-    return {
-        year: Number(parts.year),
-        month: Number(parts.month),
-        day: Number(parts.day),
-    };
-}
-
-function toDateNumber(parts: { year: number; month: number; day: number }) {
-    return parts.year * 10000 + parts.month * 100 + parts.day;
 }
 
 function formatDate(value: string) {

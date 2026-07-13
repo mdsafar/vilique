@@ -37,6 +37,12 @@ export async function POST(request: Request, { params }: Context) {
         });
     } catch (err: unknown) {
         console.error("Error publishing invitation:", err);
+        if (err instanceof Error && err.message === "Invitation is completed and locked.") {
+            return NextResponse.json({
+                code: "INVITATION_COMPLETED_LOCKED",
+                error: "This invitation is completed and can no longer be published.",
+            }, { status: 409 });
+        }
         return NextResponse.json({ error: getSafePublishError(err) }, { status: 400 });
     }
 }
@@ -51,6 +57,7 @@ function getSafePublishError(err: unknown) {
         "Title is required to publish",
         "Host/Couple name is required to publish",
         "Event date is required to publish",
+        "Event time is required to publish",
         "Venue name is required to publish",
         "Invitation message is required to publish",
         "Template entitlement could not be verified",
@@ -59,6 +66,7 @@ function getSafePublishError(err: unknown) {
         "Invalid slug format",
         "The customized link is already taken",
         "This looks like a different event. Your purchase covers one published event. Create a new invitation for this event.",
+        "Invitation is completed and locked.",
     ];
 
     return allowedMessages.includes(err.message) ? err.message : "Failed to publish invitation";

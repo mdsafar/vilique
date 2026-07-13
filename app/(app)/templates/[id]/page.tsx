@@ -7,7 +7,6 @@ import {
     Clock3,
     Eye,
     Heart,
-    ImageIcon,
     Palette,
     MapPin,
     MoreHorizontal,
@@ -146,8 +145,6 @@ export default async function TemplateDetailsPage({ params }: Props) {
                             <span><Music size={17} aria-hidden="true" />RSVP</span>
                             <span><MapPin size={17} aria-hidden="true" />Google Maps</span>
                             <span><Music size={17} aria-hidden="true" />Music</span>
-                            <span><ImageIcon size={17} aria-hidden="true" />Photo Gallery</span>
-                            <span><Phone size={17} aria-hidden="true" />Story Timeline</span>
                             <span><Heart size={17} aria-hidden="true" />Thank You screen</span>
                             <span><MoreHorizontal size={17} aria-hidden="true" />And more</span>
                         </div>

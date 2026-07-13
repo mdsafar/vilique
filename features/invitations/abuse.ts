@@ -170,9 +170,9 @@ export function assessChangeRisk(
     if (score >= 70) {
         return {
             riskLevel: "high",
-            decision: "blocked",
+            decision: "warned",
             score,
-            reason: "This looks like a different event. Your purchase covers one published event. Create a new invitation for this event.",
+            reason: "This looks like a major update to your invitation.",
             signals,
         };
     }

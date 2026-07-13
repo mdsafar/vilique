@@ -1,14 +1,16 @@
 "use client";
 
 import PastelFloralWedding from "@/components/templates/PastelFloralWedding";
-import { InvitationData } from "@/types/invitation";
+import { InvitationData, RSVPStatus } from "@/types/invitation";
 import { AnalyticsEventType } from "@/lib/analytics";
 
 type TemplateRendererProps = {
     invitation: InvitationData;
     accepted?: boolean;
+    rsvpStatus?: RSVPStatus | null;
     onAccept?: () => void;
     onDecline?: () => void;
+    onChangeRsvp?: () => void;
     onEvent?: (type: AnalyticsEventType) => void;
     enableAudio?: boolean;
 };
@@ -23,12 +25,14 @@ type TemplateRendererProps = {
 export default function TemplateRenderer({
     invitation,
     accepted,
+    rsvpStatus,
     onAccept,
     onDecline,
+    onChangeRsvp,
     onEvent,
     enableAudio,
 }: TemplateRendererProps) {
-    const props = { invitation, accepted, onAccept, onDecline, onEvent, enableAudio };
+    const props = { invitation, accepted, rsvpStatus, onAccept, onDecline, onChangeRsvp, onEvent, enableAudio };
 
     switch (invitation.templateId) {
         case "pastel-floral-wedding":

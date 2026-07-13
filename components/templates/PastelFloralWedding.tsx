@@ -3,18 +3,20 @@
 import { CSSProperties, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { MapPinned, Phone } from "lucide-react";
+import { MapPinned, Phone, CalendarOff, Clock } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
 import { getEventPhase } from "@/lib/lifecycle";
 import { parseInvitationDateParts } from "@/lib/invitationDate";
-import { InvitationData } from "@/types/invitation";
+import { InvitationData, RSVPStatus } from "@/types/invitation";
 
 type Props = {
     invitation: InvitationData;
     accepted?: boolean;
+    rsvpStatus?: RSVPStatus | null;
     onAccept?: () => void;
     onDecline?: () => void;
+    onChangeRsvp?: () => void;
     onEvent?: (eventType: AnalyticsEventType) => void;
     enableAudio?: boolean;
 };
@@ -56,8 +58,10 @@ let activeSongAudio: HTMLAudioElement | null = null;
 export default function PastelFloralWedding({
     invitation,
     accepted = false,
+    rsvpStatus = null,
     onAccept,
     onDecline,
+    onChangeRsvp,
     onEvent,
     enableAudio = false,
 }: Props) {
@@ -75,7 +79,48 @@ export default function PastelFloralWedding({
     const shouldPlayCountdownTickRef = useRef(false);
     const hasStartedTickRef = useRef(false);
     const pathname = usePathname();
+    const isPublicRoute = useMemo(() => pathname?.startsWith("/i/") || pathname?.startsWith("/invite/"), [pathname]);
+    const [isLoading, setIsLoadingState] = useState(isPublicRoute);
+    const [isExiting, setIsExiting] = useState(false);
 
+    useEffect(() => {
+        if (!isPublicRoute) return;
+
+        let isMounted = true;
+        const fontPromise = typeof document !== "undefined" ? document.fonts.ready : Promise.resolve();
+        const minTimePromise = new Promise((resolve) => setTimeout(resolve, 1200));
+
+        Promise.all([fontPromise, minTimePromise]).then(() => {
+            if (isMounted) {
+                setIsExiting(true);
+                setTimeout(() => {
+                    if (isMounted) {
+                        setIsLoadingState(false);
+                    }
+                }, 600);
+            }
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isPublicRoute]);
+    useEffect(() => {
+        if (!isPublicRoute) return;
+
+        if (isLoading) {
+            document.body.style.overflow = "hidden";
+            document.documentElement.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "";
+            document.documentElement.style.overflow = "";
+        }
+
+        return () => {
+            document.body.style.overflow = "";
+            document.documentElement.style.overflow = "";
+        };
+    }, [isLoading, isPublicRoute]);
     const eventDate = useMemo(
         () => parseEventDate(invitation.eventDate, invitation.eventTime, invitation.eventTimezone),
         [invitation.eventDate, invitation.eventTime, invitation.eventTimezone]
@@ -270,7 +315,14 @@ export default function PastelFloralWedding({
     }
 
     return (
-        <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""}`}>
+        <>
+            {isLoading && (
+                <TemplateLoader
+                    invitation={invitation}
+                    isExiting={isExiting}
+                />
+            )}
+            <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""}`}>
             {songUrl ? <audio ref={songRef} src={songUrl} preload="auto" /> : null}
             {tickUrl ? <audio ref={tickRef} src={tickUrl} preload="auto" loop /> : null}
 
@@ -292,6 +344,7 @@ export default function PastelFloralWedding({
                         isAccepting={isAccepting}
                         onAccept={handleAccept}
                         onDecline={handleDecline}
+                        rsvpStatus={rsvpStatus}
                         completed={completed}
                         inProgress={inProgress}
                         countdownTitle={countdownTitle}
@@ -302,6 +355,7 @@ export default function PastelFloralWedding({
                         eventParts={eventParts}
                         countdown={countdown}
                         onEvent={onEvent}
+                        onChangeRsvp={onChangeRsvp}
                         completed={completed}
                         inProgress={inProgress}
                         countdownTitle={countdownTitle}
@@ -309,7 +363,8 @@ export default function PastelFloralWedding({
                 )}
             </div>
         </section>
-    );
+    </>
+);
 }
 
 function InviteCard({
@@ -319,6 +374,7 @@ function InviteCard({
     isAccepting,
     onAccept,
     onDecline,
+    rsvpStatus,
     completed,
     inProgress,
     countdownTitle,
@@ -329,6 +385,7 @@ function InviteCard({
     isAccepting: boolean;
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
     onDecline: () => void;
+    rsvpStatus?: RSVPStatus | null;
     completed: boolean;
     inProgress: boolean;
     countdownTitle: string;
@@ -376,25 +433,26 @@ function InviteCard({
             ) : !completed ? (
                 <>
                     <p className="rsvpTitle">WILL YOU ATTEND?</p>
-                    <div className="rsvpButtons">
+                    {rsvpStatus === "declined" ? (
+                        <div className="rsvpPersistedNotice rsvpPersistedNotice--declined">
+                            <span>You&apos;ve declined this invitation.</span>
+                        </div>
+                    ) : null}
+                    <div className={`rsvpButtons ${rsvpStatus === "declined" ? "rsvpButtons--single" : ""}`}>
                         <button className="rsvpAcceptBtn" onClick={onAccept}>
-                            <span>Accept</span>
+                            <span>{rsvpStatus === "declined" ? "Accept Instead" : "Accept"}</span>
                             <b>♡</b>
                         </button>
-                        <button className="rsvpDeclineBtn" onClick={onDecline}>
-                            <span>Decline</span>
-                            <b>♡</b>
-                        </button>
+                        {rsvpStatus === "declined" ? null : (
+                            <button className="rsvpDeclineBtn" onClick={onDecline}>
+                                <span>Decline</span>
+                                <b>♡</b>
+                            </button>
+                        )}
                     </div>
                 </>
             ) : (
-                <div className="rsvpCompletedMsg">
-                    <span className="rsvpCompletedIcon" aria-hidden="true">✓</span>
-                    <div>
-                        <p className="rsvpTitle">RSVP CLOSED</p>
-                        <p className="rsvpCompletedSubText">This event has concluded. Thank you!</p>
-                    </div>
-                </div>
+                <EventClosedMessage />
             )}
             <WeddingBrandCredit />
         </section>
@@ -406,6 +464,7 @@ function ThanksCard({
     eventParts,
     countdown,
     onEvent,
+    onChangeRsvp,
     completed,
     inProgress,
     countdownTitle,
@@ -414,6 +473,7 @@ function ThanksCard({
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
     onEvent?: (eventType: AnalyticsEventType) => void;
+    onChangeRsvp?: () => void;
     completed: boolean;
     inProgress: boolean;
     countdownTitle: string;
@@ -463,9 +523,26 @@ function ThanksCard({
                 {countdownTitle}
             </p>
             {!completed && !inProgress ? <CountdownGrid countdown={countdown} /> : null}
-            {inProgress ? <EventInProgressMessage category={invitation.category} /> : null}
+            {completed ? <EventClosedMessage /> : inProgress ? <EventInProgressMessage category={invitation.category} /> : null}
+            {!completed && !inProgress && onChangeRsvp ? (
+                <button className="rsvpChangeBtn" type="button" onClick={onChangeRsvp}>
+                    Change RSVP
+                </button>
+            ) : null}
             <WeddingBrandCredit />
         </section>
+    );
+}
+
+function EventClosedMessage() {
+    return (
+        <div className="eventStateMessage rsvpCompletedMsg">
+            <span className="eventStateIcon rsvpCompletedIcon" aria-hidden="true">
+                <CalendarOff size={20} />
+            </span>
+            <p className="rsvpTitle">RSVP CLOSED</p>
+            <p className="eventStateCopy rsvpCompletedSubText">This event has concluded. Thank you!</p>
+        </div>
     );
 }
 
@@ -476,12 +553,12 @@ function EventInProgressMessage({ category }: { category: string }) {
         : "The event has started. Please join the celebration at the venue.";
 
     return (
-        <div className="eventInProgressMessage">
-            <span className="eventInProgressIcon" aria-hidden="true">✓</span>
-            <div>
-                <strong>{title}</strong>
-                <span>{label}</span>
-            </div>
+        <div className="eventStateMessage eventInProgressMessage">
+            <span className="eventStateIcon eventInProgressIcon" aria-hidden="true">
+                <Clock size={20} />
+            </span>
+            <p className="rsvpTitle">{title}</p>
+            <p className="eventStateCopy">{label}</p>
         </div>
     );
 }
@@ -519,7 +596,7 @@ function CountdownGrid({ countdown }: { countdown: CountdownValue }) {
 function TimeBox({ value, label }: { value: string; label: string }) {
     return (
         <div className="timeBox">
-            <b>{value}</b>
+            <b suppressHydrationWarning>{value}</b>
             <span>{label}</span>
         </div>
     );
@@ -858,4 +935,28 @@ function createSparkles(
 
     setParticles(nextParticles);
     window.setTimeout(() => setParticles([]), 1200);
+}
+
+function TemplateLoader({ invitation, isExiting }: { invitation: InvitationData; isExiting: boolean }) {
+    const isWedding = invitation.category === "wedding";
+    return (
+        <div className={`templateLoaderOverlay pastelWeddingPage ${isExiting ? "exiting" : ""}`} aria-hidden="true">
+            <div className="templateLoaderCard">
+                <div className="templateLoaderRings">
+                    <div className="ring1" />
+                    <div className="ring2" />
+                    <div className="heartCenter">❤</div>
+                </div>
+                
+                <p className="loaderCoupleName">
+                    {invitation.primaryName} {invitation.secondaryName ? `& ${invitation.secondaryName}` : ""}
+                </p>
+                
+                <p className="loaderStatusText">
+                    {isWedding ? "Opening Wedding Invitation" : "Opening Invitation"}
+                </p>
+                <div className="loaderLine" />
+            </div>
+        </div>
+    );
 }

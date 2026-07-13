@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mediaUploadSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
+import { isInvitationCompleted } from "@/lib/lifecycle";
 
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const musicTypes = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg"]);
@@ -30,13 +31,26 @@ export async function POST(request: Request) {
 
     const { data: invitation } = await supabase
         .from("invitations")
-        .select("id")
+        .select("id, event_date, event_time, event_timezone, lifecycle_status, event_status")
         .eq("id", parsed.data.invitationId)
         .eq("user_id", user.id)
         .single();
 
     if (!invitation) {
         return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
+    }
+
+    if (isInvitationCompleted({
+        eventDate: invitation.event_date,
+        eventTime: invitation.event_time,
+        eventTimezone: invitation.event_timezone,
+        lifecycleStatus: invitation.lifecycle_status,
+        eventStatus: invitation.event_status,
+    })) {
+        return NextResponse.json({
+            code: "INVITATION_COMPLETED_LOCKED",
+            error: "This invitation is completed and can no longer be edited.",
+        }, { status: 409 });
     }
 
     const isMusic = parsed.data.kind === "music";
@@ -62,4 +76,3 @@ export async function POST(request: Request) {
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return NextResponse.json({ url: data.publicUrl, path, bucket });
 }
-

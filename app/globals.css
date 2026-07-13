@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Montserrat:wght@300;400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Montserrat:wght@300;400;500;600&family=Pacifico&display=swap");
 
 * {
   box-sizing: border-box;
@@ -41,21 +41,35 @@ a {
 .appLogo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  color: #2a1434;
-  font-weight: 950;
-  line-height: 1;
+  gap: 0.35em;
+  font-family: "Pacifico", "Brush Script MT", cursive;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #6d28d9;
+  text-decoration: none;
 }
 
 .appLogoMark {
   flex: 0 0 auto;
-  border-radius: 12px;
+  width: 1.1em !important;
+  height: 1.1em !important;
+  border-radius: 0.3em;
   object-fit: cover;
-  box-shadow: 0 10px 24px rgba(130, 42, 190, 0.16);
+  box-shadow: 0 10px 25px rgba(130, 42, 190, 0.15);
 }
 
 .appLogoText {
   display: inline-block;
+  line-height: 1.2;
+  padding-bottom: 0.18em;
+  color: #7c3aed;
+  background: linear-gradient(135deg, #6d28d9 0%, #9f4df0 48%, #c026d3 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  transform: translateY(1px);
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 8px 24px rgba(124, 58, 237, 0.16);
 }
 
 .skeletonBase {
@@ -1519,7 +1533,7 @@ p {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(18px);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 999px;
+  border-radius: 24px;
   min-height: var(--bottom-nav-height);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1534,7 +1548,7 @@ p {
   justify-content: center;
   min-height: 50px;
   gap: 8px;
-  border-radius: 999px;
+  border-radius: 18px;
   font-weight: 800;
   font-size: 14px;
   color: #6e666b;
@@ -1632,7 +1646,7 @@ p {
   background: transparent;
   border: 0;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .profileCardMain::before {
@@ -1659,11 +1673,8 @@ p {
   color: #fff;
   font-size: 27px;
   font-weight: 750;
-  box-shadow:
-    0 20px 38px rgba(7, 88, 152, 0.22),
-    0 0 0 5px rgba(255, 255, 255, 0.86),
-    0 0 0 6px rgba(126, 91, 213, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.92);
+  border: 4px solid #ffffff;
+  box-shadow: 0 8px 24px rgba(7, 88, 152, 0.12);
   flex-shrink: 0;
 }
 
@@ -1819,6 +1830,218 @@ p {
   z-index: 1;
 }
 
+.profileTransactions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 16px;
+  padding-bottom: 18px;
+  scroll-margin-top: 18px;
+}
+
+.profileTransactions .paymentsHeader {
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 28px rgba(126, 91, 213, 0.055);
+}
+
+.profileTransactions .paymentsHeaderIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.profileTransactions .paymentsHeader h2 {
+  font-size: 16px;
+  font-weight: 850;
+  color: #1f1235;
+  margin: 0;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.profileTransactions .paymentsHeader p {
+  font-size: 11.5px;
+}
+
+.profileTransactions .paymentsSection {
+  gap: 8px;
+}
+
+.profileTransactions .paymentsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 8px;
+}
+
+.profileTransactionCard {
+  position: relative;
+  min-height: 142px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(225, 213, 232, 0.72);
+  border-radius: 16px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(140, 76, 243, 0.08), transparent 36%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(254, 251, 255, 0.94));
+  box-shadow:
+    0 16px 36px rgba(42, 30, 36, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.profileTransactionCard:hover {
+  border-color: rgba(140, 76, 243, 0.22);
+  box-shadow:
+    0 18px 42px rgba(126, 91, 213, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateY(-1px);
+}
+
+.profileTransactionCard--skeleton:hover {
+  border-color: rgba(225, 213, 232, 0.72);
+  box-shadow:
+    0 16px 36px rgba(42, 30, 36, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: none;
+}
+
+.profileTransactionIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #7e3ff2;
+  background: linear-gradient(135deg, rgba(140, 76, 243, 0.14), rgba(140, 76, 243, 0.06));
+  box-shadow: inset 0 0 0 1px rgba(140, 76, 243, 0.12);
+}
+
+.profileTransactionBody {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.profileTransactionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profileTransactionTitle h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 850;
+  color: #1f1235;
+  margin: 0;
+}
+
+.profileTransactionBody p {
+  margin: 0;
+  font-size: 11.5px;
+  color: #7c6f8a;
+}
+
+.profileTransactionBody p strong {
+  color: #332345;
+  font-weight: 800;
+}
+
+.profileTransactionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  margin-top: 4px;
+}
+
+.profileTransactionMeta > span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+  font-size: 10.75px;
+  color: #8b7c9f;
+}
+
+.profileTransactionMeta code {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(140, 76, 243, 0.07);
+  border: 1px solid rgba(140, 76, 243, 0.12);
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #7e3ff2;
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.profileTransactionAside {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 1px;
+  color: #1f1235;
+}
+
+.profileTransactionAside strong {
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.profileTransactionAside span {
+  font-size: 10px;
+  color: #9b8ab0;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profileTransactionAction {
+  grid-column: 1 / -1;
+  min-height: 34px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(225, 213, 232, 0.45);
+  display: flex;
+  align-items: center;
+}
+
+.profileTransactions .paymentLinkAction {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(140, 76, 243, 0.08);
+  color: #7e3ff2;
+  font-size: 10.75px;
+}
+
+.profileTransactions .paymentLinkAction:hover {
+  background: rgba(140, 76, 243, 0.14);
+  color: #6d28d9;
+  transform: none;
+}
+
+.profileTransactions .paymentNoAction {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  color: #b7aebf;
+  font-size: 11px;
+}
+
 .profileStat {
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.9);
@@ -1950,7 +2173,7 @@ p {
 
 .profileSearchInput {
   width: 100%;
-  height: 38px;
+  height: 42px;
   padding: 0 36px;
   font-size: 12px;
   border: 1px solid #e5e7eb;
@@ -2063,6 +2286,7 @@ p {
   gap: 11px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  height: 100%;
 }
 
 .profileInviteRow:hover {
@@ -2407,6 +2631,7 @@ p {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  justify-content: space-between;
 }
 
 .profileStatus {
@@ -2622,6 +2847,18 @@ p {
   align-items: center;
 }
 
+.profileInviteActions--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profileInviteActions--four {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profileInviteActions--four > :last-child {
+  grid-column: 1 / -1;
+}
+
 .profileInviteActions a,
 .profileInviteActions button,
 .profileEmptyState a,
@@ -2686,6 +2923,18 @@ p {
   color: #9a3412;
 }
 
+.profileInviteActions .profileActionBtn--online {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #bbf7d0;
+}
+
+.profileInviteActions .profileActionBtn--online:hover:not(:disabled) {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #065f46;
+}
+
 .profileInviteActions .profileActionBtn--danger {
   background: #fff1f2;
   color: #be123c;
@@ -2727,7 +2976,8 @@ p {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr auto auto;
   align-items: stretch;
-  min-height: 270px;
+  min-height: 0;
+  height: 100%;
   padding: 15px;
   gap: 10px;
   overflow: hidden;
@@ -2769,76 +3019,87 @@ p {
 
 .profileInviteRow--wedding {
   background:
-    radial-gradient(circle at 86% 34%, rgba(216, 180, 254, 0.18), transparent 22%),
-    radial-gradient(circle at 96% 96%, rgba(244, 114, 182, 0.08), transparent 28%),
-    linear-gradient(135deg, #ffffff 0%, #fffaff 55%, #faf5ff 100%);
+    radial-gradient(circle at 90% 10%, rgba(244, 114, 182, 0.12), transparent 45%),
+    radial-gradient(circle at 10% 90%, rgba(167, 139, 250, 0.08), transparent 45%),
+    linear-gradient(135deg, #ffffff 0%, #fff7fb 55%, #faf5ff 100%) !important;
 }
 
 .profileInviteRow--wedding::after {
+  right: -30px;
+  top: -20px;
+  width: 180px;
+  height: 180px;
   background:
-    radial-gradient(circle at 62% 72%, rgba(216, 180, 254, 0.26) 0 30px, transparent 31px),
-    radial-gradient(circle at 70% 48%, rgba(216, 180, 254, 0.22) 0 18px, transparent 19px),
-    linear-gradient(135deg, transparent 48%, rgba(168, 85, 247, 0.2) 49% 51%, transparent 52%);
+    radial-gradient(circle at 60% 40%, rgba(216, 180, 254, 0.28) 0 35px, transparent 36px),
+    radial-gradient(circle at 80% 60%, rgba(244, 114, 182, 0.18) 0 20px, transparent 21px) !important;
 }
 
 .profileInviteRow--birthday {
   background:
-    radial-gradient(circle at 88% 28%, rgba(251, 113, 133, 0.1), transparent 20%),
-    radial-gradient(circle at 96% 88%, rgba(251, 113, 133, 0.16), transparent 28%),
-    linear-gradient(135deg, #ffffff 0%, #fff7f8 58%, #fff1f2 100%);
+    radial-gradient(circle at 90% 10%, rgba(251, 113, 133, 0.12), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgba(251, 113, 133, 0.06), transparent 40%),
+    linear-gradient(135deg, #ffffff 0%, #fff6f7 55%, #ffeef0 100%) !important;
 }
 
 .profileInviteRow--birthday::after {
+  right: -30px;
+  top: -20px;
+  width: 180px;
+  height: 180px;
   background:
-    radial-gradient(circle at 72% 22%, rgba(244, 63, 94, 0.26) 0 5px, transparent 6px),
-    radial-gradient(circle at 40% 58%, rgba(244, 63, 94, 0.18) 0 7px, transparent 8px),
-    repeating-radial-gradient(circle at 96% 92%, rgba(251, 113, 133, 0.18) 0 2px, transparent 3px 12px);
+    radial-gradient(circle at 60% 40%, rgba(251, 113, 133, 0.24) 0 35px, transparent 36px),
+    radial-gradient(circle at 80% 60%, rgba(253, 164, 175, 0.18) 0 20px, transparent 21px) !important;
 }
 
 .profileInviteRow--housewarming {
   background:
-    radial-gradient(circle at 90% 34%, rgba(251, 191, 36, 0.16), transparent 24%),
-    linear-gradient(135deg, #ffffff 0%, #fffdf7 58%, #fffbeb 100%);
+    radial-gradient(circle at 90% 10%, rgba(251, 191, 36, 0.12), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgba(251, 191, 36, 0.06), transparent 40%),
+    linear-gradient(135deg, #ffffff 0%, #fffdf4 55%, #fffbeb 100%) !important;
 }
 
 .profileInviteRow--housewarming::after {
+  right: -30px;
+  top: -20px;
+  width: 180px;
+  height: 180px;
   background:
-    linear-gradient(135deg, transparent 42%, rgba(217, 119, 6, 0.22) 43% 57%, transparent 58%),
-    linear-gradient(90deg, transparent 34%, rgba(217, 119, 6, 0.22) 35% 65%, transparent 66%),
-    radial-gradient(circle at 76% 78%, rgba(251, 191, 36, 0.2) 0 26px, transparent 27px);
+    radial-gradient(circle at 60% 40%, rgba(251, 191, 36, 0.22) 0 35px, transparent 36px),
+    radial-gradient(circle at 80% 60%, rgba(251, 243, 219, 0.2) 0 20px, transparent 21px) !important;
 }
 
 .profileInviteRow--engagement {
   background:
-    radial-gradient(circle at 88% 26%, rgba(196, 181, 253, 0.16), transparent 22%),
-    radial-gradient(circle at 94% 88%, rgba(244, 114, 182, 0.1), transparent 26%),
-    linear-gradient(135deg, #ffffff 0%, #fdf9ff 56%, #faf5ff 100%);
+    radial-gradient(circle at 90% 10%, rgba(168, 85, 247, 0.12), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgba(244, 114, 182, 0.08), transparent 40%),
+    linear-gradient(135deg, #ffffff 0%, #faf5ff 55%, #f3e8ff 100%) !important;
 }
 
 .profileInviteRow--engagement::after {
-  border: 12px solid rgba(168, 85, 247, 0.18);
-  border-radius: 999px;
+  right: -30px;
+  top: -20px;
+  width: 180px;
+  height: 180px;
   background:
-    linear-gradient(45deg, rgba(168, 85, 247, 0.16), rgba(244, 114, 182, 0.08));
-  width: 86px;
-  height: 86px;
-  right: 28px;
-  top: 46px;
-  transform: rotate(-8deg);
+    radial-gradient(circle at 60% 40%, rgba(168, 85, 247, 0.24) 0 35px, transparent 36px),
+    radial-gradient(circle at 80% 60%, rgba(244, 114, 182, 0.18) 0 20px, transparent 21px) !important;
 }
 
 .profileInviteRow--graduation {
   background:
-    radial-gradient(circle at 88% 26%, rgba(96, 165, 250, 0.12), transparent 22%),
-    radial-gradient(circle at 94% 88%, rgba(20, 184, 166, 0.1), transparent 28%),
-    linear-gradient(135deg, #ffffff 0%, #f8fdff 58%, #ecfeff 100%);
+    radial-gradient(circle at 90% 10%, rgba(20, 184, 166, 0.12), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgba(59, 130, 246, 0.08), transparent 40%),
+    linear-gradient(135deg, #ffffff 0%, #f0fdfa 55%, #e0f2fe 100%) !important;
 }
 
 .profileInviteRow--graduation::after {
+  right: -30px;
+  top: -20px;
+  width: 180px;
+  height: 180px;
   background:
-    linear-gradient(160deg, transparent 34%, rgba(59, 130, 246, 0.22) 35% 58%, transparent 59%),
-    linear-gradient(24deg, transparent 40%, rgba(20, 184, 166, 0.18) 41% 58%, transparent 59%),
-    radial-gradient(circle at 70% 76%, rgba(59, 130, 246, 0.12) 0 34px, transparent 35px);
+    radial-gradient(circle at 60% 40%, rgba(20, 184, 166, 0.24) 0 35px, transparent 36px),
+    radial-gradient(circle at 80% 60%, rgba(59, 130, 246, 0.18) 0 20px, transparent 21px) !important;
 }
 
 .profileInviteRow.profileInviteRow--bg .profileInviteInfo,
@@ -2851,20 +3112,32 @@ p {
   grid-row: 1;
   padding-top: 0;
   justify-content: flex-start;
+  height: 100%;
 }
 
 .profileInviteRow.profileInviteRow--bg .profileInviteDetails {
   max-width: min(100%, 300px);
   gap: 7px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .profileInviteRow.profileInviteRow--bg .profileInviteHeader {
   width: 100%;
-  align-items: flex-start;
+  align-items: center;
+  gap: 10px;
 }
 
 .profileInviteRow.profileInviteRow--bg .inviteType {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 12px;
+}
+
+.profileInviteRow.profileInviteRow--bg .profileStatus {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .profileInviteRow.profileInviteRow--bg h3 {
@@ -2888,6 +3161,7 @@ p {
   border-top: 1px solid rgba(148, 163, 184, 0.22);
   gap: 8px 14px;
   font-size: 11px;
+  margin-top: auto;
 }
 
 .profileInviteRow.profileInviteRow--bg .profilePublicLinkWrap {
@@ -2899,7 +3173,7 @@ p {
 
 .profileInviteRow.profileInviteRow--bg .profileInviteActions {
   grid-row: 3;
-  margin-top: auto;
+  margin-top: 0;
 }
 
 /* Empty states */
@@ -2943,6 +3217,384 @@ p {
   background: #111827;
   color: #fff;
   padding: 0 20px;
+}
+
+.analyticsPage {
+  padding: 0 16px calc(var(--bottom-nav-clearance) + 18px);
+}
+
+.analyticsPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.analyticsHeader {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 -16px;
+  padding: 20px 26px;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(167, 139, 250, 0.24), transparent 34%),
+    linear-gradient(100deg, #fffaf4 0%, #fffbff 55%, #eee7ff 100%);
+  box-shadow: 0 12px 32px rgba(126, 91, 213, 0.08);
+}
+
+.analyticsHeaderText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.analyticsHeaderText > span {
+  color: #7e5bd5;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.analyticsHeader h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.analyticsHeader p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.analyticsBackBtn {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.045);
+}
+
+.analyticsBackBtn:hover {
+  color: #111827;
+  transform: translateY(-1px);
+}
+
+.analyticsStats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.analyticsStat {
+  position: relative;
+  min-height: 126px;
+  display: grid;
+  align-content: space-between;
+  gap: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  border-radius: 18px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(126, 91, 213, 0.08), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(251, 250, 255, 0.96));
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.035);
+}
+
+.analyticsStat::after {
+  content: "";
+  position: absolute;
+  right: -24px;
+  bottom: -30px;
+  width: 90px;
+  height: 90px;
+  border-radius: 999px;
+  opacity: 0.5;
+  background: currentColor;
+  filter: blur(34px);
+}
+
+.analyticsStatIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: currentColor;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.analyticsStatBody {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.analyticsStat strong {
+  display: block;
+  color: #111827;
+  font-size: 27px;
+  font-weight: 950;
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.analyticsStat b {
+  display: block;
+  margin-top: 6px;
+  color: currentColor;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.analyticsStat p {
+  margin: 3px 0 0;
+  color: #7a8494;
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.analyticsStat--blue { color: #2563eb; }
+.analyticsStat--green { color: #059669; }
+.analyticsStat--rose { color: #db2777; }
+.analyticsStat--orange { color: #d97706; }
+
+.analyticsStat--skeleton {
+  color: rgba(126, 91, 213, 0.08);
+}
+
+.analyticsBreakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analyticsBreakdownCard {
+  min-height: 178px;
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(167, 139, 250, 0.08), transparent 34%),
+    rgba(255, 255, 255, 0.94);
+  padding: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.03);
+}
+
+.analyticsPanelTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.analyticsPanelTitle > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #7e5bd5;
+  background: rgba(126, 91, 213, 0.1);
+}
+
+.analyticsPanelTitle h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.analyticsPanelTitle p {
+  margin: 2px 0 0;
+  color: #8a738f;
+  font-size: 10.5px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.analyticsBreakdownCard ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analyticsBreakdownCard li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  border-radius: 10px;
+  padding: 0 9px;
+  background: rgba(248, 245, 255, 0.72);
+  color: #4b5563;
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.analyticsBreakdownCard li strong {
+  color: #1f1235;
+  font-weight: 900;
+}
+
+.analyticsBreakdownCard > p {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 1px dashed rgba(203, 213, 225, 0.9);
+  border-radius: 13px;
+  color: #8b95a5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analyticsEmptyState {
+  min-height: 430px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  text-align: center;
+  border: 1px dashed rgba(203, 213, 225, 0.9);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(126, 91, 213, 0.09), transparent 38%),
+    rgba(255, 255, 255, 0.72);
+  padding: 34px;
+}
+
+.analyticsEmptyIcon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #7e5bd5;
+  background: rgba(126, 91, 213, 0.1);
+}
+
+.analyticsEmptyState h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.analyticsEmptyState p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.analyticsEmptyChips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.analyticsEmptyChips span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 11px;
+  background: #f8f5ff;
+  color: #7e5bd5;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.analyticsHeader--skeleton .analyticsHeaderText {
+  gap: 8px;
+}
+
+.analyticsBreakdownCard--skeleton {
+  display: grid;
+  align-content: start;
+}
+
+.analyticsSkeletonRows {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .analyticsStats,
+  .analyticsBreakdown {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .analyticsPage {
+    padding-inline: 12px;
+  }
+
+  .analyticsHeader {
+    margin-inline: -12px;
+    padding: 18px 16px;
+  }
+
+  .analyticsStats,
+  .analyticsBreakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .analyticsHeader {
+    align-items: flex-start;
+    padding: 16px 14px;
+  }
+
+  .analyticsHeader h1 {
+    font-size: 25px;
+  }
+
+  .analyticsBackBtn {
+    min-width: 42px;
+    padding: 0 11px;
+  }
+
+  .analyticsBackBtn span {
+    display: none;
+  }
+
+  .analyticsStats,
+  .analyticsBreakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .analyticsStat {
+    min-height: 108px;
+  }
 }
 
 .profileEmptyState a:hover {
@@ -5207,6 +5859,10 @@ p {
   gap: 14px;
 }
 
+.rsvpButtons.rsvpButtons--single {
+  grid-template-columns: 1fr;
+}
+
 .rsvpButtons button {
   border: 1px solid;
   border-radius: 16px;
@@ -5927,6 +6583,18 @@ p {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+.editorSoundField {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 11px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow:
+    0 1px 2px rgba(23, 23, 23, 0.014),
+    0 5px 12px rgba(35, 28, 34, 0.025);
+}
+
 .editorForm label:focus-within {
   background: rgba(255, 255, 255, 0.92);
   box-shadow:
@@ -5941,7 +6609,9 @@ p {
     0 8px 18px rgba(239, 68, 68, 0.08);
 }
 
-.editorForm label > span {
+.editorForm label > span,
+.editorFieldLabel {
+  display: block;
   width: fit-content;
   color: #5c5359;
   font-size: 10.5px;
@@ -6661,7 +7331,8 @@ p {
     border-radius: 12px;
   }
 
-  .mobileBuilderSheet .editorForm label > span {
+  .mobileBuilderSheet .editorForm label > span,
+  .mobileBuilderSheet .editorFieldLabel {
     font-size: 10px;
   }
 
@@ -7551,8 +8222,8 @@ p {
   }
 
   .marketSearch {
+    margin-top: 5px;
     width: 100%;
-    max-width: 360px;
   }
 
   .searchBox {
@@ -8785,6 +9456,37 @@ body:has(.publicInvitationWrapper) {
   box-shadow: 0 16px 40px rgba(180, 80, 100, 0.25);
 }
 
+.rsvpPersistedNotice {
+  width: 100%;
+  border: 1px solid rgba(224, 188, 122, 0.48);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 251, 245, 0.76);
+  color: #786451;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.rsvpChangeBtn {
+  min-height: 36px;
+  border: 1px solid rgba(224, 188, 122, 0.55);
+  border-radius: 999px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.64);
+  color: #7a5b3a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rsvpChangeBtn:hover {
+  background: rgba(255, 251, 245, 0.94);
+}
+
 .thanksCard {
   display: flex;
   flex-direction: column;
@@ -9774,6 +10476,21 @@ body:has(.publicInvitationWrapper) {
     box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
   }
 
+  .profileInviteRow.profileInviteRow--bg {
+    grid-template-columns: 1fr;
+  }
+
+  .profileInviteRow.profileInviteRow--bg .profileInviteInfo,
+  .profileInviteRow.profileInviteRow--bg .profilePublicLinkWrap,
+  .profileInviteRow.profileInviteRow--bg .profileInviteActions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .profileInviteRow.profileInviteRow--bg .profileInviteActions {
+    justify-self: stretch;
+  }
+
   .profileInvitePreview {
     width: 100%;
     min-width: 0;
@@ -9997,8 +10714,9 @@ body:has(.publicInvitationWrapper) {
 
   .profileInviteRow.profileInviteRow--bg {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
+    grid-template-rows: 1fr auto auto;
     min-height: 0;
+    height: 100%;
     padding: 14px;
     gap: 10px;
   }
@@ -10006,6 +10724,11 @@ body:has(.publicInvitationWrapper) {
   .profileInviteRow.profileInviteRow--bg .profileInviteDetails {
     gap: 7px;
     max-width: min(100%, 360px);
+  }
+
+  .profileInviteRow.profileInviteRow--bg .profileInviteHeader {
+    align-items: center;
+    gap: 8px;
   }
 
   .profileInviteRow.profileInviteRow--bg .profileStatus {
@@ -10118,30 +10841,42 @@ body:has(.publicInvitationWrapper) {
 
 @media (max-width: 767px) {
   :root {
-    --bottom-nav-height: 62px;
-    --bottom-nav-offset: max(10px, env(safe-area-inset-bottom));
-    --bottom-nav-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 30px);
+    --bottom-nav-height: 58px;
+    --bottom-nav-offset: max(12px, env(safe-area-inset-bottom));
+    --bottom-nav-clearance: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 26px);
   }
 
   .bottomNav {
     left: 50%;
     right: auto;
-    width: min(390px, calc(100% - 20px));
+    width: min(380px, calc(100% - 28px));
     min-height: var(--bottom-nav-height);
+    padding: 5px;
+    border-radius: 22px;
     transform: translateX(-50%);
   }
 
   .bottomNav a {
-    min-height: 48px;
-    margin: 0 2px;
+    min-height: 46px;
+    margin: 0;
     gap: 5px;
     font-size: 12px;
+    border-radius: 16px;
+  }
+
+  .bottomNav a:first-child {
+    padding-left: 14px;
+  }
+
+  .bottomNav a.active {
+    min-height: 48px;
+    border-radius: 18px;
   }
 }
 
 @media (max-width: 380px) {
   .bottomNav {
-    width: min(360px, calc(100% - 16px));
+    width: min(350px, calc(100% - 20px));
     padding: 5px;
   }
 
@@ -10909,6 +11644,40 @@ body:has(.publicInvitationWrapper) {
     margin-top: 8px;
   }
 
+  .profileTransactions {
+    margin-inline: 14px;
+    padding-bottom: calc(var(--bottom-nav-clearance) + 10px);
+  }
+
+  .profileTransactions .paymentsHeader {
+    padding: 11px 12px;
+  }
+
+  .profileTransactions .paymentsList {
+    grid-template-columns: 1fr;
+  }
+
+  .profileTransactionCard {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .profileTransactionAside {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-items: start;
+    align-content: center;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .profileTransactionAction {
+    grid-row: 3;
+    padding-top: 8px;
+  }
+
   .profileHeaderButtons {
     width: 100%;
     align-items: stretch;
@@ -11022,14 +11791,14 @@ body:has(.publicInvitationWrapper) {
 }
 
 .modalBtnCancel {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  color: #4b5563;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .modalBtnCancel:hover {
-  background: #e5e7eb;
-  color: #1f2937;
+  background: #f1f5f9;
+  color: #1e293b;
 }
 
 .modalBtnConfirm {
@@ -11042,6 +11811,48 @@ body:has(.publicInvitationWrapper) {
 .modalBtnConfirm:hover {
   background: #b91c1c;
   transform: translateY(-1px);
+}
+
+.modalBtnConfirm--red-pastel {
+  background: #fff1f2 !important;
+  border: 1px solid #fecdd3 !important;
+  color: #be123c !important;
+  box-shadow: none !important;
+}
+
+.modalBtnConfirm--red-pastel:hover {
+  background: #ffe4e6 !important;
+  border-color: #fda4af !important;
+  color: #9f1239 !important;
+  transform: none !important;
+}
+
+.modalBtnConfirm--green-pastel {
+  background: #ecfdf5 !important;
+  border: 1px solid #bbf7d0 !important;
+  color: #047857 !important;
+  box-shadow: none !important;
+}
+
+.modalBtnConfirm--green-pastel:hover {
+  background: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #065f46 !important;
+  transform: none !important;
+}
+
+.modalBtnConfirm--orange-pastel {
+  background: #fffbeb !important;
+  border: 1px solid #fde68a !important;
+  color: #b45309 !important;
+  box-shadow: none !important;
+}
+
+.modalBtnConfirm--orange-pastel:hover {
+  background: #fef3c7 !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+  transform: none !important;
 }
 
 /* Global Toast System */
@@ -11946,101 +12757,1018 @@ body:has(.publicInvitationWrapper) {
   white-space: nowrap;
 }
 
-.rsvpCompletedMsg {
-  width: min(100%, 560px);
-  margin: 22px auto 6px;
-  padding: 14px 16px;
-  text-align: left;
+.eventStateMessage {
+  width: min(100%, 380px);
+  margin: 24px auto 8px;
+  text-align: center;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  align-items: center;
+  justify-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(185, 154, 173, 0.28);
-  border-left: 4px solid rgba(201, 169, 110, 0.74);
-  border-radius: 8px;
-  box-shadow: 0 10px 26px rgba(120, 80, 160, 0.08);
-  backdrop-filter: blur(6px);
+  padding: 24px 20px 20px;
+  border-radius: 20px;
+  box-shadow:
+    0 10px 25px -5px rgba(92, 80, 112, 0.04),
+    inset 0 0 16px rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  animation: eventStateFadeInScale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.eventStateMessage.rsvpCompletedMsg {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(252, 240, 248, 0.45) 100%);
+  border: 1px solid rgba(196, 154, 191, 0.4);
+}
+
+.eventStateMessage.eventInProgressMessage {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(240, 250, 246, 0.45) 100%);
+  border: 1px solid rgba(106, 171, 148, 0.35);
+}
+
+.eventStateIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Montserrat", sans-serif;
+  line-height: 1;
 }
 
 .rsvpCompletedIcon {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(201, 169, 110, 0.16);
-  border: 1px solid rgba(201, 169, 110, 0.38);
-  color: #9a6b24;
-  font-family: "Montserrat", sans-serif;
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.rsvpCompletedMsg .rsvpTitle {
-  margin: 0 0 3px;
-  font-size: 0.82rem;
-  letter-spacing: 0.14em;
-  font-weight: 800;
-  color: #445068;
-  text-transform: uppercase;
-}
-
-.rsvpCompletedMsg .rsvpCompletedSubText {
-  font-size: 0.88rem;
-  line-height: 1.35;
-  color: #657088;
-  margin: 0;
-}
-
-.eventInProgressMessage {
-  width: min(100%, 560px);
-  margin: 22px auto 6px;
-  padding: 14px 16px;
-  text-align: left;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(185, 154, 173, 0.26);
-  border-left: 4px solid rgba(201, 169, 110, 0.82);
-  border-radius: 8px;
-  box-shadow: 0 10px 26px rgba(120, 80, 160, 0.08);
-  backdrop-filter: blur(6px);
+  background: linear-gradient(135deg, rgba(196, 154, 191, 0.12) 0%, rgba(196, 154, 191, 0.22) 100%);
+  border: 1.5px solid rgba(196, 154, 191, 0.45);
+  color: var(--wedding-pink);
+  box-shadow: 0 4px 12px rgba(196, 154, 191, 0.15);
+  animation: completedIconGlow 2.5s infinite ease-in-out;
 }
 
 .eventInProgressIcon {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(106, 171, 148, 0.12) 0%, rgba(106, 171, 148, 0.22) 100%);
+  border: 1.5px solid rgba(106, 171, 148, 0.45);
+  color: var(--wedding-green-dark);
+  box-shadow: 0 4px 12px rgba(106, 171, 148, 0.15);
+  animation: activeIconPulse 2s infinite ease-in-out;
+}
+
+.eventStateMessage .rsvpTitle {
+  margin: 0;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--wedding-text);
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.eventStateCopy {
+  margin: 0;
+  max-width: 320px;
+  color: var(--wedding-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+@keyframes eventStateFadeInScale {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes activeIconPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(106, 171, 148, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(106, 171, 148, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(106, 171, 148, 0);
+  }
+}
+
+@keyframes completedIconGlow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(196, 154, 191, 0.15);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 4px 16px rgba(196, 154, 191, 0.35);
+  }
+}
+
+/* App shell pages should sit flush to the viewport; cards/panels keep their own internal padding. */
+.page,
+.profilePage,
+.templatesPage,
+.invitationsPage {
+  width: 100%;
+  max-width: none;
+  padding: 0 0 var(--bottom-nav-clearance);
+}
+
+.templateDetailsPage {
+  width: 100%;
+  max-width: none;
+  padding: max(18px, env(safe-area-inset-top)) clamp(20px, 3vw, 44px)
+    calc(104px + env(safe-area-inset-bottom));
+}
+
+.marketHeroPanel,
+.profileOverview,
+.profileInvitations {
+  border: 0;
+  border-radius: 0;
+}
+
+/* Compact template marketplace */
+.templatesPage .marketHeroPanel {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 12px 18px;
+  margin-bottom: 0;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(126, 91, 213, 0.12), transparent 30%),
+    radial-gradient(circle at 10% 90%, rgba(255, 236, 207, 0.25), transparent 35%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 245, 255, 0.96) 50%, rgba(243, 240, 255, 0.96) 100%);
+  backdrop-filter: blur(18px);
+}
+
+.templatesPage .templatesBrand {
+  min-height: 50px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: rgba(201, 169, 110, 0.16);
-  border: 1px solid rgba(201, 169, 110, 0.38);
-  color: #9a6b24;
-  font-family: "Montserrat", sans-serif;
+}
+
+.templatesPage .templatesBrand .appLogo {
+  font-size: 34px;
+}
+
+.templatesPage .marketHeader {
+  gap: 10px;
+}
+
+.templatesPage .marketHeaderTop {
+  align-items: center;
+  gap: 12px;
+}
+
+.templatesPage .marketSearch {
+  width: min(100%, 520px);
+}
+
+.templatesPage .searchBox {
+  min-height: 44px;
+  border-radius: 12px;
+  padding-inline: 14px;
+}
+
+.templatesPage .searchBox input {
+  min-height: 38px;
+  font-size: 12.5px;
+}
+
+.templatesPage .categoryScroller {
+  min-height: 40px;
+  padding: 10px 18px 8px;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.templatesPage .categoryScroller button {
+  min-height: 36px;
+  padding-inline: 18px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.templatesPage .categoryScroller button.active {
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.16);
+}
+
+.templatesPage .templateGrid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
+  gap: 16px;
+  padding: 18px 18px 12px;
+}
+
+.templatesPage .templateCard {
+  border-radius: 18px;
+  border-color: rgba(226, 232, 240, 0.9);
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(135deg, rgba(216, 180, 254, 0.36), rgba(219, 234, 254, 0.22), rgba(255, 255, 255, 0.8)) border-box;
+  box-shadow:
+    0 14px 34px rgba(15, 23, 42, 0.055),
+    0 2px 8px rgba(126, 91, 213, 0.035);
+}
+
+.templatesPage .templateCard:hover {
+  transform: translateY(-4px);
+  border-color: rgba(196, 181, 253, 0.72);
+  box-shadow:
+    0 22px 46px rgba(15, 23, 42, 0.09),
+    0 8px 22px rgba(126, 91, 213, 0.08);
+}
+
+.templatesPage .templatePreviewReference {
+  min-height: 156px;
+  border-radius: 18px 18px 0 0;
+  isolation: isolate;
+}
+
+.templatesPage .templateReferenceCard {
+  width: min(70%, 218px);
+  min-height: 100px;
+  padding: 16px 18px;
+  gap: 7px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(10px);
+}
+
+.templatesPage .templateReferenceCard small {
+  font-size: 8px;
+}
+
+.templatesPage .templateReferenceCard strong {
+  font-size: clamp(25px, 2.6vw, 31px);
+}
+
+.templatesPage .templateReferenceCard span {
+  padding: 5px 10px;
+  font-size: 9px;
+}
+
+.templatesPage .templateInfo {
+  padding: 13px 14px 14px;
+}
+
+.templatesPage .templatePopularity {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.templatesPage .templateText h2 {
   font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
+  line-height: 1.05;
+  margin-top: 4px;
 }
 
-.eventInProgressMessage strong {
+.templatesPage .templateMood {
   display: block;
-  margin: 0 0 3px;
-  color: #445068;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  margin-top: 5px;
+  font-size: 12px;
 }
 
-.eventInProgressMessage span {
-  color: #657088;
-  font-size: 0.88rem;
-  line-height: 1.35;
+.templatesPage .templateFeatureChips {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.templatesPage .templateFeatureChips span {
+  min-height: 26px;
+  padding-inline: 10px;
+  border-radius: 8px;
+  background: #f4effa;
+  color: #665070;
+  font-size: 10px;
+}
+
+@media (max-width: 767px) {
+  .templatesPage .marketHeroPanel {
+    padding: 12px 12px;
+  }
+
+  .templatesPage .templatesAppHeader {
+    margin-bottom: 4px;
+  }
+
+  .templatesPage .templatesBrand {
+    min-height: 44px;
+    font-size: 28px;
+  }
+
+  .templatesPage .templatesBrand .appLogo {
+    gap: 10px;
+  }
+
+  .templatesPage .templatesBrand .appLogoMark {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .templatesPage .marketHeader {
+    gap: 8px;
+  }
+
+  .templatesPage .marketHeaderTop {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .templatesPage .templatesAppHeader {
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-bottom: 0;
+  }
+
+  .templatesPage .marketSearch {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .templatesPage .searchBox {
+    min-height: 42px;
+    padding-inline: 14px;
+  }
+
+  .templatesPage .searchBox svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .templatesPage .searchBox input {
+    min-height: 40px;
+    font-size: 13px;
+  }
+
+  .templatesPage .categoryScroller {
+    min-height: 50px;
+    padding: 10px 12px 8px;
+    border-radius: 0;
+  }
+
+  .templatesPage .categoryScroller button {
+    min-height: 40px;
+    padding-inline: 18px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  .templatesPage .templateGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 12px 12px;
+  }
+
+  .templatesPage .templatePreviewContainer {
+    height: 112px;
+  }
+
+  .templatesPage .templatePreviewReference {
+    min-height: 112px;
+  }
+
+  .templatesPage .templateReferenceCard {
+    width: min(72%, 150px);
+    min-height: 78px;
+    padding: 11px 12px;
+    gap: 5px;
+    border-radius: 12px;
+  }
+
+  .templatesPage .templateReferenceCard small {
+    font-size: 6.8px;
+  }
+
+  .templatesPage .templateReferenceCard strong {
+    font-size: clamp(18px, 5.6vw, 23px);
+  }
+
+  .templatesPage .templateReferenceCard span {
+    padding: 4px 8px;
+    font-size: 7.5px;
+  }
+
+  .templatesPage .templateInfo {
+    padding: 10px 11px 12px;
+  }
+
+  .templatesPage .templateText h2 {
+    font-size: 15px;
+  }
+
+  .templatesPage .templateMood {
+    font-size: 11px;
+  }
+
+  .templatesPage .templateFeatureChips {
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .templatesPage .templateFeatureChips span {
+    min-height: 22px;
+    padding-inline: 8px;
+    font-size: 9px;
+  }
+}
+
+/* Invitations toolbar polish */
+.profileInvitations {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  min-height: 0;
+  padding: 0 0 18px;
+}
+
+.invitationsPage {
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+html:has(.invitationsPage),
+body:has(.invitationsPage) {
+  height: 100svh;
+  overflow: hidden;
+}
+
+.invitationsPage .profileInvitations {
+  height: 100%;
+}
+
+.profileInvitations > header {
+  flex: 0 0 auto;
+  align-items: flex-end;
+  margin-bottom: 14px;
+  border-bottom: 0;
+}
+
+.profileInvitations h2 {
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.profileInvitations > header p {
+  margin-top: 0;
+  font-size: 12.5px;
+  line-height: 1.12;
+}
+
+.profileControls {
+  display: grid;
+  grid-template-columns: max-content 460px;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 42px;
+  margin-bottom: 18px;
+  padding: 12px 18px 20px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.82);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(126, 91, 213, 0.12), transparent 30%),
+    radial-gradient(circle at 10% 90%, rgba(255, 236, 207, 0.25), transparent 35%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 245, 255, 0.96) 50%, rgba(243, 240, 255, 0.96) 100%);
+  backdrop-filter: blur(18px);
+}
+
+.profileSearchSkeleton {
+  justify-self: end;
+  width: 460px;
+  height: 36px;
+}
+
+.profileTabsSkeleton {
+  justify-self: end;
+  width: min(100%, 420px);
+  height: 36px;
+}
+
+.profileInvitationsContainer {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.profileInvitationList {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  align-items: start;
+  grid-auto-rows: max-content;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 18px calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 18px);
+}
+
+.profileEmptyState {
+  flex: 1 1 auto;
+}
+
+.profileSearchWrapper {
+  justify-self: end;
+  width: 460px;
+  max-width: none;
+}
+
+.profileSearchInput {
+  height: 42px;
+  border-radius: 12px;
+  font-size: 12px;
+  padding: 0 36px;
+  background: #f8fafc;
+}
+
+.profileControls .searchIcon {
+  left: 12px;
+  width: 18px;
+  height: 18px;
+}
+
+.profileFilterTabs {
+  align-self: flex-start;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  width: fit-content;
+  min-height: 38px;
+  align-items: center;
+  padding: 4px 18px 8px;
+  margin-bottom: 4px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.filterTabBtn {
+  min-height: 36px;
+  min-width: 0;
+  flex: 0 0 auto;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  font-size: 12px;
+  padding: 0 14px;
+  border-radius: 11px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.filterTabBtn.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.16);
+}
+
+.filterTabBtn.active span,
+.filterTabBtn.active span.pub,
+.filterTabBtn.active span.drf {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .profileControls {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .profileInvitations > .profileControls {
+    align-items: start;
+    padding: 18px 24px 20px;
+  }
+
+  .profileInvitations > .profileControls > div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .profileInvitations > .profileControls,
+  .profileInvitations > .profileControls > div {
+    justify-items: start;
+    justify-self: stretch;
+    text-align: left;
+    width: 100%;
+  }
+
+  .profileSearchWrapper,
+  .profileSearchSkeleton {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .profileInvitations > .profileControls .profileSearchWrapper,
+  .profileInvitations > .profileControls .profileSearchSkeleton {
+    margin-top: 4px;
+  }
+
+  .profileInvitations > .profileControls .profileSearchWrapper {
+    min-height: 46px;
+  }
+
+  .profileInvitations > .profileControls .profileSearchInput {
+    height: 46px;
+    padding-inline: 46px 16px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+
+  .profileInvitations > .profileControls .searchIcon {
+    left: 16px;
+    width: 19px;
+    height: 19px;
+  }
+
+  .profileFilterTabs {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    gap: 10px;
+    scrollbar-width: none;
+  }
+
+  .profileFilterTabs .filterTabBtn {
+    flex: 0 0 auto;
+  }
+
+  .profileFilterTabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .profileInvitations {
+    padding: 0 0 18px;
+  }
+
+  .profileInvitations > header {
+    margin-bottom: 8px;
+    padding-bottom: 10px;
+  }
+
+  .profileInvitations > header h2 {
+    font-size: 22px;
+  }
+
+  .profileInvitations > header p {
+    font-size: 12px;
+    line-height: 1.12;
+  }
+
+  .profileControls {
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+
+  .profileInvitations > .profileControls {
+    padding: 18px 16px 16px;
+  }
+
+  .profileInvitations > .profileControls .profileSearchWrapper,
+  .profileInvitations > .profileControls .profileSearchSkeleton {
+    margin-top: 4px;
+  }
+
+  .profileInvitations > .profileControls,
+  .profileInvitations > .profileControls > div {
+    justify-items: start;
+    justify-self: stretch;
+    text-align: left;
+  }
+
+  .profileSearchSkeleton,
+  .profileTabsSkeleton {
+    width: 100%;
+    height: 44px;
+  }
+
+  .profileTabsSkeleton {
+    justify-self: stretch;
+  }
+
+  .profileSearchWrapper {
+    min-height: 46px;
+  }
+
+  .profileSearchInput {
+    height: 46px;
+    font-size: 14px;
+  }
+
+  .profileFilterTabs {
+    min-height: 42px;
+    gap: 8px;
+    justify-content: flex-start;
+    padding: 4px 12px 8px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .profileInvitationList {
+    padding: 8px 12px calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 18px);
+  }
+
+  .filterTabBtn {
+    min-height: 38px;
+    font-size: 12px;
+    padding: 0 14px;
+    border-radius: 10px;
+  }
+
+  .filterTabBtn span {
+    font-size: 10px;
+    padding: 2px 7px;
+  }
+
+  .profileInviteRow.profileInviteRow--bg .profilePublicLinkWrap {
+    min-height: 48px;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 13px;
+  }
+
+  .profilePublicLinkWrap--empty {
+    background: rgba(255, 255, 255, 0.7);
+  }
+
+  .profilePublicLinkPlaceholder {
+    min-height: 38px;
+    align-items: center;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    font-size: 13px;
+    line-height: 1.25;
+    gap: 8px;
+  }
+
+  .profilePublicLinkPlaceholder svg {
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
+  }
+
+  .profileInviteActions {
+    gap: 8px;
+  }
+
+  .profileInviteActions--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profileInviteActions--four {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .profileInviteActions--four > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .profileInviteActions a,
+  .profileInviteActions button {
+    height: 40px;
+    min-height: 40px;
+    border-radius: 10px;
+    font-size: 11.5px;
+    gap: 6px;
+  }
+
+  .profileInviteActions svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (min-width: 901px) {
+  .profileInvitations > .profileControls {
+    position: relative;
+    grid-template-columns: max-content 460px;
+    align-items: center;
+    border-bottom: 0;
+  }
+
+  .profileInvitations > .profileControls::after {
+    content: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: rgba(226, 232, 240, 0.82);
+  }
+
+  .profileInvitations > .profileControls .profileSearchWrapper,
+  .profileInvitations > .profileControls .profileSearchSkeleton {
+    width: 460px;
+    max-width: 460px;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 900px) {
+  .profileInvitations > .profileControls {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .profileInvitations > .profileControls,
+  .profileInvitations > .profileControls > div {
+    justify-items: start;
+    justify-self: stretch;
+    text-align: left;
+    width: 100%;
+  }
+
+  .profileInvitations > .profileControls .profileSearchWrapper,
+  .profileInvitations > .profileControls .profileSearchSkeleton {
+    width: 100%;
+    max-width: 100%;
+    margin-top: 4px;
+  }
+}
+
+.profileInviteActions.profileInviteActions--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profileInviteActions.profileInviteActions--four {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.profileInviteActions.profileInviteActions--four > :last-child {
+  grid-column: 1 / -1;
+}
+
+/* Template-specific Loader Styles */
+.templateLoaderOverlay.pastelWeddingPage {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wedding-bg);
+  padding: 0;
+  perspective: none;
+  min-height: 100svh;
+  overflow: hidden;
+  transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  opacity: 1;
+}
+
+.templateLoaderOverlay.exiting {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.templateLoaderCard {
+  text-align: center;
+  padding: 40px 32px;
+  max-width: 380px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transform: scale(1);
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.templateLoaderOverlay.exiting .templateLoaderCard {
+  transform: scale(0.92);
+}
+
+/* Interlocking Rings loader style */
+.templateLoaderRings {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.templateLoaderRings .ring1,
+.templateLoaderRings .ring2 {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+
+/* Golden Engagement ring style */
+.templateLoaderRings .ring1 {
+  width: 70px;
+  height: 70px;
+  top: 10px;
+  left: 10px;
+  border-top-color: var(--wedding-gold);
+  border-right-color: var(--wedding-gold-light);
+  border-bottom-color: rgba(201, 169, 110, 0.1);
+  border-left-color: rgba(201, 169, 110, 0.1);
+  animation: spinClockwise 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Pink/purple wedding band style */
+.templateLoaderRings .ring2 {
+  width: 54px;
+  height: 54px;
+  top: 18px;
+  left: 18px;
+  border-top-color: var(--wedding-pink);
+  border-left-color: rgba(196, 154, 191, 0.2);
+  border-bottom-color: var(--wedding-pink);
+  border-right-color: rgba(196, 154, 191, 0.2);
+  animation: spinCounterClockwise 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.templateLoaderRings .heartCenter {
+  font-size: 20px;
+  color: var(--wedding-red);
+  animation: heartPulse 1.2s ease-in-out infinite;
+  z-index: 3;
+}
+
+.loaderCoupleName {
+  font-family: "Montserrat", sans-serif;
   font-weight: 500;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  color: var(--wedding-text);
+  margin: 0;
+  opacity: 0.95;
+  animation: textFadeUp 0.8s ease both;
+}
+
+.loaderStatusText {
+  font-family: "Montserrat", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--wedding-muted);
+  text-transform: uppercase;
+  margin: 0;
+  animation: textFadeUp 0.8s ease both 0.15s;
+}
+
+.loaderLine {
+  width: 120px;
+  height: 2px;
+  background: rgba(216, 205, 232, 0.4);
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+  margin-top: 8px;
+}
+
+.loaderLine::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--wedding-pink), var(--wedding-gold));
+  border-radius: 9px;
+  animation: loaderProgress 1.4s ease-in-out infinite;
+}
+
+@keyframes spinClockwise {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes spinCounterClockwise {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.2); opacity: 1; text-shadow: 0 0 8px rgba(192, 112, 128, 0.4); }
+}
+
+@keyframes loaderProgress {
+  0% { left: -40%; }
+  50% { width: 60%; }
+  100% { left: 100%; }
+}
+
+@keyframes textFadeUp {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }

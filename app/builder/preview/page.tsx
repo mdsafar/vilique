@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 type Props = {
-    searchParams: Promise<{ id?: string }>;
+    searchParams: Promise<{ id?: string; from?: string }>;
 };
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BuilderPreviewPage({ searchParams }: Props) {
-    const { id } = await searchParams;
+    const { id, from } = await searchParams;
 
     if (!id) {
         redirect("/templates");
@@ -27,12 +27,15 @@ export default async function BuilderPreviewPage({ searchParams }: Props) {
         notFound();
     }
 
+    const backHref = from === "invitations" ? "/invitations" : `/builder?id=${invitation.id}`;
+    const backLabel = from === "invitations" ? "Back to Invitations" : "Back to Editor";
+
     return (
         <div className="builderPreviewShell">
             <div className="builderPreviewTopbar">
-                <Link href={`/builder?id=${invitation.id}`} className="backToBuilderBtn">
+                <Link href={backHref} className="backToBuilderBtn">
                     <ArrowLeft size={16} />
-                    <span>Back to Editor</span>
+                    <span>{backLabel}</span>
                 </Link>
                 <span className="draftBadge">Draft Preview</span>
             </div>

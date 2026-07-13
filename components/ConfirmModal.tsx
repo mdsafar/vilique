@@ -15,6 +15,7 @@ type Props = {
     confirmText?: string;
     cancelText?: string;
     confirmStyle?: React.CSSProperties;
+    confirmClassName?: string;
     icon?: React.ReactNode;
 };
 
@@ -28,6 +29,7 @@ export default function ConfirmModal({
     confirmText = "Confirm",
     cancelText = "Cancel",
     confirmStyle,
+    confirmClassName,
     icon,
 }: Props) {
     // Prevent background scrolling when open
@@ -103,7 +105,7 @@ export default function ConfirmModal({
                             </button>
                             <LoadingButton
                                 type="button"
-                                className="modalBtnConfirm"
+                                className={`modalBtnConfirm ${confirmClassName || ""}`}
                                 onClick={onConfirm}
                                 isLoading={isPending}
                                 loadingLabel={`${confirmText}...`}

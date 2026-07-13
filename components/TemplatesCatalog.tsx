@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import AppLogo from "@/components/AppLogo";
 import type { InvitationCategory } from "@/types/invitation";
+import { useNavigationState } from "@/components/NavigationStateProvider";
 
 type TemplateItem = {
     id: string;
@@ -39,8 +39,12 @@ const categoryLabels: Record<InvitationCategory | "all", string> = {
 };
 
 export default function TemplatesCatalog({ templates }: Props) {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [activeCategory, setActiveCategory] = useState<InvitationCategory | "all">("all");
+    const {
+        templatesSearch: searchTerm,
+        setTemplatesSearch: setSearchTerm,
+        templatesFilter: activeCategory,
+        setTemplatesFilter: setActiveCategory,
+    } = useNavigationState();
     const todayLabel = new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "2-digit",
@@ -64,18 +68,11 @@ export default function TemplatesCatalog({ templates }: Props) {
         <>
             <section className="marketHeroPanel" aria-label="Template marketplace">
                 <header className="marketHeader">
-                    <div className="templatesAppHeader" aria-label="Vilique">
-                        <Link href="/templates" className="templatesBrand">
-                            <AppLogo size={34} />
-                        </Link>
-                    </div>
-
                     <div className="marketHeaderTop">
-                        <div>
-                            <p className="eyebrow">Template Marketplace</p>
-                            <h1>
-                                Choose your <span>invitation mood</span>
-                            </h1>
+                        <div className="templatesAppHeader" aria-label="Vilique">
+                            <Link href="/templates" className="templatesBrand">
+                                <AppLogo size={36} />
+                            </Link>
                         </div>
 
                         <section className="marketSearch" aria-label="Template search">
@@ -90,20 +87,21 @@ export default function TemplatesCatalog({ templates }: Props) {
                         </section>
                     </div>
 
-                    <nav className="categoryScroller" aria-label="Template categories">
-                        {categories.map((category) => (
-                            <button
-                                className={category === activeCategory ? "active" : ""}
-                                key={category}
-                                type="button"
-                                onClick={() => setActiveCategory(category)}
-                            >
-                                {categoryLabels[category]}
-                            </button>
-                        ))}
-                    </nav>
                 </header>
             </section>
+
+            <nav className="categoryScroller" aria-label="Template categories">
+                {categories.map((category) => (
+                    <button
+                        className={category === activeCategory ? "active" : ""}
+                        key={category}
+                        type="button"
+                        onClick={() => setActiveCategory(category)}
+                    >
+                        {categoryLabels[category]}
+                    </button>
+                ))}
+            </nav>
 
             {filteredTemplates.length ? (
                 <section className="templateGrid">

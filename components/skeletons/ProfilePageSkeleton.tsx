@@ -29,6 +29,46 @@ export default function ProfilePageSkeleton() {
                     ))}
                 </section>
             </section>
+
+            <section className="profileTransactions" aria-label="Loading transactions">
+                <div className="paymentsHeader">
+                    <div className="paymentsHeaderBody">
+                        <Skeleton className="paymentsHeaderIcon" rounded="lg" />
+                        <div className="paymentsHeaderText">
+                            <TextSkeleton width={116} height={18} />
+                            <TextSkeleton width={260} height={12} />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="paymentsSection">
+                    <div className="paymentsList">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                            <article className="profileTransactionCard profileTransactionCard--skeleton" key={index}>
+                                <Skeleton className="profileTransactionIcon" rounded="lg" />
+                                <div className="profileTransactionBody">
+                                    <div className="profileTransactionTitle">
+                                        <TextSkeleton width={132} height={16} />
+                                        <Skeleton style={{ width: 62, height: 20 }} rounded="full" />
+                                    </div>
+                                    <TextSkeleton width={180} height={12} />
+                                    <div className="profileTransactionMeta">
+                                        <TextSkeleton width={160} height={12} />
+                                        <TextSkeleton width={140} height={18} />
+                                    </div>
+                                </div>
+                                <div className="profileTransactionAside">
+                                    <TextSkeleton width={52} height={20} />
+                                    <TextSkeleton width={26} height={10} />
+                                </div>
+                                <div className="profileTransactionAction">
+                                    <Skeleton style={{ width: 134, height: 30 }} rounded="lg" />
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            </section>
         </main>
     );
 }

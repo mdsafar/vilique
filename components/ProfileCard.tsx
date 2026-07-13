@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { LogOut, AlertTriangle, History } from "lucide-react";
+import { LogOut, AlertTriangle } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
@@ -70,14 +70,6 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
 
             {profile && (
                 <div className="profileHeaderButtons">
-                    <a
-                        href="/dashboard/payment-history"
-                        className="profileHistoryButton"
-                        title="Payment History"
-                    >
-                        <History size={14} />
-                        <span>Transactions</span>
-                    </a>
                     <button
                         className="profileLogoutButton"
                         onClick={() => setIsConfirmOpen(true)}
@@ -116,8 +108,9 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
                 title="Sign Out"
                 message="Are you sure you want to sign out of your account? You will need to sign in again to access your drafts and published invitations."
                 confirmText="Sign out"
+                confirmClassName="modalBtnConfirm--red-pastel"
                 icon={
-                    <span className="modalWarningIcon">
+                    <span className="modalWarningIcon" style={{ color: "#be123c", background: "rgba(255, 241, 242, 0.9)" }}>
                         <AlertTriangle size={24} />
                     </span>
                 }

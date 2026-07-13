@@ -1,29 +1,52 @@
 import { parseInvitationDateParts } from "@/lib/invitationDate";
 
 type EventPhase = "upcoming" | "in_progress" | "completed";
+type EventTimingInput = {
+    eventDate: string | null;
+    eventTime?: string | null;
+    eventTimezone?: string | null;
+};
+type EventLifecycleInput = EventTimingInput & {
+    lifecycleStatus?: string | null;
+    eventStatus?: string | null;
+};
 
 /**
  * Checks whether an event has completed based on its date, time range,
  * timezone, and a grace period (in hours).
  */
 export function isEventCompleted(
-    invitation: {
-        eventDate: string | null;
-        eventTime?: string | null;
-        eventTimezone?: string | null;
-    },
+    invitation: EventTimingInput,
+    graceHours?: number,
+    now?: Date
+): boolean;
+export function isEventCompleted(
+    eventDate: string | null,
+    eventTime?: string | null,
+    eventTimezone?: string | null,
+    graceHours?: number,
+    now?: Date
+): boolean;
+export function isEventCompleted(
+    input: EventTimingInput | string | null,
+    eventTimeOrGraceHours: string | null | undefined | number = 0,
+    eventTimezoneOrNow: string | null | undefined | Date = new Date(),
     graceHours: number = 0,
     now: Date = new Date()
 ): boolean {
-    return getEventPhase(invitation, graceHours, now) === "completed";
+    const invitation = normalizeEventTimingInput(input, eventTimeOrGraceHours, eventTimezoneOrNow);
+    const resolvedGraceHours = typeof eventTimeOrGraceHours === "number" ? eventTimeOrGraceHours : graceHours;
+    const resolvedNow = eventTimezoneOrNow instanceof Date ? eventTimezoneOrNow : now;
+    return getEventPhase(invitation, resolvedGraceHours, resolvedNow) === "completed";
+}
+
+export function isInvitationCompleted(invitation: EventLifecycleInput, now: Date = new Date()): boolean {
+    if (invitation.lifecycleStatus === "completed" || invitation.eventStatus === "completed") return true;
+    return isEventCompleted(invitation, 0, now);
 }
 
 export function getEventPhase(
-    invitation: {
-        eventDate: string | null;
-        eventTime?: string | null;
-        eventTimezone?: string | null;
-    },
+    invitation: EventTimingInput,
     graceHours: number = 0,
     now: Date = new Date()
 ): EventPhase {
@@ -55,6 +78,20 @@ export function getEventPhase(
         if (now < eventStart.getTime()) return "upcoming";
         return now > eventEnd.getTime() + graceHours * 60 * 60 * 1000 ? "completed" : "in_progress";
     }
+}
+
+function normalizeEventTimingInput(
+    input: EventTimingInput | string | null,
+    eventTimeOrGraceHours: string | null | undefined | number,
+    eventTimezoneOrNow: string | null | undefined | Date
+): EventTimingInput {
+    if (typeof input === "object" && input !== null) return input;
+
+    return {
+        eventDate: input,
+        eventTime: typeof eventTimeOrGraceHours === "string" ? eventTimeOrGraceHours : null,
+        eventTimezone: typeof eventTimezoneOrNow === "string" ? eventTimezoneOrNow : null,
+    };
 }
 
 function getNowInTimezone(timezone: string, now: Date) {

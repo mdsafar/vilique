@@ -23,7 +23,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import PublishModal from "@/components/PublishModal";
-import MajorChangeModal from "@/components/MajorChangeModal";
 import { useToast } from "@/components/Toast";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { normalizeInvitationDateValue, parseInvitationDateParts } from "@/lib/invitationDate";
@@ -130,6 +129,13 @@ const weddingTemplateDefaultTitle = weddingTemplateTitleOptions[0];
 let activeSoundPreviewAudio: HTMLAudioElement | null = null;
 let activeSoundPreviewStop: (() => void) | null = null;
 
+function stopActiveSoundPreview() {
+    activeSoundPreviewStop?.();
+    activeSoundPreviewAudio = null;
+    activeSoundPreviewStop = null;
+    dispatchSoundPreviewState(false);
+}
+
 function dispatchSoundPreviewState(isPlaying: boolean) {
     window.dispatchEvent(new Event(isPlaying ? "vilique:sound-preview-start" : "vilique:sound-preview-stop"));
 }
@@ -153,11 +159,11 @@ function BuilderContent() {
     const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
     const [saveState, setSaveState] = useState("Creating draft...");
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-    const [majorChangeError, setMajorChangeError] = useState<string | null>(null);
     const [leaveModalOpen, setLeaveModalOpen] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [isUploadingMusic, setIsUploadingMusic] = useState(false);
     const [validationErrors, setValidationErrors] = useState<BuilderValidationErrors>({});
     const [publishSuccessDetails, setPublishSuccessDetails] = useState<PublishSuccessDetails | null>(null);
     const [previewScrolledToBottom, setPreviewScrolledToBottom] = useState(false);
@@ -367,9 +373,14 @@ function BuilderContent() {
             showRequiredFieldErrors(serverErrors);
             return null;
         }
+        if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
+            const message = result.error || "This invitation is completed and can no longer be edited.";
+            showSaveFailure(message);
+            window.setTimeout(navigateBackToList, 450);
+            return null;
+        }
         if (response.status === 409 && (result.code === "EVENT_IDENTITY_CHANGED" || result.code === "NEW_EVENT_DETECTED" || result.code === "PROTECTED_EVENT_IDENTITY")) {
             const message = result.error || "This invitation is protected after publishing.";
-            setMajorChangeError(message);
             showSaveFailure(message);
             return null;
         }
@@ -479,34 +490,40 @@ function BuilderContent() {
         }
 
         const draft = await ensureDraftExists();
+        setIsUploadingMusic(true);
         setSaveState("Uploading music...");
-        const formData = new FormData();
-        formData.set("invitationId", draft.id);
-        formData.set("kind", "music");
-        formData.set("file", file);
+        try {
+            const formData = new FormData();
+            formData.set("invitationId", draft.id);
+            formData.set("kind", "music");
+            formData.set("file", file);
 
-        const response = await fetch("/api/media", {
-            method: "POST",
-            body: formData,
-        });
-        const result = await response.json();
+            const response = await fetch("/api/media", {
+                method: "POST",
+                body: formData,
+            });
+            const result = await response.json();
 
-        if (!response.ok) {
-            setSaveState(result.error || "Music upload failed");
-            return;
-        }
-
-        setInvitation((prev) => {
-            if (prev.musicUrl?.startsWith("blob:")) {
-                URL.revokeObjectURL(prev.musicUrl);
+            if (!response.ok) {
+                setSaveState(result.error || "Music upload failed");
+                return;
             }
 
-            return {
-                ...prev,
-                musicUrl: result.url,
-                updatedAt: new Date().toISOString(),
-            };
-        });
+            setInvitation((prev) => {
+                if (prev.musicUrl?.startsWith("blob:")) {
+                    URL.revokeObjectURL(prev.musicUrl);
+                }
+
+                return {
+                    ...prev,
+                    musicUrl: result.url,
+                    updatedAt: new Date().toISOString(),
+                };
+            });
+            setSaveState("Saved");
+        } finally {
+            setIsUploadingMusic(false);
+        }
     }
 
     useEffect(() => {
@@ -585,6 +602,12 @@ function BuilderContent() {
                     setIsLoadingInvitation(false);
                     return;
                 }
+                const result = await response.json().catch(() => ({}));
+                if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
+                    showToast(result.error || "This invitation is completed and can no longer be edited.", "error");
+                    router.replace("/invitations");
+                    return;
+                }
             }
 
             const defaultInv = {
@@ -601,7 +624,7 @@ function BuilderContent() {
         }
 
         void loadDraft();
-    }, [buildSavePayload, searchParams]);
+    }, [buildSavePayload, router, searchParams, showToast]);
 
     useEffect(() => {
         if (!hasLoadedDraft.current || !isPersistedDraft) return;
@@ -641,15 +664,18 @@ function BuilderContent() {
                 setSaveState("Fix required fields");
             } else if (response.status === 409 && (result.code === "MAJOR_CHANGE_DETECTED" || result.code === "EVENT_IDENTITY_CHANGED" || result.code === "NEW_EVENT_DETECTED" || result.code === "PROTECTED_EVENT_IDENTITY")) {
                 const message = result.error || "This invitation is protected after publishing.";
-                setMajorChangeError(message);
                 showSaveFailure(message);
+            } else if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
+                const message = result.error || "This invitation is completed and can no longer be edited.";
+                showSaveFailure(message);
+                window.setTimeout(() => router.replace(builderBackTarget.current), 450);
             } else {
                 showSaveFailure(formatSaveError(result.error));
             }
         }, 650);
 
         return () => window.clearTimeout(timeout);
-    }, [buildSavePayload, invitation, isEditingPublished, isPersistedDraft, showSaveFailure]);
+    }, [buildSavePayload, invitation, isEditingPublished, isPersistedDraft, router, showSaveFailure]);
 
     if (isLoadingInvitation) {
         return <BuilderLoadingState />;
@@ -658,15 +684,6 @@ function BuilderContent() {
     return (
         <main className="builderShell">
             <AuthRequiredModal next={currentBuilderPath} />
-            <MajorChangeModal
-                isOpen={!!majorChangeError}
-                error={majorChangeError || ""}
-                invitationId={invitation.id}
-                onClose={() => {
-                    setMajorChangeError(null);
-                    window.location.reload();
-                }}
-            />
 
             <header className="builderTopbar">
                 <button
@@ -704,6 +721,7 @@ function BuilderContent() {
                         updateField={updateField}
                         updateTheme={updateTheme}
                         updateMusicFile={updateMusicFile}
+                        isUploadingMusic={isUploadingMusic}
                     />
                 </aside>
 
@@ -790,6 +808,7 @@ function BuilderContent() {
                     updateField={updateField}
                     updateTheme={updateTheme}
                     updateMusicFile={updateMusicFile}
+                    isUploadingMusic={isUploadingMusic}
                 />
             </section>
 
@@ -963,10 +982,11 @@ function LeaveModal({
     isOpen: boolean;
     mode: "draft" | "update";
     onSave: () => Promise<void>;
-    onDiscard: () => void;
+    onDiscard: () => Promise<void> | void;
     onCancel: () => void;
 }) {
     const [saving, setSaving] = useState(false);
+    const [discarding, setDiscarding] = useState(false);
 
     // Prevent background scrolling when open
     useEffect(() => {
@@ -1001,6 +1021,16 @@ function LeaveModal({
         setSaving(true);
         await onSave();
         setSaving(false);
+    }
+
+    async function handleDiscardConfirm() {
+        setDiscarding(true);
+        try {
+            await onDiscard();
+        } catch (error) {
+            console.error("Discard failed", error);
+            setDiscarding(false);
+        }
     }
 
     const isUpdateMode = mode === "update";
@@ -1066,7 +1096,7 @@ function LeaveModal({
                                 color: "#111827",
                                 fontFamily: "Arial, Helvetica, sans-serif",
                                 letterSpacing: "-0.02em",
-                            }}>
+                             }}>
                                 {isUpdateMode ? "Discard changes?" : "Save before leaving?"}
                             </h2>
                             <p style={{
@@ -1088,38 +1118,38 @@ function LeaveModal({
                                 <button
                                     type="button"
                                     onClick={handleSave}
-                                    disabled={saving}
+                                    disabled={saving || discarding}
                                     style={{
                                         width: "100%",
                                         minHeight: "46px",
                                         borderRadius: "14px",
                                         border: "none",
-                                        background: saving
+                                        background: (saving || discarding)
                                             ? "#e5e7eb"
                                             : "linear-gradient(135deg, #8c4cf3 0%, #c46fb4 100%)",
-                                        color: saving ? "#9ca3af" : "#fff",
+                                        color: (saving || discarding) ? "#9ca3af" : "#fff",
                                         fontWeight: 800,
                                         fontSize: "14px",
-                                        cursor: saving ? "not-allowed" : "pointer",
+                                        cursor: (saving || discarding) ? "not-allowed" : "pointer",
                                         display: "inline-flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         gap: "8px",
                                         transition: "all 0.2s",
-                                        boxShadow: saving ? "none" : "0 4px 16px rgba(140, 76, 243, 0.3)",
+                                        boxShadow: (saving || discarding) ? "none" : "0 4px 16px rgba(140, 76, 243, 0.3)",
                                     }}
                                 >
-                                    <Save size={15} />
+                                    {saving ? <Loader2 size={15} className="spinner" /> : <Save size={15} />}
                                     {saving ? "Saving…" : "Save Draft"}
                                 </button>
                             ) : null}
 
                             {/* Discard & Keep Editing row */}
-                            <div style={{ display: "flex", gap: "8px" }}>
+                            <div style={{ display: "flex", gap: "8px", width: "100%" }}>
                                 <button
                                     type="button"
-                                    onClick={onDiscard}
-                                    disabled={saving}
+                                    onClick={handleDiscardConfirm}
+                                    disabled={saving || discarding}
                                     style={{
                                         flex: 1,
                                         minHeight: "42px",
@@ -1129,16 +1159,22 @@ function LeaveModal({
                                         color: "#dc2626",
                                         fontWeight: 700,
                                         fontSize: "13.5px",
-                                        cursor: saving ? "not-allowed" : "pointer",
+                                        cursor: (saving || discarding) ? "not-allowed" : "pointer",
+                                        opacity: (saving || discarding) ? 0.7 : 1,
                                         transition: "all 0.2s",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "6px",
                                     }}
                                 >
-                                    Discard
+                                    {discarding ? <Loader2 size={14} className="spinner" /> : null}
+                                    <span>Discard</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={onCancel}
-                                    disabled={saving}
+                                    disabled={saving || discarding}
                                     style={{
                                         flex: 1,
                                         minHeight: "42px",
@@ -1148,7 +1184,8 @@ function LeaveModal({
                                         color: "#6b7280",
                                         fontWeight: 700,
                                         fontSize: "13.5px",
-                                        cursor: saving ? "not-allowed" : "pointer",
+                                        cursor: (saving || discarding) ? "not-allowed" : "pointer",
+                                        opacity: (saving || discarding) ? 0.7 : 1,
                                         transition: "all 0.2s",
                                     }}
                                 >
@@ -1194,6 +1231,7 @@ function EditorForm({
     updateField,
     updateTheme,
     updateMusicFile,
+    isUploadingMusic,
 }: {
     activeTab: EditorTab;
     invitation: ReturnType<typeof createDefaultInvitation>;
@@ -1201,6 +1239,7 @@ function EditorForm({
     updateField: (key: string, value: string) => void;
     updateTheme: (key: keyof InvitationData["theme"], value: InvitationData["theme"][keyof InvitationData["theme"]]) => void;
     updateMusicFile: (file: File | null) => void;
+    isUploadingMusic: boolean;
 }) {
     const { startTime, endTime } = parseTimeRange(invitation.eventTime);
     const [activePicker, setActivePicker] = useState<"date" | "startTime" | "endTime" | null>(null);
@@ -1387,8 +1426,8 @@ function EditorForm({
     return (
         <div className="editorForm">
             {/* ── Celebration Song ── */}
-            <label style={{ display: "block", marginBottom: "4px" }}>
-                <span>Celebration Song</span>
+            <div className="editorSoundField">
+                <span className="editorFieldLabel">Celebration Song</span>
                 <SoundPreviewCard
                     icon="🎵"
                     title={hasCustomSong ? "Custom Song" : "Default Celebration Song"}
@@ -1401,13 +1440,14 @@ function EditorForm({
                     badge={hasCustomSong ? "custom" : defaultMusicUrl ? "default" : undefined}
                     onRemove={hasCustomSong ? () => updateMusicFile(null) : undefined}
                     onUpload={(file) => updateMusicFile(file)}
+                    isUploading={isUploadingMusic}
                     uploadId="musicUploadInput"
                 />
-            </label>
+            </div>
 
             {/* ── Clock Ticking Sound (read-only) ── */}
-            <label style={{ display: "block", marginBottom: "4px" }}>
-                <span>Clock Ticking Sound</span>
+            <div className="editorSoundField">
+                <span className="editorFieldLabel">Clock Ticking Sound</span>
                 <SoundPreviewCard
                     icon="⏰"
                     title="Default Ticking Sound"
@@ -1428,7 +1468,7 @@ function EditorForm({
                 }}>
                     This sound plays in the background automatically. It&apos;s set by the template and cannot be changed.
                 </p>
-            </label>
+            </div>
 
             {/* ── Play Duration ── */}
             <label>
@@ -1949,6 +1989,10 @@ function useAudioPreview(url: string | undefined) {
         };
     }, []);
 
+    useEffect(() => {
+        stopPreview();
+    }, [url]);
+
     function stopPreview() {
         if (!audioRef.current) return;
         audioRef.current.pause();
@@ -2000,6 +2044,7 @@ function SoundPreviewCard({
     badge,
     onRemove,
     onUpload,
+    isUploading = false,
     uploadId,
 }: {
     icon: string;
@@ -2009,6 +2054,7 @@ function SoundPreviewCard({
     badge?: "default" | "custom";
     onRemove?: () => void;
     onUpload?: (file: File) => void;
+    isUploading?: boolean;
     uploadId?: string;
 }) {
     const { playing, toggle } = useAudioPreview(url);
@@ -2029,12 +2075,22 @@ function SoundPreviewCard({
                 gap: "10px",
                 padding: "12px 13px",
             }}>
-                <span style={{ fontSize: "20px", lineHeight: 1 }}>{icon}</span>
+                <span style={{ fontSize: "20px", lineHeight: 1, flex: "0 0 auto" }}>{icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "1px" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 850, color: "#1a1a1a", letterSpacing: "0.02em" }}>{title}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px", minWidth: 0 }}>
+                        <span style={{
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            fontSize: "12px",
+                            fontWeight: 850,
+                            color: "#1a1a1a",
+                            letterSpacing: "0.02em",
+                        }}>{title}</span>
                         {badge && (
                             <span style={{
+                                flex: "0 0 auto",
                                 fontSize: "8px",
                                 fontWeight: 800,
                                 padding: "1px 5px",
@@ -2048,11 +2104,20 @@ function SoundPreviewCard({
                             </span>
                         )}
                     </div>
-                    <span style={{ fontSize: "10.5px", color: "#9ca3af", wordBreak: "break-all", lineHeight: 1.22 }}>
+                    <span style={{
+                        display: "block",
+                        maxWidth: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontSize: "10.5px",
+                        color: "#9ca3af",
+                        lineHeight: 1.22,
+                    }}>
                         {subtitle}
                     </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "0 0 auto" }}>
                     {url && (
                         <button
                             type="button"
@@ -2084,18 +2149,24 @@ function SoundPreviewCard({
                     {onRemove && (
                         <button
                             type="button"
-                            onClick={onRemove}
+                            onClick={() => {
+                                stopActiveSoundPreview();
+                                onRemove();
+                            }}
+                            disabled={isUploading}
                             style={{
-                                height: "28px",
-                                padding: "0 9px",
-                                borderRadius: "8px",
+                                height: "30px",
+                                minHeight: "30px",
+                                padding: "0 8px",
+                                borderRadius: "7px",
                                 background: "#fee2e2",
                                 color: "#ef4444",
-                                fontSize: "10px",
+                                fontSize: "9.5px",
                                 fontWeight: 800,
                                 border: "none",
-                                cursor: "pointer",
-                                flexShrink: 0,
+                                cursor: isUploading ? "not-allowed" : "pointer",
+                                opacity: isUploading ? 0.55 : 1,
+                                flex: "0 0 auto",
                             }}
                         >
                             Remove
@@ -2110,22 +2181,35 @@ function SoundPreviewCard({
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    cursor: "pointer",
+                    cursor: isUploading ? "wait" : "pointer",
+                    opacity: isUploading ? 0.88 : 1,
                 }}
-                    onClick={() => document.getElementById(uploadId)?.click()}
+                    onClick={() => {
+                        if (isUploading) return;
+                        stopActiveSoundPreview();
+                        document.getElementById(uploadId)?.click();
+                    }}
                 >
-                    <span style={{ fontSize: "12px" }}>📤</span>
+                    {isUploading ? (
+                        <Loader2 size={14} className="spinner" style={{ color: "#7e5bd5", flex: "0 0 auto" }} />
+                    ) : (
+                        <span style={{ fontSize: "12px", flex: "0 0 auto" }}>📤</span>
+                    )}
                     <span style={{ fontSize: "11.5px", color: "#7e5bd5", fontWeight: 750, letterSpacing: "0.015em" }}>
-                        Upload custom song to replace
+                        {isUploading ? "Uploading song..." : "Upload custom song to replace"}
                     </span>
                     <input
                         id={uploadId}
                         type="file"
                         accept="audio/*"
+                        disabled={isUploading}
                         style={{ display: "none" }}
                         onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) onUpload(file);
+                            if (file) {
+                                stopActiveSoundPreview();
+                                onUpload(file);
+                            }
                         }}
                     />
                 </div>

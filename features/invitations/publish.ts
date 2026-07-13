@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicInvitationUrl } from "@/lib/config/site";
+import { isInvitationCompleted } from "@/lib/lifecycle";
 import { isSlugAvailable } from "@/features/invitations/slug";
 import { assessChangeRisk, EventIdentitySnapshot, generateEventFingerprint } from "@/features/invitations/abuse";
 
@@ -33,6 +34,16 @@ export async function publishInvitationAfterPayment({
         throw new Error("Cannot publish an archived invitation");
     }
 
+    if (isInvitationCompleted({
+        eventDate: invite.event_date,
+        eventTime: invite.event_time,
+        eventTimezone: invite.event_timezone,
+        lifecycleStatus: invite.lifecycle_status,
+        eventStatus: invite.event_status,
+    })) {
+        throw new Error("Invitation is completed and locked.");
+    }
+
     // 2. Validate mandatory fields
     if (!invite.title?.trim()) {
         throw new Error("Title is required to publish");
@@ -42,6 +53,9 @@ export async function publishInvitationAfterPayment({
     }
     if (!invite.event_date) {
         throw new Error("Event date is required to publish");
+    }
+    if (!invite.event_time?.trim()) {
+        throw new Error("Event time is required to publish");
     }
     if (!invite.venue_name?.trim()) {
         throw new Error("Venue name is required to publish");
@@ -143,10 +157,6 @@ export async function publishInvitationAfterPayment({
         message: invite.message,
         templateId,
     });
-
-    if (invite.first_published_at && risk.decision === "blocked") {
-        throw new Error(risk.reason);
-    }
 
     // 5. Update invitation status. Retry without the newest entitlement columns
     // when PostgREST schema cache has not seen the migration yet.

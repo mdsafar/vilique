@@ -1,8 +1,30 @@
 import { NextResponse } from "next/server";
-import { rsvpCreateSchema } from "@/features/invitations/validation";
+import { rsvpCreateSchema, rsvpLookupSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
-import { isEventCompleted } from "@/lib/lifecycle";
-import { Json } from "@/types/database";
+
+export async function GET(request: Request) {
+    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const parsed = rsvpLookupSchema.safeParse({
+        invitationId: searchParams.get("invitationId"),
+        guestToken: searchParams.get("guestToken"),
+    });
+
+    if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const { data, error } = await supabase.rpc("get_public_rsvp", {
+        p_invitation_id: parsed.data.invitationId,
+        p_guest_token: parsed.data.guestToken,
+    });
+
+    if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ rsvp: data?.[0] || null }, { status: 200 });
+}
 
 export async function POST(request: Request) {
     const supabase = await createClient();
@@ -12,46 +34,23 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    // Check if the event has completed
-    const { data: invite } = await supabase
-        .from("invitations")
-        .select("event_date, event_time, event_timezone, lifecycle_status")
-        .eq("id", parsed.data.invitationId)
-        .single();
-
-    if (invite) {
-        const completed = invite.lifecycle_status === "completed" || isEventCompleted({
-            eventDate: invite.event_date,
-            eventTime: invite.event_time,
-            eventTimezone: invite.event_timezone,
-        });
-
-        if (completed) {
-            return NextResponse.json({
-                code: "EVENT_COMPLETED",
-                message: "This event has already concluded."
-            }, { status: 400 });
-        }
-    }
-
-    const { error } = await supabase.from("rsvps").insert({
-        invitation_id: parsed.data.invitationId,
-        guest_name: parsed.data.guestName,
-        guest_phone: parsed.data.guestPhone || null,
-        status: parsed.data.status,
-        guest_count: parsed.data.guestCount,
-        message: parsed.data.message || null,
+    const { data, error } = await supabase.rpc("upsert_public_rsvp", {
+        p_invitation_id: parsed.data.invitationId,
+        p_guest_token: parsed.data.guestToken,
+        p_status: parsed.data.status,
+        p_guest_name: parsed.data.guestName,
+        p_guest_phone: parsed.data.guestPhone || null,
+        p_guest_count: parsed.data.guestCount,
+        p_message: parsed.data.message || null,
     });
 
     if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        const isCompleted = error.message.toLowerCase().includes("concluded");
+        return NextResponse.json({
+            code: isCompleted ? "EVENT_COMPLETED" : "RSVP_FAILED",
+            message: error.message,
+        }, { status: isCompleted ? 409 : 400 });
     }
 
-    await supabase.from("invitation_events").insert({
-        invitation_id: parsed.data.invitationId,
-        event_type: "rsvp_submit",
-        metadata: { status: parsed.data.status } as Json,
-    });
-
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true, rsvp: data?.[0] || null }, { status: 200 });
 }

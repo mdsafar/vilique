@@ -3,6 +3,7 @@ import { mapInvitationRow } from "@/features/invitations/mappers";
 import { invitationUpdateSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isInvitationCompleted } from "@/lib/lifecycle";
 import { Json } from "@/types/database";
 
 type Context = {
@@ -11,6 +12,7 @@ type Context = {
 
 type IdentityCheckedUpdateResult = {
     blocked?: boolean;
+    locked?: boolean;
     validationError?: boolean;
     code?: string;
     reason?: string;
@@ -44,6 +46,21 @@ export async function PATCH(request: Request, { params }: Context) {
     }
 
     const supabaseAdmin = createAdminClient();
+    const { data: currentInvite, error: currentInviteError } = await supabaseAdmin
+        .from("invitations")
+        .select("id, user_id, event_date, event_time, event_timezone, lifecycle_status, event_status")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single();
+
+    if (currentInviteError || !currentInvite) {
+        return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
+    }
+
+    if (isCompletedInvitationRow(currentInvite)) {
+        return completedLockedResponse();
+    }
+
     const { data, error } = await supabaseAdmin.rpc("update_invitation_with_identity_check", {
         p_invitation_id: id,
         p_patch: stripUndefined(parsed.data) as Json,
@@ -69,6 +86,10 @@ export async function PATCH(request: Request, { params }: Context) {
             error: result.error || "Complete the required fields before updating.",
             fields: result.fields || {},
         }, { status: 400 });
+    }
+
+    if (result.locked || result.code === "INVITATION_COMPLETED_LOCKED") {
+        return completedLockedResponse();
     }
 
     if (result.blocked) {
@@ -103,6 +124,10 @@ export async function GET(_request: Request, { params }: Context) {
 
     if (error || !data) {
         return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
+    }
+
+    if (isCompletedInvitationRow(data)) {
+        return completedLockedResponse();
     }
 
     return NextResponse.json(mapInvitationRow(data));
@@ -165,6 +190,29 @@ function stripUndefined<T extends Record<string, unknown>>(value: T) {
     ) as T;
 }
 
+function isCompletedInvitationRow(invitation: {
+    event_date: string | null;
+    event_time: string | null;
+    event_timezone: string | null;
+    lifecycle_status?: string | null;
+    event_status?: string | null;
+}) {
+    return isInvitationCompleted({
+        eventDate: invitation.event_date,
+        eventTime: invitation.event_time,
+        eventTimezone: invitation.event_timezone,
+        lifecycleStatus: invitation.lifecycle_status,
+        eventStatus: invitation.event_status,
+    });
+}
+
+function completedLockedResponse() {
+    return NextResponse.json({
+        code: "INVITATION_COMPLETED_LOCKED",
+        error: "This invitation is completed and can no longer be edited.",
+    }, { status: 409 });
+}
+
 function getSafeUpdateErrorResponse(error: { code?: string; message?: string; details?: string | null }) {
     const message = error.message || "";
     const details = error.details || "";
@@ -208,6 +256,13 @@ function getSafeUpdateErrorResponse(error: { code?: string; message?: string; de
             code: "PROTECTED_EVENT_IDENTITY",
             error: "This invitation is protected after publishing. Please reload and try your edit again.",
         }, { status: 409 });
+    }
+
+    if (
+        error.code === "P0001" &&
+        combined.includes("completed invitations cannot be edited")
+    ) {
+        return completedLockedResponse();
     }
 
     return NextResponse.json({
