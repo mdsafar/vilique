@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: Context) {
     const supabaseAdmin = createAdminClient();
     const { data: currentInvite, error: currentInviteError } = await supabaseAdmin
         .from("invitations")
-        .select("id, user_id, event_date, event_time, event_timezone, lifecycle_status, event_status")
+        .select("id, user_id, status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
         .eq("id", id)
         .eq("user_id", user.id)
         .single();
@@ -191,18 +191,24 @@ function stripUndefined<T extends Record<string, unknown>>(value: T) {
 }
 
 function isCompletedInvitationRow(invitation: {
+    status?: string | null;
     event_date: string | null;
     event_time: string | null;
     event_timezone: string | null;
     lifecycle_status?: string | null;
     event_status?: string | null;
+    first_published_at?: string | null;
+    published_at?: string | null;
 }) {
     return isInvitationCompleted({
         eventDate: invitation.event_date,
         eventTime: invitation.event_time,
         eventTimezone: invitation.event_timezone,
+        status: invitation.status,
         lifecycleStatus: invitation.lifecycle_status,
         eventStatus: invitation.event_status,
+        first_published_at: invitation.first_published_at,
+        published_at: invitation.published_at,
     });
 }
 

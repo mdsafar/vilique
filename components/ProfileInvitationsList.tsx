@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import useSWRInfinite from "swr/infinite";
 import {
     CalendarDays,
     Clock,
@@ -13,7 +14,6 @@ import {
     Trash2,
     Search,
     X,
-    Filter,
     ExternalLink,
     Copy,
     Check,
@@ -27,15 +27,20 @@ import {
     WifiOff,
     Wifi,
     Lock,
+    MoreVertical,
 } from "lucide-react";
 import { deleteInvitation } from "@/app/(app)/profile/actions";
+import ListState from "@/components/ListState";
 import { InvitationData } from "@/types/invitation";
 import { getPublicInvitationUrl } from "@/lib/config/site";
-import { getEventPhase, isInvitationCompleted } from "@/lib/lifecycle";
+import { getInvitationLifecycle, InvitationLifecycleStatus } from "@/lib/lifecycle";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
 import { useNavigationState } from "./NavigationStateProvider";
 import { useSWRConfig } from "swr";
+import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 interface DashboardData {
     profile: {
@@ -53,13 +58,22 @@ interface DashboardData {
 }
 
 interface ProfileInvitationsListProps {
-    initialInvitations: InvitationData[];
-    invitationStats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
+    initialInvitations?: InvitationData[];
+    invitationStats?: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
 }
 
+type InvitationsPageResponse = {
+    items: InvitationData[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    totalCount: number;
+    counts: Record<string, number>;
+    stats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
+};
+
 export default function ProfileInvitationsList({
-    initialInvitations,
-    invitationStats,
+    initialInvitations = [],
+    invitationStats = {},
 }: ProfileInvitationsListProps) {
     const {
         invitationsSearch: searchTerm,
@@ -68,32 +82,72 @@ export default function ProfileInvitationsList({
         setInvitationsFilter: setStatusFilter,
     } = useNavigationState();
 
-    const filteredInvitations = initialInvitations.filter((item) => {
-        const lifecycleStatus = getInvitationLifecycleStatus(item);
-        const matchesStatus = statusFilter === "all" ||
-            lifecycleStatus === statusFilter ||
-            (statusFilter === "upcoming" && lifecycleStatus === "live_today");
-
-        const combinedText = `
-            ${item.title}
-            ${item.primaryName}
-            ${item.secondaryName || ""}
-            ${item.category}
-        `.toLowerCase();
-
-        return matchesStatus && combinedText.includes(searchTerm.toLowerCase());
+    const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
+    const {
+        data,
+        error,
+        setSize,
+        isLoading,
+        isValidating,
+        mutate,
+    } = useSWRInfinite<InvitationsPageResponse>((pageIndex, previousPageData) => {
+        if (previousPageData && !previousPageData.hasMore) return null;
+        const params = new URLSearchParams({
+            status: statusFilter,
+            sort: "updated_desc",
+            limit: "12",
+        });
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
+        return `/api/invitations?${params.toString()}`;
+    }, null, {
+        suspense: false,
+        revalidateFirstPage: false,
     });
 
-    const lifecycleCounts = initialInvitations.reduce(
-        (counts, item) => {
-            const lifecycleStatus = getInvitationLifecycleStatus(item);
-            if (lifecycleStatus === "draft") counts.draft += 1;
-            if (lifecycleStatus === "completed") counts.completed += 1;
-            if (lifecycleStatus === "upcoming" || lifecycleStatus === "live_today") counts.upcoming += 1;
-            return counts;
-        },
-        { upcoming: 0, completed: 0, draft: 0 }
-    );
+    const pages = data || [];
+    const invitations = pages.flatMap((page) => page.items);
+    const firstPage = pages[0];
+    const counts = firstPage?.counts || {
+        all: initialInvitations.length,
+        upcoming: 0,
+        completed: 0,
+        draft: 0,
+        offline: 0,
+    };
+    const mergedStats = pages.reduce((acc, page) => ({ ...acc, ...page.stats }), invitationStats);
+    const hasMore = Boolean(pages[pages.length - 1]?.hasMore);
+    const shouldShowEndState = pages.length > 1 && !hasMore;
+    const isSearching = searchTerm !== debouncedSearch;
+    const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
+    const isLoadingNextPage = isValidating && pages.length > 0;
+    const hasActiveFilters = Boolean(searchTerm) || statusFilter !== "all";
+    const statusLabels: Record<string, string> = {
+        all: "All",
+        upcoming: "Upcoming",
+        completed: "Completed",
+        draft: "Drafts",
+        offline: "Offline",
+    };
+    const emptyStateDetails = [
+        statusFilter !== "all" ? `Tab: ${statusLabels[statusFilter] || statusFilter}` : null,
+        searchTerm ? `Search: ${searchTerm}` : null,
+    ].filter(Boolean) as string[];
+    const sentinelRef = useInfiniteScroll<HTMLDivElement>({
+        disabled: !hasMore || isLoadingNextPage,
+        onLoadMore: () => setSize((current) => current + 1),
+    });
+
+    useEffect(() => {
+        if (window.location.pathname !== "/invitations") return;
+        const params = new URLSearchParams(window.location.search);
+        if (statusFilter === "all") params.delete("status");
+        else params.set("status", statusFilter);
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        else params.delete("search");
+        const nextUrl = params.toString() ? `/invitations?${params.toString()}` : "/invitations";
+        window.history.replaceState(null, "", nextUrl);
+    }, [debouncedSearch, statusFilter]);
 
     const handleClearSearch = () => setSearchTerm("");
     const handleResetAll = () => {
@@ -138,69 +192,120 @@ export default function ProfileInvitationsList({
                         className={`filterTabBtn ${statusFilter === "all" ? "active" : ""}`}
                         onClick={() => setStatusFilter("all")}
                     >
-                        All <span>{initialInvitations.length}</span>
+                        All <span>{counts.all || 0}</span>
                     </button>
                     <button
                         type="button"
                         className={`filterTabBtn ${statusFilter === "upcoming" ? "active" : ""}`}
                         onClick={() => setStatusFilter("upcoming")}
                     >
-                        Upcoming <span className="pub">{lifecycleCounts.upcoming}</span>
+                        Upcoming <span className="pub">{counts.upcoming || 0}</span>
                     </button>
                     <button
                         type="button"
                         className={`filterTabBtn ${statusFilter === "completed" ? "active" : ""}`}
                         onClick={() => setStatusFilter("completed")}
                     >
-                        Completed <span>{lifecycleCounts.completed}</span>
+                        Completed <span>{counts.completed || 0}</span>
                     </button>
                     <button
                         type="button"
                         className={`filterTabBtn ${statusFilter === "draft" ? "active" : ""}`}
                         onClick={() => setStatusFilter("draft")}
                     >
-                        Drafts <span className="drf">{lifecycleCounts.draft}</span>
+                        Drafts <span className="drf">{counts.draft || 0}</span>
                     </button>
                 </nav>
 
-            {filteredInvitations.length ? (
+            {isLoadingFirstPage ? (
+                <InvitationListSkeleton />
+            ) : invitations.length ? (
                 <div className="profileInvitationList">
-                    {filteredInvitations.map((invitation) => (
+                    {invitations.map((invitation) => (
                         <InvitationRow
                             invitation={invitation}
                             key={invitation.id}
-                            stats={invitationStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
+                            stats={mergedStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
                         />
                     ))}
+                    {isLoadingNextPage ? <InvitationAppendSkeleton /> : null}
+                    {error && invitations.length ? (
+                        <div className="listLoadState" role="status">
+                            <span>Couldn&apos;t load more</span>
+                            <button type="button" onClick={() => mutate()}>Retry</button>
+                        </div>
+                    ) : null}
+                    {shouldShowEndState && invitations.length ? <div className="listEndState">You&apos;ve reached the end.</div> : null}
+                    <div ref={sentinelRef} className="infiniteScrollSentinel" aria-hidden="true" />
                 </div>
             ) : (
-                <div className="profileEmptyState">
-                    {searchTerm || statusFilter !== "all" ? (
-                        <>
-                            <div className="emptyStateIcon">
-                                <Filter size={32} />
-                            </div>
-                            <h3>No results found</h3>
-                            <p>No invitations match your active search or filters.</p>
-                            <button
-                                type="button"
-                                onClick={handleResetAll}
-                                className="resetFilterBtn"
-                            >
-                                Reset Search & Filters
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <h3>Choose a template to begin</h3>
-                            <p>Pick a template to publish your first invite.</p>
-                            <Link href="/templates">Browse templates</Link>
-                        </>
-                    )}
-                </div>
+                <ListState
+                    actionLabel={error ? "Retry" : hasActiveFilters ? "Reset search & filters" : "Browse templates"}
+                    className="profileEmptyState"
+                    description={
+                        error
+                            ? "We could not retrieve your invitations."
+                            : hasActiveFilters
+                            ? "No invitations match this combination. Try a different tab or clear the search."
+                            : "Pick a template to publish your first invite."
+                    }
+                    details={hasActiveFilters ? emptyStateDetails : undefined}
+                    href={hasActiveFilters ? undefined : "/templates"}
+                    onAction={error ? () => mutate() : hasActiveFilters ? handleResetAll : undefined}
+                    title={error ? "Could not load invitations" : hasActiveFilters ? "No matching invitations" : "Choose a template to begin"}
+                    variant={error ? "error" : hasActiveFilters ? "filtered" : "empty"}
+                />
             )}
         </div>
         </>
+    );
+}
+
+function InvitationListSkeleton() {
+    return (
+        <div className="profileInvitationList" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+                <InvitationSkeletonCard key={index} />
+            ))}
+        </div>
+    );
+}
+
+function InvitationAppendSkeleton() {
+    return (
+        <>
+            {Array.from({ length: 2 }).map((_, index) => (
+                <InvitationSkeletonCard key={`append-${index}`} />
+            ))}
+        </>
+    );
+}
+
+function InvitationSkeletonCard() {
+    return (
+        <article className="profileInviteRow profileInviteRow--bg profileInviteRow--wedding">
+            <div className="profileInviteInfo">
+                <div className="profileInviteDetails">
+                    <div className="profileInviteHeader">
+                        <TextSkeleton width={150} height={14} />
+                        <ButtonSkeleton width={92} height={26} />
+                    </div>
+                    <TextSkeleton width={220} height={24} />
+                    <TextSkeleton width="82%" height={15} />
+                    <div className="profileInviteMeta">
+                        <TextSkeleton width={112} height={15} />
+                        <TextSkeleton width={150} height={15} />
+                        <TextSkeleton width={140} height={15} />
+                    </div>
+                </div>
+            </div>
+            <Skeleton className="profilePublicLinkWrap" style={{ width: "100%", height: 40 }} rounded="lg" />
+            <div className="profileInviteActions">
+                <ButtonSkeleton width="100%" height={34} />
+                <ButtonSkeleton width="100%" height={34} />
+                <ButtonSkeleton width="100%" height={34} />
+            </div>
+        </article>
     );
 }
 
@@ -218,9 +323,13 @@ function InvitationRow({
     const [isEditing, setIsEditing] = useState(false);
     const [isTakingOffline, setIsTakingOffline] = useState(false);
     const [isMakingOnline, setIsMakingOnline] = useState(false);
+    const [isMoreOpen, setIsMoreOpen] = useState(false);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
+    const moreMenuFirstItemRef = useRef<HTMLButtonElement>(null);
     const router = useRouter();
     const { showToast } = useToast();
     const { mutate } = useSWRConfig();
+    const refreshInvitationLists = () => mutate((key) => typeof key === "string" && key.startsWith("/api/invitations"));
 
     const lifecycleStatus = getInvitationLifecycleStatus(invitation);
     const isDraft = lifecycleStatus === "draft";
@@ -230,7 +339,6 @@ function InvitationRow({
     const isOffline = lifecycleStatus === "offline";
     const isPublic = isUpcoming || isLiveToday || isCompleted;
     const hasAnalyticsAccess = Boolean(invitation.firstPublishedAt || invitation.publishedAt);
-
     const isSample = invitation.id.startsWith("sample-");
     const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}&from=invitations`;
     const analyticsHref = `/invitations/${invitation.id}/analytics`;
@@ -240,6 +348,30 @@ function InvitationRow({
             ? `/i/${invitation.slug}`
             : `/builder/preview?id=${invitation.id}&from=invitations`;
     const publicUrl = getPublicInvitationUrl(invitation.slug);
+
+    useEffect(() => {
+        if (!isMoreOpen) return;
+
+        function handlePointerDown(event: PointerEvent) {
+            if (!moreMenuRef.current?.contains(event.target as Node)) {
+                setIsMoreOpen(false);
+            }
+        }
+
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                setIsMoreOpen(false);
+            }
+        }
+
+        document.addEventListener("pointerdown", handlePointerDown);
+        document.addEventListener("keydown", handleKeyDown);
+        window.requestAnimationFrame(() => moreMenuFirstItemRef.current?.focus());
+        return () => {
+            document.removeEventListener("pointerdown", handlePointerDown);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [isMoreOpen]);
 
     const handleEdit = () => {
         setIsEditing(true);
@@ -273,6 +405,7 @@ function InvitationRow({
             }
             showToast(isDraft ? "Draft deleted." : "Invitation deleted.", "success");
             mutate("/api/profile/dashboard");
+            refreshInvitationLists();
         } catch (error) {
             showToast(error instanceof Error ? error.message : "Failed to delete invitation", "error");
             mutate("/api/profile/dashboard", originalData, { revalidate: false });
@@ -283,6 +416,7 @@ function InvitationRow({
     }
 
     function handleTakeOfflineClick() {
+        setIsMoreOpen(false);
         setIsOfflineOpen(true);
     }
 
@@ -324,6 +458,7 @@ function InvitationRow({
             }
             showToast("Invitation taken offline.", "success");
             mutate("/api/profile/dashboard");
+            refreshInvitationLists();
         } catch {
             showToast("Unable to take invitation offline.", "error");
             mutate("/api/profile/dashboard", originalData, { revalidate: false });
@@ -375,6 +510,7 @@ function InvitationRow({
             }
             showToast("Invitation is online again.", "success");
             mutate("/api/profile/dashboard");
+            refreshInvitationLists();
         } catch {
             showToast("Unable to make invitation online.", "error");
             mutate("/api/profile/dashboard", originalData, { revalidate: false });
@@ -456,7 +592,7 @@ function InvitationRow({
                 </div>
             ) : null}
 
-            <div className={`profileInviteActions ${isCompleted ? "profileInviteActions--two" : isOffline || hasAnalyticsAccess ? "profileInviteActions--four" : ""}`}>
+            <div className={`profileInviteActions ${isCompleted ? "profileInviteActions--two" : isOffline ? "profileInviteActions--four" : isUpcoming || isLiveToday ? "profileInviteActions--published" : ""}`}>
                 {isDraft ? (
                     <>
                         <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
@@ -580,19 +716,37 @@ function InvitationRow({
                                 <span>Analytics</span>
                             </Link>
                         ) : null}
-                        <button
-                            type="button"
-                            className="profileActionBtn profileActionBtn--offline"
-                            onClick={handleTakeOfflineClick}
-                            disabled={isTakingOffline}
-                        >
-                            {isTakingOffline ? (
-                                <Loader2 size={14} className="spinner" aria-hidden="true" />
-                            ) : (
-                                <Power size={14} aria-hidden="true" />
-                            )}
-                            <span>Take Offline</span>
-                        </button>
+                        <div className="profileActionOverflow" ref={moreMenuRef}>
+                            <button
+                                type="button"
+                                className="profileActionBtn profileActionBtn--more"
+                                onClick={() => setIsMoreOpen((open) => !open)}
+                                aria-label={`More actions for ${invitation.title}`}
+                                aria-haspopup="menu"
+                                aria-expanded={isMoreOpen}
+                            >
+                                <MoreVertical size={15} aria-hidden="true" />
+                            </button>
+                            {isMoreOpen ? (
+                                <div className="profileActionMenu" role="menu" aria-label={`More actions for ${invitation.title}`}>
+                                    <button
+                                        ref={moreMenuFirstItemRef}
+                                        type="button"
+                                        className="profileActionMenuItem"
+                                        onClick={handleTakeOfflineClick}
+                                        disabled={isTakingOffline}
+                                        role="menuitem"
+                                    >
+                                        {isTakingOffline ? (
+                                            <Loader2 size={14} className="spinner" aria-hidden="true" />
+                                        ) : (
+                                            <Power size={14} aria-hidden="true" />
+                                        )}
+                                        <span>Go Offline</span>
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
                     </>
 	                ) : (
 	                    <>
@@ -680,25 +834,10 @@ function InvitationRow({
     );
 }
 
-type DashboardLifecycleStatus = "draft" | "upcoming" | "live_today" | "completed" | "offline";
+type DashboardLifecycleStatus = InvitationLifecycleStatus;
 
 function getInvitationLifecycleStatus(invitation: InvitationData): DashboardLifecycleStatus {
-    if (isInvitationCompleted(invitation)) {
-        return "completed";
-    }
-
-    if (invitation.lifecycleStatus === "unpublished" || invitation.eventStatus === "unpublished") {
-        return "offline";
-    }
-
-    if (invitation.status !== "published") {
-        return "draft";
-    }
-
-    const phase = getEventPhase(invitation);
-    if (phase === "upcoming") return "upcoming";
-    if (phase === "in_progress") return "live_today";
-    return "completed";
+    return getInvitationLifecycle(invitation);
 }
 
 function getLifecycleStatusLabel(status: DashboardLifecycleStatus) {

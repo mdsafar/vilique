@@ -1,3 +1,5 @@
+import { Heart } from "lucide-react";
+
 export default function PublicInviteLoading() {
     return (
         <main className="publicInvitationWrapper" aria-busy="true">
@@ -6,7 +8,9 @@ export default function PublicInviteLoading() {
                     <div className="templateLoaderRings">
                         <div className="ring1" />
                         <div className="ring2" />
-                        <div className="heartCenter">❤</div>
+                        <div className="heartCenter">
+                            <Heart size={22} strokeWidth={1.7} fill="currentColor" aria-hidden="true" />
+                        </div>
                     </div>
                     
                     <p className="loaderCoupleName">

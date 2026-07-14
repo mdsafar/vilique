@@ -3,6 +3,8 @@ import { templates } from "@/data/templates";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { createPublicServerClient } from "@/lib/supabase/public-server";
 import { createClient } from "@/lib/supabase/server";
+import { getDefaultRatingSummary } from "@/lib/templateRatingFormat";
+import { getTemplateRatingSummaryMap } from "@/lib/templateRatings";
 import { mapInvitationRow, mapTemplateRow } from "@/features/invitations/mappers";
 
 const getCachedActiveTemplates = unstable_cache(
@@ -10,7 +12,7 @@ const getCachedActiveTemplates = unstable_cache(
         const supabase = createPublicServerClient();
         const { data, error } = await supabase
             .from("invitation_templates")
-            .select("*")
+            .select("id, template_key, name, category, description, preview_image_url, accent_color, is_premium, is_active, created_at, updated_at, price_paise, currency, is_free, slug, is_paid, metadata")
             .eq("is_active", true)
             .order("created_at", { ascending: true });
 
@@ -19,7 +21,17 @@ const getCachedActiveTemplates = unstable_cache(
         const implementedTemplateIds = new Set(templates.map((template) => template.id));
         const implementedRows = data.filter((row) => implementedTemplateIds.has(row.template_key));
 
-        return implementedRows.length ? implementedRows.map(mapTemplateRow) : templates;
+        const mappedTemplates = implementedRows.length ? implementedRows.map(mapTemplateRow) : templates;
+        const ratingSummaries = await getTemplateRatingSummaryMap(mappedTemplates.map((template) => template.id));
+
+        return mappedTemplates.map((template) => {
+            const summary = ratingSummaries.get(template.id) || getDefaultRatingSummary();
+            return {
+                ...template,
+                ratingAverage: summary.average,
+                ratingCount: summary.count,
+            };
+        });
     },
     ["active-invitation-templates"],
     {
@@ -130,14 +142,14 @@ export async function getDashboardData() {
 
     const { data: invitationRows } = await supabase
         .from("invitations")
-        .select("*, invitation_templates(template_key)")
+        .select("id, status, template_id, invitation_templates(template_key)")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
-    const invitations = (invitationRows || []).map(mapInvitationRow);
+    const invitations = invitationRows || [];
     const invitationIds = invitations.map((invitation) => invitation.id);
     const rsvpEligibleInvitationIds = invitations
-        .filter((invitation) => templateCollectsDetailedRsvps(invitation.templateId))
+        .filter((invitation) => templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation)))
         .map((invitation) => invitation.id);
 
     const [rsvpRowsResult, viewResult, viewRowsResult, paymentsResult] = await Promise.all([
@@ -157,8 +169,8 @@ export async function getDashboardData() {
         invitations.map((invitation) => [
             invitation.id,
             {
-                acceptsRsvps: templateCollectsDetailedRsvps(invitation.templateId),
-                rsvps: templateCollectsDetailedRsvps(invitation.templateId)
+                acceptsRsvps: templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation)),
+                rsvps: templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation))
                     ? (rsvpRowsResult.data || []).filter((row) => row.invitation_id === invitation.id).length
                     : 0,
                 views: (viewRowsResult.data || []).filter((row) => row.invitation_id === invitation.id).length,
@@ -178,7 +190,7 @@ export async function getDashboardData() {
                 "Friend",
             avatarUrl: getUserMetadataString(user.user_metadata, "avatar_url"),
         },
-        invitations,
+        invitations: [],
         published: invitations.filter((item) => item.status === "published").length,
         drafts: invitations.filter((item) => item.status === "draft").length,
         views: viewResult.count || 0,
@@ -190,6 +202,13 @@ export async function getDashboardData() {
 
 function templateCollectsDetailedRsvps(templateId: string) {
     return !["pastel-floral-wedding"].includes(templateId);
+}
+
+function getInvitationTemplateKey(invitation: { template_id: string | null; invitation_templates?: { template_key?: string | null } | { template_key?: string | null }[] | null }) {
+    const template = Array.isArray(invitation.invitation_templates)
+        ? invitation.invitation_templates[0]
+        : invitation.invitation_templates;
+    return template?.template_key || invitation.template_id || "";
 }
 
 function getUserMetadataString(metadata: unknown, key: string) {

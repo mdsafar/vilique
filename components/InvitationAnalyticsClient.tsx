@@ -93,15 +93,14 @@ export default function InvitationAnalyticsClient({ invitation, initialAnalytics
     return (
         <section className="analyticsPanel">
             <header className="analyticsHeader">
-                <div className="analyticsHeaderText">
-                    <span>Invitation analytics</span>
-                    <h1>Analytics</h1>
-                    <p>{invitation.title}</p>
-                </div>
-                <Link href="/invitations" className="analyticsBackBtn">
+                <Link href="/invitations" className="analyticsBackBtn" aria-label="Back to invitations">
                     <ArrowLeft size={16} />
                     <span>Back</span>
                 </Link>
+                <div className="analyticsHeaderText">
+                    <h1>Analytics</h1>
+                    <p>{invitation.title}</p>
+                </div>
             </header>
 
             {!hasData ? (

@@ -3,10 +3,10 @@
 import { CSSProperties, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { MapPinned, Phone, CalendarOff, Clock } from "lucide-react";
+import { MapPin, MapPinned, Phone, CalendarOff, Clock, Flower2, Heart, HeartCrack, Sparkle, Star } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
-import { getEventPhase } from "@/lib/lifecycle";
+import { getEventPhase, isInvitationCompleted } from "@/lib/lifecycle";
 import { parseInvitationDateParts } from "@/lib/invitationDate";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 
@@ -30,8 +30,9 @@ type CountdownValue = {
 
 type CelebrationParticle = {
     id: number;
-    symbol: string;
+    icon: ParticleIconName;
     color: string;
+    variant?: "accept" | "decline";
     left: number;
     top: number;
     mx: number;
@@ -43,7 +44,7 @@ type CelebrationParticle = {
 
 type FallingPetal = {
     id: number;
-    symbol: string;
+    icon: ParticleIconName;
     color: string;
     left: number;
     size: number;
@@ -51,6 +52,8 @@ type FallingPetal = {
     duration: number;
     delay: number;
 };
+
+type ParticleIconName = "flower" | "heart" | "heartCrack" | "sparkle" | "star";
 
 let activeTickAudio: HTMLAudioElement | null = null;
 let activeSongAudio: HTMLAudioElement | null = null;
@@ -133,12 +136,17 @@ export default function PastelFloralWedding({
 
     const { countdown, isStarted, now } = useCountdown(eventDate);
     const completed = useMemo(() => {
-        return invitation.lifecycleStatus === 'completed' || getEventPhase({
+        return isInvitationCompleted({
             eventDate: invitation.eventDate,
             eventTime: invitation.eventTime,
             eventTimezone: invitation.eventTimezone,
-        }, 0, new Date(now)) === "completed";
-    }, [invitation.lifecycleStatus, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
+            status: invitation.status,
+            lifecycleStatus: invitation.lifecycleStatus,
+            eventStatus: invitation.eventStatus,
+            firstPublishedAt: invitation.firstPublishedAt,
+            publishedAt: invitation.publishedAt,
+        }, new Date(now));
+    }, [invitation.status, invitation.lifecycleStatus, invitation.eventStatus, invitation.firstPublishedAt, invitation.publishedAt, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
     const eventPhase = useMemo(() => {
         if (completed) return "completed";
         return getEventPhase({
@@ -186,6 +194,20 @@ export default function PastelFloralWedding({
             return () => window.cancelAnimationFrame(frame);
         }
     }, [accepted]);
+
+    useEffect(() => {
+        if (!declineOpen) return;
+
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = previousBodyOverflow;
+            document.documentElement.style.overflow = previousHtmlOverflow;
+        };
+    }, [declineOpen]);
 
     function stopThisTemplateAudio(updateState = true) {
         if (songTimeoutRef.current) {
@@ -263,20 +285,25 @@ export default function PastelFloralWedding({
         return () => document.removeEventListener("visibilitychange", onVisibilityChange);
     }, [isSongPlaying, shouldPlayCountdownTick]);
 
-    function handleAccept(event: MouseEvent<HTMLButtonElement>) {
-        event.stopPropagation();
-        const sparkleTarget = event.currentTarget.querySelector("b") ?? event.currentTarget;
-        const targetRect = sparkleTarget.getBoundingClientRect();
-        const targetX = targetRect.left + targetRect.width / 2;
-        const targetY = targetRect.top + targetRect.height / 2;
+    function getPagePointFromEvent(event: MouseEvent<HTMLButtonElement>) {
+        const buttonRect = event.currentTarget.getBoundingClientRect();
+        const fallbackX = buttonRect.left + buttonRect.width / 2;
+        const fallbackY = buttonRect.top + buttonRect.height / 2;
         const page = event.currentTarget.closest(".pastelWeddingPage") as HTMLElement | null;
-        const pageTransform = page ? window.getComputedStyle(page).transform : "none";
         const pageRect = page?.getBoundingClientRect();
         const scaleX = page && pageRect ? pageRect.width / page.offsetWidth : 1;
         const scaleY = page && pageRect ? pageRect.height / page.offsetHeight : 1;
-        const hasScaledPage = page && pageRect && pageTransform !== "none" && scaleX > 0 && scaleY > 0;
-        const x = hasScaledPage ? (targetX - pageRect.left) / scaleX : targetX;
-        const y = hasScaledPage ? (targetY - pageRect.top) / scaleY : targetY;
+        const viewportX = event.clientX || fallbackX;
+        const viewportY = event.clientY || fallbackY;
+        const x = page && pageRect && scaleX > 0 ? (viewportX - pageRect.left) / scaleX : viewportX;
+        const y = page && pageRect && scaleY > 0 ? (viewportY - pageRect.top) / scaleY : viewportY;
+
+        return { x, y };
+    }
+
+    function handleAccept(event: MouseEvent<HTMLButtonElement>) {
+        event.stopPropagation();
+        const { x, y } = getPagePointFromEvent(event);
 
         setIsAccepting(true);
         createSparkles(x, y, setParticles);
@@ -309,7 +336,10 @@ export default function PastelFloralWedding({
         window.setTimeout(() => setIsAccepting(false), 900);
     }
 
-    function handleDecline() {
+    function handleDecline(event: MouseEvent<HTMLButtonElement>) {
+        event.stopPropagation();
+        const { x, y } = getPagePointFromEvent(event);
+        createDeclineBurst(x, y, setParticles);
         setDeclineOpen(true);
         onDecline?.();
     }
@@ -384,7 +414,7 @@ function InviteCard({
     countdown: CountdownValue;
     isAccepting: boolean;
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
-    onDecline: () => void;
+    onDecline: (event: MouseEvent<HTMLButtonElement>) => void;
     rsvpStatus?: RSVPStatus | null;
     completed: boolean;
     inProgress: boolean;
@@ -395,7 +425,7 @@ function InviteCard({
             <CardDecor />
 
             <p className="weddingTopText">WEDDING INVITATION</p>
-            <div className="goldLine">❤</div>
+            <GoldDivider />
 
             <h1 className="weddingNames">
                 {invitation.primaryName} & {invitation.secondaryName}
@@ -417,12 +447,14 @@ function InviteCard({
             </div>
 
             <div className="venueBlock">
-                <span>⌖</span>
+                <span aria-hidden="true">
+                    <MapPin size={18} strokeWidth={1.75} />
+                </span>
                 <h2>{invitation.venueName}</h2>
                 <p>{invitation.venueAddress}</p>
             </div>
 
-            <div className="goldLine dividerHeart">❤</div>
+            <GoldDivider className="dividerHeart" />
             <p className="countdownTitle">
                 {countdownTitle}
             </p>
@@ -441,12 +473,12 @@ function InviteCard({
                     <div className={`rsvpButtons ${rsvpStatus === "declined" ? "rsvpButtons--single" : ""}`}>
                         <button className="rsvpAcceptBtn" onClick={onAccept}>
                             <span>{rsvpStatus === "declined" ? "Accept Instead" : "Accept"}</span>
-                            <b>♡</b>
+                            <Heart size={23} strokeWidth={1.8} aria-hidden="true" />
                         </button>
                         {rsvpStatus === "declined" ? null : (
                             <button className="rsvpDeclineBtn" onClick={onDecline}>
                                 <span>Decline</span>
-                                <b>♡</b>
+                                <HeartCrack size={23} strokeWidth={1.8} aria-hidden="true" />
                             </button>
                         )}
                     </div>
@@ -483,7 +515,7 @@ function ThanksCard({
             <CardDecor />
 
             <h1 className="thanksTitle">We Can&apos;t Wait!</h1>
-            <div className="goldLine">❤</div>
+            <GoldDivider />
 
             <p className="thanksName">
                 {invitation.primaryName} & {invitation.secondaryName}
@@ -518,7 +550,7 @@ function ThanksCard({
                 </a>
             ) : null}
 
-            <div className="goldLine dividerHeart">❤</div>
+            <GoldDivider className="dividerHeart" />
             <p className="countdownTitle">
                 {countdownTitle}
             </p>
@@ -577,8 +609,19 @@ function CardDecor() {
         <>
             <div className="floral floralLeft" aria-hidden="true" />
             <div className="floral floralRight" aria-hidden="true" />
-            <div className="cornerHeart" aria-hidden="true">♡</div>
+            <div className="floral floralBottomRight" aria-hidden="true" />
+            <div className="cornerHeart" aria-hidden="true">
+                <Heart size={34} strokeWidth={1.35} />
+            </div>
         </>
+    );
+}
+
+function GoldDivider({ className = "" }: { className?: string }) {
+    return (
+        <div className={`goldLine ${className}`.trim()} aria-hidden="true">
+            <Heart size={13} strokeWidth={1.8} fill="currentColor" />
+        </div>
     );
 }
 
@@ -606,7 +649,9 @@ function FloatingFlowers() {
     return (
         <div className="floatingFlowers" aria-hidden="true">
             {Array.from({ length: 18 }).map((_, index) => (
-                <span key={index}>✿</span>
+                <span key={index}>
+                    <Flower2 size={22} strokeWidth={1.5} />
+                </span>
             ))}
         </div>
     );
@@ -634,12 +679,12 @@ function CelebrationLayer({
                         animationDelay: `${petal.delay}s`,
                     }}
                 >
-                    {petal.symbol}
+                    <ParticleIcon name={petal.icon} />
                 </span>
             ))}
             {particles.map((particle) => (
                 <span
-                    className="sparkleParticle"
+                    className={`sparkleParticle ${particle.variant === "decline" ? "sparkleParticle--decline" : ""}`}
                     key={particle.id}
                     style={{
                         left: `${particle.left}px`,
@@ -652,11 +697,19 @@ function CelebrationLayer({
                         "--mrot": `${particle.rotate}deg`,
                     } as CSSProperties}
                 >
-                    {particle.symbol}
+                    <ParticleIcon name={particle.icon} />
                 </span>
             ))}
         </div>
     );
+}
+
+function ParticleIcon({ name }: { name: ParticleIconName }) {
+    if (name === "flower") return <Flower2 size="1em" strokeWidth={1.5} />;
+    if (name === "heart") return <Heart size="1em" strokeWidth={1.7} />;
+    if (name === "heartCrack") return <HeartCrack size="1em" strokeWidth={1.7} />;
+    if (name === "star") return <Star size="1em" strokeWidth={1.6} />;
+    return <Sparkle size="1em" strokeWidth={1.7} />;
 }
 
 function DeclineModal({
@@ -673,9 +726,11 @@ function DeclineModal({
     return (
         <div className="declineModal active" onClick={onClose}>
             <div className="declineCard" onClick={(event) => event.stopPropagation()}>
-                <div className="declineEmoji">💔</div>
+                <div className="declineEmoji" aria-hidden="true">
+                    <HeartCrack size={52} strokeWidth={1.6} />
+                </div>
                 <h2>We&apos;ll Miss You</h2>
-                <div className="goldLine">❤</div>
+                <GoldDivider />
                 <p>
                     We&apos;re sorry you can&apos;t make it.<br />
                     You&apos;ll always be in our hearts on this special day.
@@ -889,12 +944,12 @@ function playCelebrationSong(
 }
 
 function createPetals(setPetals: (value: FallingPetal[]) => void) {
-    const symbols = ["❀", "✿", "❁", "♡", "✦"];
+    const icons: ParticleIconName[] = ["flower", "flower", "flower", "heart", "sparkle"];
     const colors = ["#9b9aa5", "#b99aad", "#c9a96e", "#c07090", "#7c5fa0"];
 
     const nextPetals = Array.from({ length: 90 }).map((_, index) => ({
         id: Date.now() + index,
-        symbol: symbols[Math.floor(Math.random() * symbols.length)],
+        icon: icons[Math.floor(Math.random() * icons.length)],
         color: colors[Math.floor(Math.random() * colors.length)],
         left: Math.random() * 100,
         size: 14 + Math.random() * 18,
@@ -913,7 +968,7 @@ function createSparkles(
     setParticles: (value: CelebrationParticle[]) => void
 ) {
     const colors = ["#c9a96e", "#e8cc94", "#7c5fa0", "#c49abf", "#e8a0b0", "#6aab94"];
-    const shapes = ["✦", "✧", "★", "☆", "♡", "❤", "✨"];
+    const icons: ParticleIconName[] = ["sparkle", "sparkle", "star", "star", "heart", "heart"];
 
     const nextParticles = Array.from({ length: 45 }).map((_, index) => {
         const angle = Math.random() * Math.PI * 2;
@@ -921,7 +976,7 @@ function createSparkles(
 
         return {
             id: Date.now() + index,
-            symbol: shapes[Math.floor(Math.random() * shapes.length)],
+            icon: icons[Math.floor(Math.random() * icons.length)],
             color: colors[Math.floor(Math.random() * colors.length)],
             left: startX,
             top: startY,
@@ -937,6 +992,37 @@ function createSparkles(
     window.setTimeout(() => setParticles([]), 1200);
 }
 
+function createDeclineBurst(
+    startX: number,
+    startY: number,
+    setParticles: (value: CelebrationParticle[]) => void
+) {
+    const colors = ["#c07080", "#d98b9a", "#e8a0b0", "#b99aad", "#c9a96e"];
+    const icons: ParticleIconName[] = ["heartCrack", "heart", "sparkle", "sparkle", "star"];
+
+    const nextParticles = Array.from({ length: 24 }).map((_, index) => {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 36 + Math.random() * 110;
+
+        return {
+            id: Date.now() + index,
+            icon: icons[Math.floor(Math.random() * icons.length)],
+            color: colors[Math.floor(Math.random() * colors.length)],
+            variant: "decline" as const,
+            left: startX,
+            top: startY,
+            mx: Math.cos(angle) * distance,
+            my: Math.sin(angle) * distance + 26,
+            scale: 0.45 + Math.random() * 0.9,
+            rotate: Math.random() * 260 - 130,
+            duration: 0.55 + Math.random() * 0.35,
+        };
+    });
+
+    setParticles(nextParticles);
+    window.setTimeout(() => setParticles([]), 1000);
+}
+
 function TemplateLoader({ invitation, isExiting }: { invitation: InvitationData; isExiting: boolean }) {
     const isWedding = invitation.category === "wedding";
     return (
@@ -945,7 +1031,9 @@ function TemplateLoader({ invitation, isExiting }: { invitation: InvitationData;
                 <div className="templateLoaderRings">
                     <div className="ring1" />
                     <div className="ring2" />
-                    <div className="heartCenter">❤</div>
+                    <div className="heartCenter">
+                        <Heart size={22} strokeWidth={1.7} fill="currentColor" aria-hidden="true" />
+                    </div>
                 </div>
                 
                 <p className="loaderCoupleName">

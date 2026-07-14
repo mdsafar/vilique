@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     if (parsed.data.eventType === "rsvp_submit") {
         const { data: invite } = await supabase
             .from("invitations")
-            .select("event_date, event_time, event_timezone, lifecycle_status, event_status")
+            .select("status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
             .eq("id", parsed.data.invitationId)
             .single();
 
@@ -23,8 +23,11 @@ export async function POST(request: Request) {
             eventDate: invite.event_date,
             eventTime: invite.event_time,
             eventTimezone: invite.event_timezone,
+            status: invite.status,
             lifecycleStatus: invite.lifecycle_status,
             eventStatus: invite.event_status,
+            first_published_at: invite.first_published_at,
+            published_at: invite.published_at,
         })) {
             return NextResponse.json({
                 code: "EVENT_COMPLETED",

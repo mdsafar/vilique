@@ -73,6 +73,49 @@ export type Database = {
                 Update: Partial<Database["public"]["Tables"]["invitation_templates"]["Insert"]>;
                 Relationships: [];
             };
+            template_ratings: {
+                Row: {
+                    id: string;
+                    template_id: string;
+                    user_id: string;
+                    rating: number;
+                    is_hidden: boolean;
+                    moderation_reason: string | null;
+                    moderated_at: string | null;
+                    moderated_by: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    template_id: string;
+                    user_id: string;
+                    rating: number;
+                    is_hidden?: boolean;
+                    moderation_reason?: string | null;
+                    moderated_at?: string | null;
+                    moderated_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: Partial<Database["public"]["Tables"]["template_ratings"]["Insert"]>;
+                Relationships: [
+                    {
+                        foreignKeyName: "template_ratings_template_id_fkey";
+                        columns: ["template_id"];
+                        isOneToOne: false;
+                        referencedRelation: "invitation_templates";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "template_ratings_moderated_by_fkey";
+                        columns: ["moderated_by"];
+                        isOneToOne: false;
+                        referencedRelation: "users";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
             invitations: {
                 Row: {
                     id: string;
@@ -465,6 +508,23 @@ export type Database = {
         };
         Views: Record<string, never>;
         Functions: {
+            can_rate_template: {
+                Args: {
+                    p_template_id: string;
+                    p_user_id: string;
+                };
+                Returns: boolean;
+            };
+            get_template_rating_summaries: {
+                Args: {
+                    p_template_keys: string[];
+                };
+                Returns: {
+                    template_key: string;
+                    average_rating: number | null;
+                    rating_count: number;
+                }[];
+            };
             get_public_rsvp: {
                 Args: {
                     p_invitation_id: string;

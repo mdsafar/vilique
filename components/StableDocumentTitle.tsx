@@ -14,7 +14,7 @@ const titleByPath = [
     { test: (path: string) => path.startsWith("/templates"), title: "Templates | Vilique" },
     { test: (path: string) => path.startsWith("/i/") || path.startsWith("/invite/"), title: "Invitation | Vilique" },
     { test: (path: string) => path.startsWith("/login"), title: "Log in | Vilique" },
-    { test: (path: string) => path.startsWith("/signup"), title: "Sign up | Vilique" },
+    { test: (path: string) => path.startsWith("/signup"), title: "Log in | Vilique" },
 ];
 
 function getStableTitle(pathname: string) {

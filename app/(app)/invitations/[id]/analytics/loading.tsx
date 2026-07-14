@@ -5,12 +5,11 @@ export default function AnalyticsLoading() {
         <main className="profilePage analyticsPage" aria-busy="true">
             <section className="analyticsPanel">
                 <header className="analyticsHeader analyticsHeader--skeleton">
+                    <ButtonSkeleton width={82} height={38} />
                     <div className="analyticsHeaderText">
-                        <TextSkeleton width={132} height={12} />
                         <TextSkeleton width={158} height={34} />
                         <TextSkeleton width={190} height={15} />
                     </div>
-                    <ButtonSkeleton width={82} height={38} />
                 </header>
 
                 <section className="analyticsStats" aria-hidden="true">

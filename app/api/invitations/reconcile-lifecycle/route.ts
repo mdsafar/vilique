@@ -13,11 +13,13 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    // 2. Fetch all currently active published invitations
+    // 2. Fetch only invitations with publication history. Never-published
+    // drafts are intentionally excluded before any event-time calculation.
     const { data: invitations, error } = await supabase
         .from("invitations")
-        .select("id, event_date, event_time, event_timezone, lifecycle_status")
-        .eq("lifecycle_status", "published");
+        .select("id, event_date, event_time, event_timezone, lifecycle_status, first_published_at, published_at")
+        .eq("lifecycle_status", "published")
+        .or("first_published_at.not.is.null,published_at.not.is.null");
 
     if (error) {
         console.error("Error fetching invitations for reconciliation:", error);
@@ -46,7 +48,8 @@ export async function POST(request: Request) {
                 event_status: "completed",
                 completed_at: new Date().toISOString()
             })
-            .in("id", completedIds);
+            .in("id", completedIds)
+            .or("first_published_at.not.is.null,published_at.not.is.null");
 
         if (updateError) {
             console.error("Failed to update status for reconciled items:", updateError);

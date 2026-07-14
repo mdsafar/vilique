@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     AlertTriangle,
+    ArrowLeft,
     CalendarDays,
     Check,
     ChevronLeft,
@@ -685,22 +686,22 @@ function BuilderContent() {
         <main className="builderShell">
             <AuthRequiredModal next={currentBuilderPath} />
 
-            <header className="builderTopbar">
+            <header className="builderTopbar analyticsHeader">
                 <button
                     type="button"
-                    className="builderBack"
+                    className="builderBack analyticsBackBtn"
                     onClick={() => setLeaveModalOpen(true)}
                 >
-                    <ChevronLeft size={20} aria-hidden="true" />
+                    <ArrowLeft size={16} aria-hidden="true" />
                     <span>{builderBackLabel.current}</span>
                 </button>
 
-                <div className="builderTitle">
-                    <span>{saveState}</span>
-                    <strong>{selectedTemplate?.name || "Custom Template"}</strong>
+                <div className="builderTitle analyticsHeaderText">
+                    <h1>{selectedTemplate?.name || "Custom Template"}</h1>
+                    <p>{saveState}</p>
                 </div>
 
-                <div aria-hidden="true" />
+                <div className="analyticsHeaderSpacer" aria-hidden="true" />
             </header>
 
             <section className="builderWorkspace">

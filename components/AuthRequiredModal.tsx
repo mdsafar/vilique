@@ -127,7 +127,7 @@ export default function AuthRequiredModal({ next }: Props) {
                         <span aria-hidden="true">
                             <Sparkles size={18} />
                         </span>
-                        Welcome back
+                        Welcome
                     </p>
                     <h1>Sign in</h1>
                     <p>
@@ -150,20 +150,11 @@ export default function AuthRequiredModal({ next }: Props) {
 
                 <form action={signInWithGoogle}>
                     <input type="hidden" name="next" value={next} />
-                    <input type="hidden" name="authPage" value="login" />
-                    <input type="hidden" name="view" value="modal" />
                     <button className="oauthButton" type="submit">
                         <span className="googleMark" aria-hidden="true">G</span>
                         Continue with Google
                     </button>
                 </form>
-
-                <p className="authSwitch" style={{ justifyContent: "center" }}>
-                    <span>
-                        <ShieldCheck size={18} aria-hidden="true" />
-                        We never post without your permission
-                    </span>
-                </p>
             </section>
         </div>
     );

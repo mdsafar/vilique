@@ -16,6 +16,7 @@ type StoredRsvp = {
 };
 
 const RSVP_TOKEN_PREFIX = "vilique:rsvp-token:";
+const RSVP_CHANGE_PREFIX = "vilique:rsvp-changing:";
 
 export default function PublicInviteExperience({ invitation, isPublic = false }: Props) {
     const [accepted, setAccepted] = useState(false);
@@ -65,20 +66,24 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             .then((response) => response.ok ? response.json() : null)
             .then((payload: { rsvp?: StoredRsvp | null } | null) => {
                 const nextStatus = payload?.rsvp?.status || null;
+                const isChangingStoredResponse = getIsChangingResponse(invitation.id);
                 setRsvpStatus(nextStatus);
-                setAccepted(nextStatus === "accepted");
-                setIsChangingResponse(false);
+                setAccepted(nextStatus === "accepted" && !isChangingStoredResponse);
+                setIsChangingResponse(isChangingStoredResponse);
             })
             .catch(() => undefined);
 
         return () => controller.abort();
     }, [invitation.id, isPublic]);
 
-    function submitRsvp(nextStatus: RSVPStatus) {
+    function submitRsvp(nextStatus: RSVPStatus, options: { keepalive?: boolean; keepChangingResponse?: boolean } = {}) {
         const shouldAccept = nextStatus === "accepted";
+        if (!options.keepChangingResponse) {
+            clearIsChangingResponse(invitation.id);
+        }
         setAccepted(shouldAccept);
         setRsvpStatus(nextStatus);
-        setIsChangingResponse(false);
+        setIsChangingResponse(Boolean(options.keepChangingResponse));
 
         if (!isPublic) {
             return;
@@ -89,6 +94,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
 
         void fetch("/api/rsvps", {
             method: "POST",
+            keepalive: options.keepalive,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 invitationId: invitation.id,
@@ -103,12 +109,13 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 const persistedStatus = payload.rsvp?.status || nextStatus;
                 setRsvpStatus(persistedStatus);
                 setAccepted(persistedStatus === "accepted");
-                setIsChangingResponse(false);
+                setIsChangingResponse(Boolean(options.keepChangingResponse && persistedStatus === "accepted"));
+                clearIsChangingResponse(invitation.id);
             })
             .catch(() => {
                 setAccepted(false);
-                setRsvpStatus(null);
-                setIsChangingResponse(false);
+                setRsvpStatus(options.keepChangingResponse ? nextStatus : null);
+                setIsChangingResponse(Boolean(options.keepChangingResponse));
             });
     }
 
@@ -127,6 +134,11 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 onAccept={() => submitRsvp("accepted")}
                 onDecline={() => submitRsvp("declined")}
                 onChangeRsvp={() => {
+                    if (isPublic) {
+                        setIsChangingResponseFlag(invitation.id);
+                        submitRsvp("maybe", { keepalive: true, keepChangingResponse: true });
+                        return;
+                    }
                     setAccepted(false);
                     setIsChangingResponse(true);
                 }}
@@ -149,5 +161,29 @@ function getOrCreateGuestToken(invitationId: string) {
         return nextToken;
     } catch {
         return crypto.randomUUID();
+    }
+}
+
+function getIsChangingResponse(invitationId: string) {
+    try {
+        return sessionStorage.getItem(`${RSVP_CHANGE_PREFIX}${invitationId}`) === "true";
+    } catch {
+        return false;
+    }
+}
+
+function setIsChangingResponseFlag(invitationId: string) {
+    try {
+        sessionStorage.setItem(`${RSVP_CHANGE_PREFIX}${invitationId}`, "true");
+    } catch {
+        // Ignore storage failures; the in-memory state still handles this session.
+    }
+}
+
+function clearIsChangingResponse(invitationId: string) {
+    try {
+        sessionStorage.removeItem(`${RSVP_CHANGE_PREFIX}${invitationId}`);
+    } catch {
+        // Ignore storage failures; submitting the RSVP still updates the UI state.
     }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { wishCreateSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
-import { isEventCompleted } from "@/lib/lifecycle";
+import { isInvitationCompleted } from "@/lib/lifecycle";
 
 export async function POST(request: Request) {
     const supabase = await createClient();
@@ -14,15 +14,20 @@ export async function POST(request: Request) {
     // Check if the event has completed
     const { data: invite } = await supabase
         .from("invitations")
-        .select("event_date, event_time, event_timezone, lifecycle_status")
+        .select("status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
         .eq("id", parsed.data.invitationId)
         .single();
 
     if (invite) {
-        const completed = invite.lifecycle_status === "completed" || isEventCompleted({
+        const completed = isInvitationCompleted({
             eventDate: invite.event_date,
             eventTime: invite.event_time,
             eventTimezone: invite.event_timezone,
+            status: invite.status,
+            lifecycleStatus: invite.lifecycle_status,
+            eventStatus: invite.event_status,
+            first_published_at: invite.first_published_at,
+            published_at: invite.published_at,
         });
 
         if (completed) {
@@ -45,4 +50,3 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true }, { status: 201 });
 }
-

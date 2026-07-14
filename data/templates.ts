@@ -13,6 +13,8 @@ export interface InvitationTemplate {
     features: string[];
     palette: string[];
     previewSections: string[];
+    ratingAverage?: number | null;
+    ratingCount?: number;
 }
 
 export const templates: InvitationTemplate[] = [

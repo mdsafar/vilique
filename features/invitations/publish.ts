@@ -38,8 +38,11 @@ export async function publishInvitationAfterPayment({
         eventDate: invite.event_date,
         eventTime: invite.event_time,
         eventTimezone: invite.event_timezone,
+        status: invite.status,
         lifecycleStatus: invite.lifecycle_status,
         eventStatus: invite.event_status,
+        first_published_at: invite.first_published_at,
+        published_at: invite.published_at,
     })) {
         throw new Error("Invitation is completed and locked.");
     }

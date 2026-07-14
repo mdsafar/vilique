@@ -24,40 +24,12 @@ export async function signInWithEmail(formData: FormData) {
     redirect(next);
 }
 
-export async function signUpWithEmail(formData: FormData) {
-    const supabase = await createClient();
-    const email = String(formData.get("email") || "");
-    const password = String(formData.get("password") || "");
-    const fullName = String(formData.get("fullName") || "");
-    const next = getRedirectPath(formData);
-
-    const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-            data: {
-                full_name: fullName,
-            },
-            emailRedirectTo: `${siteConfig.url}/auth/callback?next=${encodeURIComponent(next)}`,
-        },
-    });
-
-    if (error) {
-        redirect(`/signup?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
-    }
-
-    redirect(next);
-}
-
 export async function signInWithGoogle(formData: FormData) {
     const next = getRedirectPath(formData);
-    const authPage = String(formData.get("authPage") || "login") === "signup" ? "signup" : "login";
-    const view = String(formData.get("view") || "") === "modal" ? "modal" : "";
-    const viewQuery = view ? `&view=${encodeURIComponent(view)}` : "";
 
     if (process.env.GOOGLE_AUTH_ENABLED !== "true") {
         redirect(
-            `/${authPage}?error=${encodeURIComponent("Google login is not enabled for this Supabase project yet.")}&next=${encodeURIComponent(next)}${viewQuery}`
+            `/login?error=${encodeURIComponent("Google login is not enabled for this Supabase project yet.")}&next=${encodeURIComponent(next)}`
         );
     }
 
@@ -73,7 +45,7 @@ export async function signInWithGoogle(formData: FormData) {
 
     if (error || !data.url) {
         redirect(
-            `/${authPage}?error=${encodeURIComponent(error?.message || "Unable to start Google login.")}&next=${encodeURIComponent(next)}${viewQuery}`
+            `/login?error=${encodeURIComponent(error?.message || "Unable to start Google login.")}&next=${encodeURIComponent(next)}`
         );
     }
 

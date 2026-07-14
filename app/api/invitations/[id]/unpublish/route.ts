@@ -19,7 +19,7 @@ export async function POST(_request: Request, { params }: Context) {
 
     const { data: invite, error: inviteError } = await supabase
         .from("invitations")
-        .select("id, event_date, event_time, event_timezone, lifecycle_status, event_status")
+        .select("id, status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
         .eq("id", id)
         .eq("user_id", user.id)
         .single();
@@ -32,8 +32,11 @@ export async function POST(_request: Request, { params }: Context) {
         eventDate: invite.event_date,
         eventTime: invite.event_time,
         eventTimezone: invite.event_timezone,
+        status: invite.status,
         lifecycleStatus: invite.lifecycle_status,
         eventStatus: invite.event_status,
+        first_published_at: invite.first_published_at,
+        published_at: invite.published_at,
     })) {
         return NextResponse.json({
             code: "INVITATION_COMPLETED_LOCKED",

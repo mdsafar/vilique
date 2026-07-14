@@ -18,10 +18,10 @@ type NavigationState = {
 const NavigationStateContext = createContext<NavigationState | undefined>(undefined);
 
 export function NavigationStateProvider({ children }: { children: React.ReactNode }) {
-    const [templatesSearch, setTemplatesSearch] = useState("");
-    const [templatesFilter, setTemplatesFilter] = useState("all");
-    const [invitationsSearch, setInvitationsSearch] = useState("");
-    const [invitationsFilter, setInvitationsFilter] = useState("all");
+    const [templatesSearch, setTemplatesSearch] = useState(() => getInitialQueryValue("/templates", "search", ""));
+    const [templatesFilter, setTemplatesFilter] = useState(() => getInitialQueryValue("/templates", "category", "all"));
+    const [invitationsSearch, setInvitationsSearch] = useState(() => getInitialQueryValue("/invitations", "search", ""));
+    const [invitationsFilter, setInvitationsFilter] = useState(() => getInitialQueryValue("/invitations", "status", "all"));
     const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
 
     const setScrollPosition = (path: string, y: number) => {
@@ -46,6 +46,11 @@ export function NavigationStateProvider({ children }: { children: React.ReactNod
             {children}
         </NavigationStateContext.Provider>
     );
+}
+
+function getInitialQueryValue(pathname: string, key: string, fallback: string) {
+    if (typeof window === "undefined" || window.location.pathname !== pathname) return fallback;
+    return new URLSearchParams(window.location.search).get(key) || fallback;
 }
 
 export function useNavigationState() {

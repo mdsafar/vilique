@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Star } from "lucide-react";
+import useSWRInfinite from "swr/infinite";
 import AppLogo from "@/components/AppLogo";
+import ListState from "@/components/ListState";
 import type { InvitationCategory } from "@/types/invitation";
 import { useNavigationState } from "@/components/NavigationStateProvider";
+import { formatTemplateRating } from "@/lib/templateRatingFormat";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import TemplateCardSkeleton from "@/components/skeletons/TemplateCardSkeleton";
 
 type TemplateItem = {
     id: string;
@@ -18,10 +25,16 @@ type TemplateItem = {
     popularity: "Featured" | "Popular" | "Newest";
     features: string[];
     palette: string[];
+    ratingAverage?: number | null;
+    ratingCount?: number;
 };
 
-type Props = {
-    templates: TemplateItem[];
+type TemplatesResponse = {
+    items: TemplateItem[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    totalCount: number;
+    counts: Record<string, number>;
 };
 
 const categoryLabels: Record<InvitationCategory | "all", string> = {
@@ -38,76 +51,137 @@ const categoryLabels: Record<InvitationCategory | "all", string> = {
     custom: "Custom",
 };
 
-export default function TemplatesCatalog({ templates }: Props) {
+export default function TemplatesCatalog() {
     const {
         templatesSearch: searchTerm,
         setTemplatesSearch: setSearchTerm,
         templatesFilter: activeCategory,
         setTemplatesFilter: setActiveCategory,
     } = useNavigationState();
+    const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
+    const {
+        data,
+        error,
+        setSize,
+        isLoading,
+        isValidating,
+        mutate,
+    } = useSWRInfinite<TemplatesResponse>((pageIndex, previousPageData) => {
+        if (previousPageData && !previousPageData.hasMore) return null;
+        const params = new URLSearchParams({
+            category: activeCategory,
+            sort: "popular",
+            limit: "12",
+        });
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
+        return `/api/templates?${params.toString()}`;
+    }, null, {
+        suspense: false,
+        revalidateFirstPage: false,
+    });
     const todayLabel = new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "2-digit",
     }).format(new Date()).toUpperCase();
-    const categories = ["all", ...Array.from(new Set(templates.map((template) => template.category)))] as const;
-    const query = searchTerm.trim().toLowerCase();
-    const filteredTemplates = templates.filter((template) => {
-        const matchesCategory = activeCategory === "all" || template.category === activeCategory;
-        const searchable = [
-            template.name,
-            template.description,
-            template.mood,
-            template.category.replace("_", " "),
-            template.popularity,
-        ].join(" ").toLowerCase();
-
-        return matchesCategory && (!query || searchable.includes(query));
+    const pages = data || [];
+    const templates = pages.flatMap((page) => page.items);
+    const counts = pages[0]?.counts || { all: 0 };
+    const categories = Object.keys(categoryLabels).filter((category) => category === "all" || counts[category] > 0) as (InvitationCategory | "all")[];
+    const hasActiveFilters = Boolean(debouncedSearch) || activeCategory !== "all";
+    const activeCategoryLabel = activeCategory in categoryLabels
+        ? categoryLabels[activeCategory as InvitationCategory | "all"]
+        : activeCategory;
+    const emptyStateDetails = [
+        activeCategory !== "all" ? `Category: ${activeCategoryLabel}` : null,
+        debouncedSearch ? `Search: ${debouncedSearch}` : null,
+    ].filter(Boolean) as string[];
+    const hasMore = Boolean(pages[pages.length - 1]?.hasMore);
+    const shouldShowEndState = pages.length > 1 && !hasMore;
+    const isSearching = searchTerm !== debouncedSearch;
+    const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
+    const isLoadingNextPage = isValidating && pages.length > 0;
+    const sentinelRef = useInfiniteScroll<HTMLDivElement>({
+        disabled: !hasMore || isLoadingNextPage,
+        onLoadMore: () => setSize((current) => current + 1),
     });
+
+    useEffect(() => {
+        if (window.location.pathname !== "/templates") return;
+        const params = new URLSearchParams(window.location.search);
+        if (activeCategory === "all") params.delete("category");
+        else params.set("category", activeCategory);
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        else params.delete("search");
+        const nextUrl = params.toString() ? `/templates?${params.toString()}` : "/templates";
+        window.history.replaceState(null, "", nextUrl);
+    }, [activeCategory, debouncedSearch]);
 
     return (
         <>
-            <section className="marketHeroPanel" aria-label="Template marketplace">
-                <header className="marketHeader">
-                    <div className="marketHeaderTop">
-                        <div className="templatesAppHeader" aria-label="Vilique">
-                            <Link href="/templates" className="templatesBrand">
-                                <AppLogo size={36} />
-                            </Link>
+            <div className="templatesFixedHeader">
+                <section className="marketHeroPanel" aria-label="Template marketplace">
+                    <header className="marketHeader">
+                        <div className="marketHeaderTop">
+                            <div className="templatesAppHeader" aria-label="Vilique">
+                                <Link href="/templates" className="templatesBrand">
+                                    <AppLogo size={36} />
+                                </Link>
+                            </div>
+
+                            <section className="marketSearch" aria-label="Template search">
+                                <label className="searchBox">
+                                    <Search size={18} aria-hidden="true" />
+                                    <input
+                                        value={searchTerm}
+                                        onChange={(event) => setSearchTerm(event.target.value)}
+                                        placeholder="Search floral, pastel"
+                                    />
+                                </label>
+                            </section>
                         </div>
 
-                        <section className="marketSearch" aria-label="Template search">
-                            <label className="searchBox">
-                                <Search size={18} aria-hidden="true" />
-                                <input
-                                    value={searchTerm}
-                                    onChange={(event) => setSearchTerm(event.target.value)}
-                                    placeholder="Search floral, pastel"
-                                />
-                            </label>
-                        </section>
-                    </div>
+                    </header>
+                </section>
 
-                </header>
-            </section>
+                <nav className="categoryScroller" aria-label="Template categories">
+                    {categories.map((category) => (
+                        <button
+                            className={category === activeCategory ? "active" : ""}
+                            key={category}
+                            type="button"
+                            onClick={() => setActiveCategory(category)}
+                        >
+                            {categoryLabels[category]} <span>{counts[category] || 0}</span>
+                        </button>
+                    ))}
+                </nav>
+            </div>
 
-            <nav className="categoryScroller" aria-label="Template categories">
-                {categories.map((category) => (
-                    <button
-                        className={category === activeCategory ? "active" : ""}
-                        key={category}
-                        type="button"
-                        onClick={() => setActiveCategory(category)}
-                    >
-                        {categoryLabels[category]}
-                    </button>
-                ))}
-            </nav>
-
-            {filteredTemplates.length ? (
+            {isLoadingFirstPage ? (
+                <section className="templateGrid" aria-hidden="true">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                        <TemplateCardSkeleton key={index} />
+                    ))}
+                </section>
+            ) : error && !templates.length ? (
+                <ListState
+                    actionLabel="Try again"
+                    className="templatesListState"
+                    description="We could not load the template catalog. Check your connection and try again."
+                    onAction={() => void mutate()}
+                    title="Templates did not load"
+                    variant="error"
+                />
+            ) : templates.length ? (
                 <section className="templateGrid">
-                    {filteredTemplates.map((template) => {
+                    {templates.map((template) => {
                         const details = [template.popularity, categoryLabels[template.category], template.badge];
                         const featureChips = template.features.slice(0, 3);
+                        const ratingLabel = formatTemplateRating({
+                            average: template.ratingAverage ?? null,
+                            count: template.ratingCount ?? 0,
+                        });
 
                         return (
                             <article className="templateCard" key={template.id}>
@@ -128,6 +202,16 @@ export default function TemplatesCatalog({ templates }: Props) {
                                             </div>
                                             <i className="templateFlower flowerOne" />
                                             <i className="templateFlower flowerTwo" />
+                                            <span className="templateAggregateRating">
+                                                {ratingLabel === "New" ? (
+                                                    "New"
+                                                ) : (
+                                                    <>
+                                                        <span>{ratingLabel}</span>
+                                                        <Star size={13} fill="currentColor" aria-hidden="true" />
+                                                    </>
+                                                )}
+                                            </span>
                                         </div>
                                     </div>
 
@@ -147,21 +231,35 @@ export default function TemplatesCatalog({ templates }: Props) {
                             </article>
                         );
                     })}
+                    {isLoadingNextPage ? (
+                        <>
+                            {Array.from({ length: 2 }).map((_, index) => (
+                                <TemplateCardSkeleton key={`append-${index}`} />
+                            ))}
+                        </>
+                    ) : null}
+                    {error && templates.length ? (
+                        <div className="listLoadState" role="status">
+                            <span>Couldn&apos;t load more</span>
+                            <button type="button" onClick={() => mutate()}>Retry</button>
+                        </div>
+                    ) : null}
+                    {shouldShowEndState && templates.length ? <div className="listEndState">You&apos;ve reached the end.</div> : null}
+                    <div ref={sentinelRef} className="infiniteScrollSentinel" aria-hidden="true" />
                 </section>
             ) : (
-                <section className="templateNoResults">
-                    <h2>No templates found</h2>
-                    <p>Try searching for wedding, floral, or pastel.</p>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setSearchTerm("");
-                            setActiveCategory("all");
-                        }}
-                    >
-                        Reset filters
-                    </button>
-                </section>
+                <ListState
+                    actionLabel={hasActiveFilters ? "Reset filters" : undefined}
+                    className="templatesListState"
+                    description="No templates match this combination. Try another category or clear the search."
+                    details={emptyStateDetails}
+                    onAction={() => {
+                        setSearchTerm("");
+                        setActiveCategory("all");
+                    }}
+                    title="No matching templates"
+                    variant="filtered"
+                />
             )}
         </>
     );

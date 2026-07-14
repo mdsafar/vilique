@@ -1,14 +1,20 @@
 import { parseInvitationDateParts } from "@/lib/invitationDate";
 
 type EventPhase = "upcoming" | "in_progress" | "completed";
+export type InvitationLifecycleStatus = "draft" | "upcoming" | "live_today" | "completed" | "offline";
 type EventTimingInput = {
     eventDate: string | null;
     eventTime?: string | null;
     eventTimezone?: string | null;
 };
 type EventLifecycleInput = EventTimingInput & {
+    status?: string | null;
     lifecycleStatus?: string | null;
     eventStatus?: string | null;
+    firstPublishedAt?: string | null;
+    first_published_at?: string | null;
+    publishedAt?: string | null;
+    published_at?: string | null;
 };
 
 /**
@@ -41,8 +47,51 @@ export function isEventCompleted(
 }
 
 export function isInvitationCompleted(invitation: EventLifecycleInput, now: Date = new Date()): boolean {
+    if (isExplicitDraft(invitation)) return false;
+    if (!hasEverBeenPublished(invitation)) return false;
     if (invitation.lifecycleStatus === "completed" || invitation.eventStatus === "completed") return true;
     return isEventCompleted(invitation, 0, now);
+}
+
+export function getInvitationLifecycle(
+    invitation: EventLifecycleInput,
+    now: Date = new Date()
+): InvitationLifecycleStatus {
+    if (isExplicitDraft(invitation)) {
+        return "draft";
+    }
+
+    if (!hasEverBeenPublished(invitation)) {
+        return "draft";
+    }
+
+    if (isInvitationCompleted(invitation, now)) {
+        return "completed";
+    }
+
+    if (invitation.lifecycleStatus === "unpublished" || invitation.eventStatus === "unpublished" || invitation.status !== "published") {
+        return "offline";
+    }
+
+    const phase = getEventPhase(invitation, 0, now);
+    if (phase === "upcoming") return "upcoming";
+    if (phase === "in_progress") return "live_today";
+    return "completed";
+}
+
+export function hasEverBeenPublished(invitation: EventLifecycleInput): boolean {
+    return Boolean(
+        invitation.firstPublishedAt ||
+        invitation.first_published_at ||
+        invitation.publishedAt ||
+        invitation.published_at
+    );
+}
+
+function isExplicitDraft(invitation: EventLifecycleInput): boolean {
+    return invitation.status === "draft" &&
+        invitation.lifecycleStatus === "draft" &&
+        invitation.eventStatus === "draft";
 }
 
 export function getEventPhase(

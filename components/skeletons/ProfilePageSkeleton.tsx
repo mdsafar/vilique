@@ -2,73 +2,89 @@ import { Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 
 export default function ProfilePageSkeleton() {
     return (
-        <main className="profilePage" aria-busy="true">
-            <section className="profileOverview" aria-label="Loading profile overview">
-                <article className="profileCard">
+        <>
+            <section className="profileOverview profileOverview--skeleton" aria-label="Loading profile overview">
+                <article className="profileCard profileCard--skeleton">
                     <div className="profileIdentity">
-                        <Skeleton style={{ width: 64, height: 64 }} rounded="full" />
+                        <Skeleton style={{ width: 58, height: 58 }} rounded="full" />
                         <div className="profileDetails">
-                            <TextSkeleton width={112} height={12} />
-                            <TextSkeleton width={160} height={24} />
-                            <TextSkeleton width={220} height={13} />
+                            <TextSkeleton width={110} height={11} />
+                            <TextSkeleton width={150} height={22} />
+                            <TextSkeleton width={198} height={12} />
                         </div>
                     </div>
-                    <Skeleton style={{ width: "100%", height: 126 }} rounded="xl" />
+                    <Skeleton style={{ width: "100%", height: 112 }} rounded="xl" />
                 </article>
 
                 <section className="profileStats" aria-label="Loading invitation metrics">
                     {Array.from({ length: 4 }).map((_, index) => (
                         <article className="profileStat" key={index}>
-                            <Skeleton style={{ width: 34, height: 34 }} rounded="md" />
+                            <Skeleton style={{ width: 30, height: 30 }} rounded="md" />
                             <div>
-                                <TextSkeleton width={28} height={24} />
-                                <TextSkeleton width={84} height={13} />
-                                <TextSkeleton width={118} height={11} />
+                                <TextSkeleton width={24} height={21} />
+                                <TextSkeleton width={78} height={12} />
+                                <TextSkeleton width={104} height={10} />
                             </div>
                         </article>
                     ))}
                 </section>
             </section>
 
-            <section className="profileTransactions" aria-label="Loading transactions">
-                <div className="paymentsHeader">
-                    <div className="paymentsHeaderBody">
-                        <Skeleton className="paymentsHeaderIcon" rounded="lg" />
-                        <div className="paymentsHeaderText">
-                            <TextSkeleton width={116} height={18} />
-                            <TextSkeleton width={260} height={12} />
-                        </div>
-                    </div>
+            <section className="profileActivityTabs profileActivityTabs--shellLoading" aria-label="Loading profile activity">
+                <div className="profileTabList profileTabList--skeleton" aria-hidden="true">
+                    <Skeleton style={{ width: 148, height: 36 }} rounded="lg" />
+                    <Skeleton style={{ width: 132, height: 36 }} rounded="lg" />
                 </div>
 
-                <div className="paymentsSection">
-                    <div className="paymentsList">
-                        {Array.from({ length: 4 }).map((_, index) => (
-                            <article className="profileTransactionCard profileTransactionCard--skeleton" key={index}>
-                                <Skeleton className="profileTransactionIcon" rounded="lg" />
-                                <div className="profileTransactionBody">
-                                    <div className="profileTransactionTitle">
-                                        <TextSkeleton width={132} height={16} />
-                                        <Skeleton style={{ width: 62, height: 20 }} rounded="full" />
+                <section className="profileTemplateRatings" aria-label="Loading used templates">
+                    <div className="profileTemplateRatingsSection">
+                        <div className="profileTemplateRatingGrid profileTemplateRatingGrid--skeleton" aria-hidden="true">
+                            {Array.from({ length: 2 }).map((_, cardIndex) => (
+                                <article className="profileTemplateRatingCard profileTemplateRatingCard--skeleton" key={cardIndex}>
+                                    <div className="profileTemplateRatingHeader">
+                                        <div className="profileTemplateRatingTitle">
+                                            <TextSkeleton width={136} height={15} />
+                                            <TextSkeleton width={78} height={11} />
+                                            <Skeleton style={{ width: 62, height: 19 }} rounded="md" />
+                                        </div>
+                                        <div className="profileTemplateRatingStats">
+                                            <TextSkeleton width={24} height={20} />
+                                            <TextSkeleton width={104} height={10} />
+                                            <TextSkeleton width={96} height={10} />
+                                        </div>
                                     </div>
-                                    <TextSkeleton width={180} height={12} />
-                                    <div className="profileTransactionMeta">
-                                        <TextSkeleton width={160} height={12} />
-                                        <TextSkeleton width={140} height={18} />
+
+                                    <div className="profileTemplateRatingPanel">
+                                        <div className="profileTemplateRatingPanelCopy">
+                                            <TextSkeleton width={74} height={10} />
+                                            <TextSkeleton width={58} height={13} />
+                                        </div>
+                                        <div className="profileTemplateRatingStars">
+                                            {Array.from({ length: 5 }).map((_, index) => (
+                                                <Skeleton
+                                                    key={index}
+                                                    style={{ width: 24, height: 24 }}
+                                                    rounded="lg"
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="profileTransactionAside">
-                                    <TextSkeleton width={52} height={20} />
-                                    <TextSkeleton width={26} height={10} />
-                                </div>
-                                <div className="profileTransactionAction">
-                                    <Skeleton style={{ width: 134, height: 30 }} rounded="lg" />
-                                </div>
-                            </article>
-                        ))}
+
+                                    <div className="profileTemplateRatingDates">
+                                        <Skeleton style={{ width: "100%", height: 34 }} rounded="lg" />
+                                        <Skeleton style={{ width: "100%", height: 34 }} rounded="lg" />
+                                    </div>
+                                    <Skeleton
+                                        className="profileTemplateRatingAction profileTemplateRatingAction--skeleton"
+                                        style={{ width: 132, height: 32 }}
+                                        rounded="lg"
+                                    />
+                                </article>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                </section>
             </section>
-        </main>
+        </>
     );
 }

@@ -20,6 +20,7 @@ import {
 import TemplateDetailPreview from "@/components/templates/TemplateDetailPreview";
 import UseTemplateButton from "@/components/UseTemplateButton";
 import { getActiveTemplates } from "@/features/invitations/data";
+import { formatTemplateRating } from "@/lib/templateRatingFormat";
 import { InvitationCategory } from "@/types/invitation";
 
 type Props = {
@@ -52,20 +53,6 @@ const categoryLabels: Record<InvitationCategory, string> = {
     custom: "Custom",
 };
 
-const usageDetails: Record<string, {
-    rating: string;
-    used: string;
-    setup: string;
-    flow: string;
-}> = {
-    "pastel-floral-wedding": {
-        rating: "4.9/5 rating",
-        used: "1.2k+ uses",
-        setup: "5 min setup",
-        flow: "RSVP ready",
-    },
-};
-
 export default async function TemplateDetailsPage({ params }: Props) {
     const { id } = await params;
     const templates = await getActiveTemplates();
@@ -75,24 +62,28 @@ export default async function TemplateDetailsPage({ params }: Props) {
         notFound();
     }
 
-    const usage = usageDetails[template.id] ?? {
-        rating: "4.8/5 rating",
-        used: `${template.popularity} template`,
-        setup: "Quick setup",
-        flow: "Flow ready",
+    const ratingSummary = {
+        average: template.ratingAverage ?? null,
+        count: template.ratingCount ?? 0,
     };
+    const ratingLabel = formatTemplateRating(ratingSummary);
 
     return (
         <main className="page templateDetailsPage">
-            <header className="templateDetailTopbar">
+            <header className="templateDetailTopbar analyticsHeader">
                 <div className="templateDetailCrumb">
-                    <Link aria-label="Back to templates" href="/templates">
+                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/templates">
                         <ArrowLeft size={16} aria-hidden="true" />
                         <span>Templates</span>
                     </Link>
                 </div>
 
-                <button className="templateDetailSelect" type="button">
+                <div className="analyticsHeaderText">
+                    <h1>{template.name}</h1>
+                    <p>Template details</p>
+                </div>
+
+                <button className="templateDetailSelect analyticsHeaderPill" type="button">
                     {categoryLabels[template.category]} template
                 </button>
             </header>
@@ -107,14 +98,30 @@ export default async function TemplateDetailsPage({ params }: Props) {
                     <div className="templateDetailHeader">
                         <p className="eyebrow">Template Details</p>
                         <h1>{template.name}</h1>
-                        <div className="detailRating" aria-label={usage.rating}>
-                            <span aria-hidden="true">
-                                {Array.from({ length: 5 }).map((_, index) => (
-                                    <Star fill="currentColor" key={index} size={16} />
-                                ))}
-                            </span>
-                            <strong>4.9</strong>
-                            <p>(1.2k uses)</p>
+                        <div className="detailRating" aria-label={`Template rating: ${ratingLabel}`}>
+                            {ratingSummary.count ? (
+                                <>
+                                    <span aria-hidden="true">
+                                        {Array.from({ length: 5 }).map((_, index) => (
+                                            <Star
+                                                fill={ratingSummary.average !== null && index < Math.round(ratingSummary.average) ? "currentColor" : "none"}
+                                                key={index}
+                                                size={16}
+                                            />
+                                        ))}
+                                    </span>
+                                    <strong>{ratingSummary.average?.toFixed(1)}</strong>
+                                    <p>({ratingSummary.count})</p>
+                                </>
+                            ) : (
+                                <>
+                                    <span aria-hidden="true">
+                                        <Star size={16} />
+                                    </span>
+                                    <strong>New</strong>
+                                    <p>No ratings yet</p>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -174,41 +181,49 @@ export default async function TemplateDetailsPage({ params }: Props) {
                             <b><Type size={30} /></b>
                         </div>
                     </div>
+
+                    <TemplateSupport className="templateDetailSupport templateDetailSupport--mobile" />
                 </div>
             </section>
 
-            <section className="templateDetailSupport" aria-label="Template composition">
-                <article>
-                    <span>
-                        <Phone size={28} aria-hidden="true" />
-                    </span>
-                    <b>01</b>
-                    <div>
-                        <h2>Invitation screen</h2>
-                        <p>Names, date, venue, countdown and RSVP controls use the real mobile preview.</p>
-                    </div>
-                </article>
-                <article>
-                    <span>
-                        <CheckCircle2 size={30} aria-hidden="true" />
-                    </span>
-                    <b>02</b>
-                    <div>
-                        <h2>Thank-you screen</h2>
-                        <p>The accepted state is previewed beside the invite so the full flow is easy to visualize.</p>
-                    </div>
-                </article>
-                <article>
-                    <span>
-                        <Wand2 size={30} aria-hidden="true" />
-                    </span>
-                    <b>03</b>
-                    <div>
-                        <h2>Builder ready</h2>
-                        <p>The template opens directly in the builder with Supabase draft saved.</p>
-                    </div>
-                </article>
-            </section>
+            <TemplateSupport className="templateDetailSupport templateDetailSupport--desktop" />
         </main>
+    );
+}
+
+function TemplateSupport({ className }: { className: string }) {
+    return (
+        <section className={className} aria-label="Template composition">
+            <article>
+                <span>
+                    <Phone size={28} aria-hidden="true" />
+                </span>
+                <b>01</b>
+                <div>
+                    <h2>Invitation screen</h2>
+                    <p>Names, date, venue, countdown and RSVP controls use the real mobile preview.</p>
+                </div>
+            </article>
+            <article>
+                <span>
+                    <CheckCircle2 size={30} aria-hidden="true" />
+                </span>
+                <b>02</b>
+                <div>
+                    <h2>Thank-you screen</h2>
+                    <p>The accepted state is previewed beside the invite so the full flow is easy to visualize.</p>
+                </div>
+            </article>
+            <article>
+                <span>
+                    <Wand2 size={30} aria-hidden="true" />
+                </span>
+                <b>03</b>
+                <div>
+                    <h2>Builder ready</h2>
+                    <p>The template opens directly in the builder with Supabase draft saved.</p>
+                </div>
+            </article>
+        </section>
     );
 }
