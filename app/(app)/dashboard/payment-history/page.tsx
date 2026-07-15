@@ -4,7 +4,6 @@ import { ArrowLeft, Receipt, ExternalLink, Calendar, HelpCircle, CheckCircle2, A
 import { createClient } from "@/lib/supabase/server";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { formatPaiseToCurrency } from "@/lib/currency";
-import AuthRequiredModal from "@/components/AuthRequiredModal";
 
 export const dynamic = "force-dynamic";
 
@@ -128,8 +127,6 @@ export default async function PaymentHistoryPage() {
 
     return (
         <main className="paymentsPage">
-            <AuthRequiredModal next="/dashboard/payment-history" />
-
             <Link href="/profile" className="backToDashboardBtn">
                 <ArrowLeft size={14} />
                 <span>Back to Dashboard</span>

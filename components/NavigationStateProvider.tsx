@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useSyncExternalStore } from "react";
 
 type NavigationState = {
     templatesSearch: string;
@@ -18,11 +18,43 @@ type NavigationState = {
 const NavigationStateContext = createContext<NavigationState | undefined>(undefined);
 
 export function NavigationStateProvider({ children }: { children: React.ReactNode }) {
-    const [templatesSearch, setTemplatesSearch] = useState(() => getInitialQueryValue("/templates", "search", ""));
-    const [templatesFilter, setTemplatesFilter] = useState(() => getInitialQueryValue("/templates", "category", "all"));
-    const [invitationsSearch, setInvitationsSearch] = useState(() => getInitialQueryValue("/invitations", "search", ""));
-    const [invitationsFilter, setInvitationsFilter] = useState(() => getInitialQueryValue("/invitations", "status", "all"));
+    const templatesSearchFromUrl = useUrlQueryValue("/templates", "search");
+    const templatesFilterFromUrl = useUrlQueryValue("/templates", "category");
+    const invitationsSearchFromUrl = useUrlQueryValue("/invitations", "search");
+    const invitationsFilterFromUrl = useUrlQueryValue("/invitations", "status");
+    const [templatesSearchState, setTemplatesSearchState] = useState("");
+    const [templatesFilterState, setTemplatesFilterState] = useState("all");
+    const [invitationsSearchState, setInvitationsSearchState] = useState("");
+    const [invitationsFilterState, setInvitationsFilterState] = useState("all");
+    const [templatesSearchTouched, setTemplatesSearchTouched] = useState(false);
+    const [templatesFilterTouched, setTemplatesFilterTouched] = useState(false);
+    const [invitationsSearchTouched, setInvitationsSearchTouched] = useState(false);
+    const [invitationsFilterTouched, setInvitationsFilterTouched] = useState(false);
     const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
+    const templatesSearch = templatesSearchTouched ? templatesSearchState : templatesSearchFromUrl ?? templatesSearchState;
+    const templatesFilter = templatesFilterTouched ? templatesFilterState : templatesFilterFromUrl ?? templatesFilterState;
+    const invitationsSearch = invitationsSearchTouched ? invitationsSearchState : invitationsSearchFromUrl ?? invitationsSearchState;
+    const invitationsFilter = invitationsFilterTouched ? invitationsFilterState : invitationsFilterFromUrl ?? invitationsFilterState;
+
+    const setTemplatesSearch = (value: string) => {
+        setTemplatesSearchTouched(true);
+        setTemplatesSearchState(value);
+    };
+
+    const setTemplatesFilter = (value: string) => {
+        setTemplatesFilterTouched(true);
+        setTemplatesFilterState(value);
+    };
+
+    const setInvitationsSearch = (value: string) => {
+        setInvitationsSearchTouched(true);
+        setInvitationsSearchState(value);
+    };
+
+    const setInvitationsFilter = (value: string) => {
+        setInvitationsFilterTouched(true);
+        setInvitationsFilterState(value);
+    };
 
     const setScrollPosition = (path: string, y: number) => {
         setScrollPositions((prev) => ({ ...prev, [path]: y }));
@@ -48,9 +80,22 @@ export function NavigationStateProvider({ children }: { children: React.ReactNod
     );
 }
 
-function getInitialQueryValue(pathname: string, key: string, fallback: string) {
-    if (typeof window === "undefined" || window.location.pathname !== pathname) return fallback;
-    return new URLSearchParams(window.location.search).get(key) || fallback;
+function useUrlQueryValue(pathname: string, key: string) {
+    return useSyncExternalStore(
+        subscribeToLocationChanges,
+        () => getUrlQueryValue(pathname, key),
+        () => null
+    );
+}
+
+function subscribeToLocationChanges(onStoreChange: () => void) {
+    window.addEventListener("popstate", onStoreChange);
+    return () => window.removeEventListener("popstate", onStoreChange);
+}
+
+function getUrlQueryValue(pathname: string, key: string) {
+    if (typeof window === "undefined" || window.location.pathname !== pathname) return null;
+    return new URLSearchParams(window.location.search).get(key);
 }
 
 export function useNavigationState() {

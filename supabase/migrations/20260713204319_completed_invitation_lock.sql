@@ -297,8 +297,12 @@ begin
        or new.event_date is null
        or btrim(coalesce(new.event_time, '')) = ''
        or btrim(coalesce(new.venue_name, '')) = ''
+       or btrim(coalesce(new.phone, '')) = ''
+       or length(new.phone) <> 10
+       or btrim(coalesce(new.secondary_phone, '')) = ''
+       or length(new.secondary_phone) <> 10
        or btrim(coalesce(new.message, '')) = '' then
-      raise exception 'Published invitations require title, primary name, date, time, venue name, and message.'
+      raise exception 'Published invitations require title, primary name, date, time, venue name, 10-digit phone numbers, and message.'
         using errcode = 'P0001';
     end if;
 
@@ -377,6 +381,16 @@ begin
     if btrim(coalesce(p_patch->>'venueName', invite.venue_name, '')) = '' then
       required_errors := required_errors || jsonb_build_object('venueName', 'Enter the venue name before updating.');
     end if;
+    if btrim(coalesce(p_patch->>'phone', invite.phone, '')) = '' then
+      required_errors := required_errors || jsonb_build_object('phone', 'Enter the primary phone number before updating.');
+    elsif length(coalesce(p_patch->>'phone', invite.phone)) <> 10 then
+      required_errors := required_errors || jsonb_build_object('phone', 'Primary phone number must be 10 digits.');
+    end if;
+    if btrim(coalesce(p_patch->>'secondaryPhone', invite.secondary_phone, '')) = '' then
+      required_errors := required_errors || jsonb_build_object('secondaryPhone', 'Enter the secondary phone number before updating.');
+    elsif length(coalesce(p_patch->>'secondaryPhone', invite.secondary_phone)) <> 10 then
+      required_errors := required_errors || jsonb_build_object('secondaryPhone', 'Secondary phone number must be 10 digits.');
+    end if;
     if btrim(coalesce(p_patch->>'message', invite.message, '')) = '' then
       required_errors := required_errors || jsonb_build_object('message', 'Enter an invitation message before updating.');
     end if;
@@ -407,6 +421,7 @@ begin
       venue_address = case when p_patch ? 'venueAddress' then nullif(p_patch->>'venueAddress', '') else venue_address end,
       map_link = case when p_patch ? 'mapLink' then nullif(p_patch->>'mapLink', '') else map_link end,
       phone = case when p_patch ? 'phone' then nullif(p_patch->>'phone', '') else phone end,
+      secondary_phone = case when p_patch ? 'secondaryPhone' then nullif(p_patch->>'secondaryPhone', '') else secondary_phone end,
       whatsapp = case when p_patch ? 'whatsapp' then nullif(p_patch->>'whatsapp', '') else whatsapp end,
       message = case when p_patch ? 'message' then p_patch->>'message' else message end,
       music_url = case when p_patch ? 'musicUrl' then nullif(p_patch->>'musicUrl', '') else music_url end,
@@ -513,6 +528,7 @@ begin
     venue_address = case when p_patch ? 'venueAddress' then nullif(p_patch->>'venueAddress', '') else venue_address end,
     map_link = case when p_patch ? 'mapLink' then nullif(p_patch->>'mapLink', '') else map_link end,
     phone = case when p_patch ? 'phone' then nullif(p_patch->>'phone', '') else phone end,
+    secondary_phone = case when p_patch ? 'secondaryPhone' then nullif(p_patch->>'secondaryPhone', '') else secondary_phone end,
     whatsapp = case when p_patch ? 'whatsapp' then nullif(p_patch->>'whatsapp', '') else whatsapp end,
     message = case when p_patch ? 'message' then p_patch->>'message' else message end,
     music_url = case when p_patch ? 'musicUrl' then nullif(p_patch->>'musicUrl', '') else music_url end,

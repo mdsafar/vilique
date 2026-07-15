@@ -3,7 +3,7 @@ import TemplateDetailsSkeleton from "@/components/skeletons/TemplateDetailsSkele
 
 export default function TemplateDetailsLoading() {
     return (
-        <DelayedRouteSkeleton>
+        <DelayedRouteSkeleton delayMs={0}>
             <TemplateDetailsSkeleton />
         </DelayedRouteSkeleton>
     );

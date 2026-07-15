@@ -249,6 +249,8 @@ function getSafeUpdateErrorResponse(error: { code?: string; message?: string; de
                 eventDate: "Choose a valid event date.",
                 eventTime: "Choose an event time.",
                 venueName: "Enter the venue name before updating.",
+                phone: "Primary phone number must be 10 digits.",
+                secondaryPhone: "Secondary phone number must be 10 digits.",
                 message: "Enter an invitation message before updating.",
             },
         }, { status: 400 });

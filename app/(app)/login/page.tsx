@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { signInWithGoogle } from "@/app/auth/actions";
 import AppLogo from "@/components/AppLogo";
+import GoogleOAuthButton from "@/components/GoogleOAuthButton";
 
 export const metadata: Metadata = {
     title: "Log in",
@@ -46,10 +47,7 @@ export default async function LoginPage({ searchParams }: Props) {
 
                 <form action={signInWithGoogle}>
                     <input type="hidden" name="next" value={next} />
-                    <button className="oauthButton" type="submit" disabled={!googleEnabled}>
-                        <span className="googleMark" aria-hidden="true">G</span>
-                        Continue with Google
-                    </button>
+                    <GoogleOAuthButton disabled={!googleEnabled} />
                 </form>
                 {!googleEnabled ? <p className="authHint">Google login needs OAuth credentials in Supabase first.</p> : null}
 

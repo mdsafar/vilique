@@ -543,11 +543,15 @@ function ThanksCard({
                 </div>
             </div>
 
-            {invitation.phone ? (
-                <a className="phonePill" href={`tel:${invitation.phone}`} onClick={() => onEvent?.("call_click")}>
-                    <Phone size={14} aria-hidden="true" />
-                    {invitation.phone}
-                </a>
+            {invitation.phone || invitation.secondaryPhone ? (
+                <div className="phonePillGroup">
+                    {[invitation.phone, invitation.secondaryPhone].filter((phone): phone is string => Boolean(phone)).map((phone) => (
+                        <a className="phonePill" href={`tel:${phone}`} onClick={() => onEvent?.("call_click")} key={phone}>
+                            <Phone size={14} aria-hidden="true" />
+                            {phone}
+                        </a>
+                    ))}
+                </div>
             ) : null}
 
             <GoldDivider className="dividerHeart" />

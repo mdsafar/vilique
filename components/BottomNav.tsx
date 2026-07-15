@@ -7,12 +7,16 @@ import { LayoutGrid, Mail } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
-type NavUser = Pick<User, "email" | "user_metadata">;
+type NavUser = Pick<User, "id" | "email" | "user_metadata">;
 
-export default function BottomNav() {
+type Props = {
+    initialUser: NavUser | null;
+};
+
+export default function BottomNav({ initialUser }: Props) {
     const pathname = usePathname();
-    const [user, setUser] = useState<NavUser | null>(null);
-    const [authChecked, setAuthChecked] = useState(false);
+    const [user, setUser] = useState<NavUser | null>(initialUser);
+    const [authChecked, setAuthChecked] = useState(true);
 
     useEffect(() => {
         let active = true;

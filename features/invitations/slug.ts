@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 
+export const INVITATION_SLUG_MAX_LENGTH = 80;
+export const INVITATION_SLUG_SUFFIX_LENGTH = 8;
+export const INVITATION_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export function generateBaseSlug(primaryName: string, secondaryName?: string, category?: string) {
     let base = "";
     if (primaryName && secondaryName) {
@@ -12,18 +16,64 @@ export function generateBaseSlug(primaryName: string, secondaryName?: string, ca
         base = `${base} ${category}`;
     }
 
-    return base
+    return slugifyInvitationText(base);
+}
+
+export function slugifyInvitationText(value: string) {
+    return value
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\s-&]/g, "") // remove unsafe characters
-        .replace(/[\s&]+/g, "-")       // spaces and & to hyphens
-        .replace(/-+/g, "-")           // collapse consecutive hyphens
-        .replace(/^-|-$/g, "");        // trim leading/trailing hyphens
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+export function getInvitationSlugSuffix(invitationId: string, length = INVITATION_SLUG_SUFFIX_LENGTH) {
+    return invitationId.replace(/-/g, "").toLowerCase().slice(0, length);
+}
+
+export function buildInvitationSlug(
+    readableName: string,
+    invitationId: string,
+    maxLength = INVITATION_SLUG_MAX_LENGTH,
+    suffixLength = INVITATION_SLUG_SUFFIX_LENGTH
+) {
+    const suffix = getInvitationSlugSuffix(invitationId, suffixLength);
+    if (!suffix) {
+        throw new Error("SLUG_GENERATION_FAILED");
+    }
+
+    const reservedLength = suffix.length + 1;
+    const baseMaxLength = Math.max(1, maxLength - reservedLength);
+    const base = slugifyInvitationText(readableName)
+        .slice(0, baseMaxLength)
+        .replace(/-+$/g, "");
+
+    return `${base || "invitation"}-${suffix}`;
+}
+
+export function getInvitationReadableName(invitation: {
+    primary_name?: string | null;
+    secondary_name?: string | null;
+    title?: string | null;
+    category?: string | null;
+}) {
+    if (invitation.primary_name?.trim() && invitation.secondary_name?.trim()) {
+        return `${invitation.primary_name} ${invitation.secondary_name}`;
+    }
+    return invitation.primary_name?.trim() || invitation.title?.trim() || invitation.category?.trim() || "invitation";
+}
+
+export function isValidInvitationSlug(slug: string) {
+    return slug.length >= 3 && slug.length <= INVITATION_SLUG_MAX_LENGTH && INVITATION_SLUG_PATTERN.test(slug);
 }
 
 export async function isSlugAvailable(slug: string, excludeInvitationId?: string) {
     const cleanSlug = slug.toLowerCase().trim();
-    if (!cleanSlug || cleanSlug.length < 3 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) {
+    if (!cleanSlug || !isValidInvitationSlug(cleanSlug)) {
         return false;
     }
 
@@ -42,32 +92,7 @@ export async function isSlugAvailable(slug: string, excludeInvitationId?: string
     return count === 0;
 }
 
-export async function generateUniqueSlug(primaryName: string, secondaryName?: string, category?: string) {
-    const baseSlug = generateBaseSlug(primaryName, secondaryName, category) || "invite";
-
-    const slug = baseSlug;
-    const isAvailable = await isSlugAvailable(slug);
-
-    if (isAvailable) {
-        return slug;
-    }
-
-    // Try appending numbers 2 to 9
-    for (let i = 2; i <= 9; i++) {
-        const candidate = `${baseSlug}-${i}`;
-        const isCandidateAvailable = await isSlugAvailable(candidate);
-        if (isCandidateAvailable) {
-            return candidate;
-        }
-    }
-
-    // Try appending a short random suffix
-    while (true) {
-        const randomSuffix = Math.random().toString(36).substring(2, 6);
-        const candidate = `${baseSlug}-${randomSuffix}`;
-        const isCandidateAvailable = await isSlugAvailable(candidate);
-        if (isCandidateAvailable) {
-            return candidate;
-        }
-    }
+export async function generateUniqueSlug(primaryName: string, secondaryName: string | undefined, category: string | undefined, invitationId: string) {
+    const readableName = generateBaseSlug(primaryName, secondaryName, category) || "invitation";
+    return buildInvitationSlug(readableName, invitationId);
 }

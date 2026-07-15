@@ -28,9 +28,9 @@ export default function TemplatesPageSkeleton() {
                 </section>
 
                 <nav className="categoryScroller" aria-hidden="true">
-                    <ButtonSkeleton width={70} height={32} />
-                    <ButtonSkeleton width={104} height={32} />
-                    <ButtonSkeleton width={96} height={32} />
+                    <ButtonSkeleton className="categoryTabSkeleton" width={72} height={36} />
+                    <ButtonSkeleton className="categoryTabSkeleton" width={104} height={36} />
+                    <ButtonSkeleton className="categoryTabSkeleton" width={96} height={36} />
                 </nav>
             </div>
 

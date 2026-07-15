@@ -29,6 +29,7 @@ export interface InvitationData {
     mapLink: string;
 
     phone?: string;
+    secondaryPhone?: string;
     whatsapp?: string;
     message: string;
 
@@ -50,6 +51,7 @@ export interface InvitationData {
     };
     sections?: Record<string, unknown>;
     status?: "draft" | "published" | "archived";
+    paymentStatus?: "unpaid" | "paid" | "refunded";
     publishedAt?: string;
 
     createdAt: string;

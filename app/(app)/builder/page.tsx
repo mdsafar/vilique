@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     AlertTriangle,
@@ -38,7 +38,7 @@ type PublishSuccessDetails = {
     slug: string;
     publishedAt?: string | null;
 };
-type BuilderFieldKey = "title" | "primaryName" | "eventDate" | "eventTime" | "venueName" | "message";
+type BuilderFieldKey = "title" | "primaryName" | "eventDate" | "eventTime" | "venueName" | "phone" | "secondaryPhone" | "message";
 type BuilderValidationErrors = Partial<Record<BuilderFieldKey, string>>;
 
 const requiredFieldTabs: Record<BuilderFieldKey, EditorTab> = {
@@ -48,6 +48,8 @@ const requiredFieldTabs: Record<BuilderFieldKey, EditorTab> = {
     eventDate: "event",
     eventTime: "event",
     venueName: "event",
+    phone: "contact",
+    secondaryPhone: "contact",
 };
 
 const requiredFieldLabels: Record<BuilderFieldKey, string> = {
@@ -57,6 +59,8 @@ const requiredFieldLabels: Record<BuilderFieldKey, string> = {
     eventDate: "Date",
     eventTime: "Time",
     venueName: "Venue name",
+    phone: "Primary phone",
+    secondaryPhone: "Secondary phone",
 };
 
 function formatSaveError(error: unknown): string {
@@ -109,11 +113,17 @@ function parseServerValidationErrors(fields: unknown): BuilderValidationErrors {
 
 function validateRequiredFields(source: InvitationData) {
     const nextErrors: BuilderValidationErrors = {};
+    const phone = source.phone || "";
+    const secondaryPhone = source.secondaryPhone || "";
     if (!source.title.trim()) nextErrors.title = "Enter a title before updating.";
     if (!source.primaryName.trim()) nextErrors.primaryName = "Enter the primary name before updating.";
     if (!normalizeInvitationDateValue(source.eventDate)) nextErrors.eventDate = "Choose a valid event date.";
     if (!source.eventTime.trim()) nextErrors.eventTime = "Choose an event time.";
     if (!source.venueName.trim()) nextErrors.venueName = "Enter the venue name before updating.";
+    if (!phone.trim()) nextErrors.phone = "Enter the primary phone number before updating.";
+    else if (phone.length !== 10) nextErrors.phone = "Primary phone number must be 10 digits.";
+    if (!secondaryPhone.trim()) nextErrors.secondaryPhone = "Enter the secondary phone number before updating.";
+    else if (secondaryPhone.length !== 10) nextErrors.secondaryPhone = "Secondary phone number must be 10 digits.";
     if (!source.message.trim()) nextErrors.message = "Enter an invitation message before updating.";
     return nextErrors;
 }
@@ -154,6 +164,7 @@ function BuilderContent() {
     const searchParams = useSearchParams();
     const { showToast } = useToast();
     const [invitation, setInvitation] = useState(createDefaultInvitation());
+    const [authStatus, setAuthStatus] = useState<"authed" | "guest">("authed");
     const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
     const [activeTab, setActiveTab] = useState<EditorTab>("content");
     const [previewScreen, setPreviewScreen] = useState<PreviewScreen>("invite");
@@ -234,6 +245,7 @@ function BuilderContent() {
             venueAddress: source.venueAddress,
             mapLink: source.mapLink,
             phone: source.phone || null,
+            secondaryPhone: source.secondaryPhone || null,
             whatsapp: source.whatsapp || null,
             message: source.message,
             musicUrl: source.musicUrl && source.musicUrl !== source.defaultMusicUrl ? source.musicUrl : null,
@@ -275,6 +287,7 @@ function BuilderContent() {
                     venueAddress: invitation.venueAddress,
                     mapLink: invitation.mapLink,
                     phone: invitation.phone,
+                    secondaryPhone: invitation.secondaryPhone,
                     whatsapp: invitation.whatsapp,
                     message: invitation.message,
                     musicUrl: invitation.musicUrl,
@@ -604,6 +617,11 @@ function BuilderContent() {
                     return;
                 }
                 const result = await response.json().catch(() => ({}));
+                if (response.status === 401) {
+                    setAuthStatus("guest");
+                    setIsLoadingInvitation(false);
+                    return;
+                }
                 if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
                     showToast(result.error || "This invitation is completed and can no longer be edited.", "error");
                     router.replace("/invitations");
@@ -682,10 +700,16 @@ function BuilderContent() {
         return <BuilderLoadingState />;
     }
 
+    if (authStatus === "guest") {
+        return (
+            <main className="builderShell">
+                <AuthRequiredModal next={currentBuilderPath} forceOpen />
+            </main>
+        );
+    }
+
     return (
         <main className="builderShell">
-            <AuthRequiredModal next={currentBuilderPath} />
-
             <header className="builderTopbar analyticsHeader">
                 <button
                     type="button"
@@ -779,7 +803,7 @@ function BuilderContent() {
                 onClick={() => setMobileEditorOpen(true)}
             >
                 <PencilLine size={17} aria-hidden="true" />
-                Edit {activeTab}
+                Edit Content
             </button>
 
             <button
@@ -963,10 +987,10 @@ function BuilderLoadingState() {
     return (
         <main className="builderShell builderLoadingShell" aria-busy="true">
             <div className="builderLoadingCard">
-                <Loader2 className="spinner" size={28} aria-hidden="true" />
-                <div>
+                <Loader2 className="builderLoadingSpinner spinner" size={22} aria-hidden="true" />
+                <div className="builderLoadingCopy">
                     <strong>Opening builder</strong>
-                    <span>Loading your invitation</span>
+                    <span>Preparing your invitation workspace</span>
                 </div>
             </div>
         </main>
@@ -1386,16 +1410,32 @@ function EditorForm({
     if (activeTab === "contact") {
         return (
             <div className="editorForm">
-                <label>
-                    <span>Phone / WhatsApp</span>
+                <label className={errors.phone ? "hasError" : ""}>
+                    <span>Primary Phone</span>
                     <input
                         type="tel"
                         inputMode="numeric"
-                        pattern="[0-9]*"
+                        pattern="[0-9]{10}"
                         value={invitation.phone || ""}
-                        onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, ""))}
-                        maxLength={15}
+                        onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        maxLength={10}
+                        aria-invalid={!!errors.phone}
                     />
+                    {errors.phone ? <small className="fieldError">{errors.phone}</small> : null}
+                </label>
+
+                <label className={errors.secondaryPhone ? "hasError" : ""}>
+                    <span>Secondary Phone</span>
+                    <input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]{10}"
+                        value={invitation.secondaryPhone || ""}
+                        onChange={(e) => updateField("secondaryPhone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        maxLength={10}
+                        aria-invalid={!!errors.secondaryPhone}
+                    />
+                    {errors.secondaryPhone ? <small className="fieldError">{errors.secondaryPhone}</small> : null}
                 </label>
 
                 <label>
@@ -1460,8 +1500,8 @@ function EditorForm({
                     url={defaultTickUrl || undefined}
                     badge="default"
                 />
-                <p style={{
-                    fontSize: "10px",
+                <p className="soundHelperText" style={{
+                    fontSize: "var(--sound-helper-font, 10px)",
                     color: "#9ca3af",
                     marginTop: "6px",
                     lineHeight: 1.35,
@@ -1474,7 +1514,7 @@ function EditorForm({
             {/* ── Play Duration ── */}
             <label>
                 <span>Song Play Duration</span>
-                <div style={{ display: "flex", gap: "7px", marginTop: "7px" }}>
+                <div className="soundDurationOptions" style={{ display: "flex", gap: "7px", marginTop: "7px" }}>
                     {durationOptions.map((opt) => {
                         const isSelected = (invitation.theme?.musicDuration ?? 20) === opt.value;
                         return (
@@ -1486,16 +1526,14 @@ function EditorForm({
                                     flex: 1,
                                     minHeight: "38px",
                                     borderRadius: "12px",
-                                    border: isSelected ? "2px solid #7e5bd5" : "1px solid rgba(23, 23, 23, 0.08)",
-                                    background: isSelected
-                                        ? "linear-gradient(135deg, #3b2a3a 0%, #7e5bd5 100%)"
-                                        : "#fff",
-                                    color: isSelected ? "#fff" : "#4b5563",
-                                    fontSize: "13px",
+                                    border: isSelected ? "2px solid #d8bfff" : "1px solid rgba(23, 23, 23, 0.08)",
+                                    background: isSelected ? "#ead8ff" : "#fff",
+                                    color: isSelected ? "#6f43e8" : "#4b5563",
+                                    fontSize: "var(--sound-duration-font, 13px)",
                                     fontWeight: isSelected ? 800 : 650,
                                     cursor: "pointer",
                                     transition: "all 0.2s",
-                                    boxShadow: isSelected ? "0 3px 10px rgba(126,91,213,0.24)" : "none",
+                                    boxShadow: isSelected ? "0 3px 10px rgba(140, 76, 243, 0.12)" : "none",
                                 }}
                             >
                                 {opt.label}
@@ -1526,24 +1564,12 @@ function DatePickerField({
     const minVisibleMonth = startOfMonth(minDate);
     const canGoPreviousMonth = startOfMonth(visibleMonth).getTime() > minVisibleMonth.getTime();
     const calendarDays = getCalendarDays(visibleMonth);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isValidDateValue(value)) {
             onChange(toDateInputValue(minDate));
         }
     }, [minDate, onChange, value]);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        function handleClickOutside(e: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                onToggle(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [isOpen, onToggle]);
 
     function selectDate(date: Date) {
         if (isPastDate(date, minDate)) return;
@@ -1568,7 +1594,7 @@ function DatePickerField({
     }
 
     return (
-        <div className="customPicker" ref={containerRef}>
+        <div className="customPicker">
             <button
                 className="customPickerTrigger"
                 type="button"
@@ -1579,57 +1605,59 @@ function DatePickerField({
             </button>
 
             {isOpen ? (
-                <div className="customPickerPopover datePickerPopover">
-                    <div className="customPickerHeader">
-                        <strong>
-                            {visibleMonth.toLocaleString("en", { month: "long", year: "numeric" })}
-                        </strong>
-                        <div>
-                            <button
-                                type="button"
-                                onClick={goToPreviousMonth}
-                                aria-label="Previous month"
-                                disabled={!canGoPreviousMonth}
-                            >
-                                <ChevronLeft size={17} aria-hidden="true" />
-                            </button>
-                            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} aria-label="Next month">
-                                <ChevronLeft size={17} aria-hidden="true" />
-                            </button>
+                <PickerModal title="Choose date" variant="date" onClose={() => onToggle(false)}>
+                    <div className="customPickerPopover datePickerPopover">
+                        <div className="customPickerHeader">
+                            <strong>
+                                {visibleMonth.toLocaleString("en", { month: "long", year: "numeric" })}
+                            </strong>
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={goToPreviousMonth}
+                                    aria-label="Previous month"
+                                    disabled={!canGoPreviousMonth}
+                                >
+                                    <ChevronLeft size={17} aria-hidden="true" />
+                                </button>
+                                <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} aria-label="Next month">
+                                    <ChevronLeft size={17} aria-hidden="true" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="datePickerGrid">
+                            {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+                                <b key={`${day}-${index}`}>{day}</b>
+                            ))}
+                            {calendarDays.map((date) => {
+                                const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
+                                const isSelected = selectedDate ? isSameDate(date, selectedDate) : false;
+                                const isDisabled = isPastDate(date, minDate);
+
+                                return (
+                                    <button
+                                        className={[
+                                            isSelected ? "selected" : "",
+                                            !isCurrentMonth ? "muted" : "",
+                                            isDisabled ? "disabled" : "",
+                                        ].filter(Boolean).join(" ") || undefined}
+                                        disabled={isDisabled}
+                                        key={date.toISOString()}
+                                        type="button"
+                                        onClick={() => selectDate(date)}
+                                    >
+                                        {date.getDate()}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="customPickerFooter single">
+                            <button type="button" onClick={() => onToggle(false)}>Done</button>
                         </div>
                     </div>
-
-                    <div className="datePickerGrid">
-                        {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                            <b key={`${day}-${index}`}>{day}</b>
-                        ))}
-                        {calendarDays.map((date) => {
-                            const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
-                            const isSelected = selectedDate ? isSameDate(date, selectedDate) : false;
-                            const isDisabled = isPastDate(date, minDate);
-
-                            return (
-                                <button
-                                    className={[
-                                        isSelected ? "selected" : "",
-                                        !isCurrentMonth ? "muted" : "",
-                                        isDisabled ? "disabled" : "",
-                                    ].filter(Boolean).join(" ") || undefined}
-                                    disabled={isDisabled}
-                                    key={date.toISOString()}
-                                    type="button"
-                                    onClick={() => selectDate(date)}
-                                >
-                                    {date.getDate()}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    <div className="customPickerFooter single">
-                        <button type="button" onClick={() => onToggle(false)}>Done</button>
-                    </div>
-                </div>
+                </PickerModal>
             ) : null}
         </div>
     );
@@ -1651,7 +1679,6 @@ function TimePickerField({
     onToggle: (open: boolean) => void;
 }) {
     const parsed = parseTimeInputParts(value);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     function updateTime(next: Partial<ReturnType<typeof parseTimeInputParts>>) {
         const nextValue = toTimeInputFromParts({ ...parsed, ...next });
@@ -1659,19 +1686,8 @@ function TimePickerField({
         onChange(nextValue);
     }
 
-    useEffect(() => {
-        if (!isOpen) return;
-        function handleClickOutside(e: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                onToggle(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [isOpen, onToggle]);
-
     return (
-        <div className="customPicker" ref={containerRef}>
+        <div className="customPicker">
             <button
                 className="customPickerTrigger"
                 type="button"
@@ -1682,41 +1698,47 @@ function TimePickerField({
             </button>
 
             {isOpen ? (
-                <div className="customPickerPopover timePickerPopover">
-                    <div className="timePickerColumns">
-                        <div className="timePickerColGroup">
-                            <span className="timePickerColLabel">Hour</span>
-                            <PickerColumn
-                                values={Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))}
-                                selected={parsed.hour}
-                                isDisabled={(hour) => !isSelectableTime(toTimeInputFromParts({ ...parsed, hour }), minTimeMinutes, maxTimeMinutes)}
-                                onSelect={(hour) => updateTime({ hour })}
-                            />
+                <PickerModal title="Choose time" variant="time" onClose={() => onToggle(false)}>
+                    <div className="customPickerPopover timePickerPopover">
+                        <div className="timePickerSummary">
+                            <span>Selected time</span>
+                            <strong>{fromTimeInputValue(toTimeInputFromParts(parsed))}</strong>
                         </div>
-                        <div className="timePickerColGroup">
-                            <span className="timePickerColLabel">Min</span>
-                            <PickerColumn
-                                values={Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))}
-                                selected={parsed.minute}
-                                isDisabled={(minute) => !isSelectableTime(toTimeInputFromParts({ ...parsed, minute }), minTimeMinutes, maxTimeMinutes)}
-                                onSelect={(minute) => updateTime({ minute })}
-                            />
+                        <div className="timePickerColumns">
+                            <div className="timePickerColGroup">
+                                <span className="timePickerColLabel">Hour</span>
+                                <PickerColumn
+                                    values={Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))}
+                                    selected={parsed.hour}
+                                    isDisabled={(hour) => !isSelectableTime(toTimeInputFromParts({ ...parsed, hour }), minTimeMinutes, maxTimeMinutes)}
+                                    onSelect={(hour) => updateTime({ hour })}
+                                />
+                            </div>
+                            <div className="timePickerColGroup">
+                                <span className="timePickerColLabel">Min</span>
+                                <PickerColumn
+                                    values={Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))}
+                                    selected={parsed.minute}
+                                    isDisabled={(minute) => !isSelectableTime(toTimeInputFromParts({ ...parsed, minute }), minTimeMinutes, maxTimeMinutes)}
+                                    onSelect={(minute) => updateTime({ minute })}
+                                />
+                            </div>
+                            <div className="timePickerColGroup">
+                                <span className="timePickerColLabel">Period</span>
+                                <PickerColumn
+                                    values={["AM", "PM"]}
+                                    selected={parsed.period}
+                                    isDisabled={(period) => !isSelectableTime(toTimeInputFromParts({ ...parsed, period: period as "AM" | "PM" }), minTimeMinutes, maxTimeMinutes)}
+                                    onSelect={(period) => updateTime({ period: period as "AM" | "PM" })}
+                                />
+                            </div>
                         </div>
-                        <div className="timePickerColGroup">
-                            <span className="timePickerColLabel">Period</span>
-                            <PickerColumn
-                                values={["AM", "PM"]}
-                                selected={parsed.period}
-                                isDisabled={(period) => !isSelectableTime(toTimeInputFromParts({ ...parsed, period: period as "AM" | "PM" }), minTimeMinutes, maxTimeMinutes)}
-                                onSelect={(period) => updateTime({ period: period as "AM" | "PM" })}
-                            />
-                        </div>
-                    </div>
 
-                    <div className="customPickerFooter single">
-                        <button type="button" onClick={() => onToggle(false)}>Done</button>
+                        <div className="customPickerFooter single">
+                            <button type="button" onClick={() => onToggle(false)}>Done</button>
+                        </div>
                     </div>
-                </div>
+                </PickerModal>
             ) : null}
         </div>
     );
@@ -1754,6 +1776,51 @@ function PickerColumn({
                 );
             })}
         </div>
+    );
+}
+
+function PickerModal({
+    title,
+    variant,
+    children,
+    onClose,
+}: {
+    title: string;
+    variant: "date" | "time";
+    children: ReactNode;
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") onClose();
+        }
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [onClose]);
+
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="customPickerSheetOverlay" role="presentation" onMouseDown={onClose}>
+            <section
+                className={`customPickerSheet customPickerSheet--${variant}`}
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <div className="customPickerSheetHandle" aria-hidden="true" />
+                <div className="customPickerSheetHeader">
+                    <strong>{title}</strong>
+                    <button className="customPickerSheetClose" type="button" onClick={onClose} aria-label="Close picker">
+                        <X size={16} aria-hidden="true" />
+                    </button>
+                </div>
+                {children}
+            </section>
+        </div>,
+        document.body
     );
 }
 
@@ -1919,16 +1986,23 @@ function isSameDate(left: Date, right: Date) {
 }
 
 function normalizeInvitationDate<T extends InvitationData>(invitation: T): T {
+    const defaults = createDefaultInvitation();
     const normalizedEventDate = normalizeInvitationDateValue(invitation.eventDate);
+    const invitationWithDefaults = {
+        ...invitation,
+        phone: invitation.phone || defaults.phone,
+        secondaryPhone: invitation.secondaryPhone || defaults.secondaryPhone,
+    };
+
     if (normalizedEventDate) {
         return {
-            ...invitation,
+            ...invitationWithDefaults,
             eventDate: normalizedEventDate,
         };
     }
 
     return {
-        ...invitation,
+        ...invitationWithDefaults,
         eventDate: toDateInputValue(new Date()),
     };
 }
@@ -2061,7 +2135,7 @@ function SoundPreviewCard({
     const { playing, toggle } = useAudioPreview(url);
 
     return (
-        <div style={{
+        <div className="soundPreviewCard" style={{
             borderRadius: "13px",
             border: "1px solid rgba(126, 91, 213, 0.12)",
             background: badge === "custom"
@@ -2070,29 +2144,29 @@ function SoundPreviewCard({
             overflow: "hidden",
             marginTop: "7px",
         }}>
-            <div style={{
+            <div className="soundPreviewMain" style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
                 padding: "12px 13px",
             }}>
-                <span style={{ fontSize: "20px", lineHeight: 1, flex: "0 0 auto" }}>{icon}</span>
+                <span className="soundPreviewIcon" style={{ fontSize: "var(--sound-icon-font, 20px)", lineHeight: 1, flex: "0 0 auto" }}>{icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px", minWidth: 0 }}>
-                        <span style={{
+                        <span className="soundPreviewTitle" style={{
                             minWidth: 0,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
-                            fontSize: "12px",
+                            fontSize: "var(--sound-title-font, 12px)",
                             fontWeight: 850,
                             color: "#1a1a1a",
                             letterSpacing: "0.02em",
                         }}>{title}</span>
                         {badge && (
-                            <span style={{
+                            <span className="soundPreviewBadge" style={{
                                 flex: "0 0 auto",
-                                fontSize: "8px",
+                                fontSize: "var(--sound-badge-font, 8px)",
                                 fontWeight: 800,
                                 padding: "1px 5px",
                                 borderRadius: "999px",
@@ -2105,29 +2179,30 @@ function SoundPreviewCard({
                             </span>
                         )}
                     </div>
-                    <span style={{
+                    <span className="soundPreviewSubtitle" style={{
                         display: "block",
                         maxWidth: "100%",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                        fontSize: "10.5px",
+                        fontSize: "var(--sound-subtitle-font, 10.5px)",
                         color: "#9ca3af",
                         lineHeight: 1.22,
                     }}>
                         {subtitle}
                     </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "0 0 auto" }}>
+                <div className="soundPreviewActions" style={{ display: "flex", alignItems: "center", gap: "6px", flex: "0 0 auto" }}>
                     {url && (
                         <button
                             type="button"
                             onClick={toggle}
+                            className="soundPreviewPlay"
                             style={{
-                                width: "34px",
-                                minWidth: "34px",
-                                height: "34px",
-                                minHeight: "34px",
+                                width: "var(--sound-play-size, 34px)",
+                                minWidth: "var(--sound-play-size, 34px)",
+                                height: "var(--sound-play-size, 34px)",
+                                minHeight: "var(--sound-play-size, 34px)",
                                 aspectRatio: "1 / 1",
                                 padding: 0,
                                 borderRadius: "50%",
@@ -2141,7 +2216,7 @@ function SoundPreviewCard({
                                 lineHeight: 0,
                                 cursor: "pointer",
                                 transition: "all 0.2s",
-                                flex: "0 0 34px",
+                                flex: "0 0 var(--sound-play-size, 34px)",
                             }}
                         >
                             {playing ? <Pause size={12} /> : <Play size={12} />}
@@ -2162,7 +2237,7 @@ function SoundPreviewCard({
                                 borderRadius: "7px",
                                 background: "#fee2e2",
                                 color: "#ef4444",
-                                fontSize: "9.5px",
+                                fontSize: "var(--sound-remove-font, 9.5px)",
                                 fontWeight: 800,
                                 border: "none",
                                 cursor: isUploading ? "not-allowed" : "pointer",
@@ -2176,7 +2251,7 @@ function SoundPreviewCard({
                 </div>
             </div>
             {onUpload && uploadId && (
-                <div style={{
+                <div className="soundUploadRow" style={{
                     borderTop: "1px dashed rgba(126, 91, 213, 0.12)",
                     padding: "10px 13px",
                     display: "flex",
@@ -2194,9 +2269,9 @@ function SoundPreviewCard({
                     {isUploading ? (
                         <Loader2 size={14} className="spinner" style={{ color: "#7e5bd5", flex: "0 0 auto" }} />
                     ) : (
-                        <span style={{ fontSize: "12px", flex: "0 0 auto" }}>📤</span>
+                        <span className="soundUploadIcon" style={{ fontSize: "var(--sound-upload-icon-font, 12px)", flex: "0 0 auto" }}>📤</span>
                     )}
-                    <span style={{ fontSize: "11.5px", color: "#7e5bd5", fontWeight: 750, letterSpacing: "0.015em" }}>
+                    <span className="soundUploadText" style={{ fontSize: "var(--sound-upload-font, 11.5px)", color: "#7e5bd5", fontWeight: 750, letterSpacing: "0.015em" }}>
                         {isUploading ? "Uploading song..." : "Upload custom song to replace"}
                     </span>
                     <input

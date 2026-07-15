@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import AuthRequiredModal from "@/components/AuthRequiredModal";
 import InvitationAnalyticsClient from "@/components/InvitationAnalyticsClient";
 import { getInvitationAnalytics } from "@/lib/invitationAnalytics";
 
@@ -17,7 +16,6 @@ export default async function InvitationAnalyticsPage({ params }: Props) {
 
     return (
         <main className="profilePage analyticsPage">
-            <AuthRequiredModal next={`/invitations/${id}/analytics`} />
             <InvitationAnalyticsClient
                 invitation={result.invitation}
                 initialAnalytics={result.analytics}

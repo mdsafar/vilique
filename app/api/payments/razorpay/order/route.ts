@@ -4,10 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { razorpay } from "@/lib/razorpay";
 import { Json } from "@/types/database";
+import { isInvitationCompleted } from "@/lib/lifecycle";
+import { buildInvitationSlug, getInvitationReadableName, isSlugAvailable, slugifyInvitationText } from "@/features/invitations/slug";
 import crypto from "crypto";
 
 const orderInputSchema = z.object({
     invitationId: z.string().uuid(),
+    slug: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
         if (!validation.success) {
             return NextResponse.json({ error: "Invalid invitation ID" }, { status: 400 });
         }
-        const { invitationId } = validation.data;
+        const { invitationId, slug: customSlug } = validation.data;
 
         // 3-6. Fetch invitation and confirm ownership
         const { data: invite, error: inviteError } = await supabase
@@ -57,6 +60,15 @@ export async function POST(request: Request) {
         const template = invite.invitation_templates;
         if (!template) {
             return NextResponse.json({ error: "Template not found" }, { status: 400 });
+        }
+
+        const preflightError = await getPublishPreflightError({
+            invite,
+            invitationId,
+            customSlug,
+        });
+        if (preflightError) {
+            return NextResponse.json({ error: getSafePreflightError(preflightError) }, { status: 400 });
         }
 
         const amountPaise = template.price_paise;
@@ -161,4 +173,83 @@ export async function POST(request: Request) {
         console.error("Unhandled error creating Razorpay order:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
+}
+
+function getSafePreflightError(error: string) {
+    if (error === "SLUG_GENERATION_FAILED") {
+        return "We could not create a unique public link. Please try again.";
+    }
+    return error;
+}
+
+async function getPublishPreflightError({
+    invite,
+    invitationId,
+    customSlug,
+}: {
+    invite: {
+        status?: string | null;
+        lifecycle_status?: string | null;
+        event_status?: string | null;
+        event_date?: string | null;
+        event_time?: string | null;
+        event_timezone?: string | null;
+        first_published_at?: string | null;
+        published_at?: string | null;
+        title?: string | null;
+        primary_name?: string | null;
+        venue_name?: string | null;
+        phone?: string | null;
+        secondary_phone?: string | null;
+        message?: string | null;
+        slug?: string | null;
+    };
+    invitationId: string;
+    customSlug?: string;
+}) {
+    if (invite.status === "archived" || invite.lifecycle_status === "archived") {
+        return "Cannot publish an archived invitation";
+    }
+
+    if (isInvitationCompleted({
+        eventDate: invite.event_date ?? null,
+        eventTime: invite.event_time ?? null,
+        eventTimezone: invite.event_timezone ?? null,
+        status: invite.status ?? null,
+        lifecycleStatus: invite.lifecycle_status ?? null,
+        eventStatus: invite.event_status ?? null,
+        first_published_at: invite.first_published_at ?? null,
+        published_at: invite.published_at ?? null,
+    })) {
+        return "This invitation is completed and can no longer be published.";
+    }
+
+    if (!invite.title?.trim()) return "Title is required to publish";
+    if (!invite.primary_name?.trim()) return "Host/Couple name is required to publish";
+    if (!invite.event_date) return "Event date is required to publish";
+    if (!invite.event_time?.trim()) return "Event time is required to publish";
+    if (!invite.venue_name?.trim()) return "Venue name is required to publish";
+    if (!invite.phone?.trim()) return "Primary phone is required to publish";
+    if (invite.phone.length !== 10) return "Primary phone must be 10 digits";
+    if (!invite.secondary_phone?.trim()) return "Secondary phone is required to publish";
+    if (invite.secondary_phone.length !== 10) return "Secondary phone must be 10 digits";
+    if (!invite.message?.trim()) return "Invitation message is required to publish";
+
+    if (!invite.first_published_at) {
+        const cleanSlug = customSlug?.toLowerCase().trim();
+        const readableSlug = cleanSlug && cleanSlug !== invite.slug ? slugifyInvitationText(cleanSlug) : "";
+        if (cleanSlug && cleanSlug !== invite.slug && !readableSlug) {
+            return "Invalid slug format";
+        }
+
+        const finalSlug = buildInvitationSlug(readableSlug || getInvitationReadableName(invite), invitationId);
+        const available = await isSlugAvailable(finalSlug, invitationId);
+        if (!available) {
+            const fallbackSlug = buildInvitationSlug(readableSlug || getInvitationReadableName(invite), invitationId, 80, 12);
+            const fallbackAvailable = await isSlugAvailable(fallbackSlug, invitationId);
+            if (!fallbackAvailable) return "SLUG_GENERATION_FAILED";
+        }
+    }
+
+    return "";
 }

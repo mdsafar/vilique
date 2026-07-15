@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { buildInvitationSlug, getInvitationReadableName } from "@/features/invitations/slug";
 
 type Context = {
     params: Promise<{ id: string }>;
@@ -28,12 +29,13 @@ export async function POST(request: Request, { params }: Context) {
         return NextResponse.json({ error: "Source invitation not found." }, { status: 404 });
     }
 
-    // 2. Generate unique clean slug
-    const randomSuffix = Math.random().toString(36).substring(2, 6);
-    const newSlug = `${invite.slug}-${randomSuffix}`;
+    // 2. Generate unique clean slug from the new invitation id.
+    const newInvitationId = crypto.randomUUID();
+    const newSlug = buildInvitationSlug(`${getInvitationReadableName(invite)} copy`, newInvitationId);
 
     // 3. Construct clean copy resetting all payments & snapshot credentials
     const duplicatePayload = {
+        id: newInvitationId,
         user_id: user.id,
         template_id: invite.template_id,
         slug: newSlug,
@@ -47,6 +49,7 @@ export async function POST(request: Request, { params }: Context) {
         venue_address: invite.venue_address,
         map_link: invite.map_link,
         phone: invite.phone,
+        secondary_phone: invite.secondary_phone,
         whatsapp: invite.whatsapp,
         message: invite.message,
         music_url: invite.music_url,

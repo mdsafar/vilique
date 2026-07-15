@@ -68,6 +68,7 @@ begin
     and new.venue_address is not distinct from old.venue_address
     and new.map_link is not distinct from old.map_link
     and new.phone is not distinct from old.phone
+    and new.secondary_phone is not distinct from old.secondary_phone
     and new.whatsapp is not distinct from old.whatsapp
     and new.message is not distinct from old.message
     and new.template_id is not distinct from old.template_id

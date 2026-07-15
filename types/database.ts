@@ -132,6 +132,7 @@ export type Database = {
                     venue_address: string | null;
                     map_link: string | null;
                     phone: string | null;
+                    secondary_phone: string | null;
                     whatsapp: string | null;
                     message: string | null;
                     music_url: string | null;
@@ -179,6 +180,7 @@ export type Database = {
                     venue_address?: string | null;
                     map_link?: string | null;
                     phone?: string | null;
+                    secondary_phone?: string | null;
                     whatsapp?: string | null;
                     message?: string | null;
                     music_url?: string | null;
@@ -567,6 +569,14 @@ export type Database = {
                     p_invitation_id: string;
                     p_patch: Json;
                     p_user_id: string;
+                };
+                Returns: Json;
+            };
+            publish_invitation_with_identity_check: {
+                Args: {
+                    p_invitation_id: string;
+                    p_user_id: string;
+                    p_patch: Json;
                 };
                 Returns: Json;
             };

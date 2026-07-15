@@ -43,12 +43,19 @@ export async function POST(request: Request, { params }: Context) {
                 error: "This invitation is completed and can no longer be published.",
             }, { status: 409 });
         }
-        return NextResponse.json({ error: getSafePublishError(err) }, { status: 400 });
+        return NextResponse.json(getSafePublishError(err), { status: 400 });
     }
 }
 
 function getSafePublishError(err: unknown) {
-    if (!(err instanceof Error)) return "Failed to publish invitation";
+    if (!(err instanceof Error)) return { code: "PUBLISH_FAILED", error: "Failed to publish invitation" };
+
+    if (err.message === "SLUG_GENERATION_FAILED") {
+        return {
+            code: "SLUG_GENERATION_FAILED",
+            error: "We could not create a unique public link. Please try again.",
+        };
+    }
 
     const allowedMessages = [
         "Invitation not found",
@@ -59,6 +66,10 @@ function getSafePublishError(err: unknown) {
         "Event date is required to publish",
         "Event time is required to publish",
         "Venue name is required to publish",
+        "Primary phone is required to publish",
+        "Primary phone must be 10 digits",
+        "Secondary phone is required to publish",
+        "Secondary phone must be 10 digits",
         "Invitation message is required to publish",
         "Template entitlement could not be verified",
         "Payment required: Please complete payment before publishing",
@@ -69,5 +80,8 @@ function getSafePublishError(err: unknown) {
         "Invitation is completed and locked.",
     ];
 
-    return allowedMessages.includes(err.message) ? err.message : "Failed to publish invitation";
+    return {
+        code: err.message === "The customized link is already taken" ? "CUSTOM_SLUG_TAKEN" : "PUBLISH_FAILED",
+        error: allowedMessages.includes(err.message) ? err.message : "Failed to publish invitation",
+    };
 }

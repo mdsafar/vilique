@@ -3,6 +3,7 @@ import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { mapInvitationRow, type InvitationRowWithTemplate } from "@/features/invitations/mappers";
 import { createClient } from "@/lib/supabase/server";
 import { invitationCreateSchema } from "@/features/invitations/validation";
+import { buildInvitationSlug } from "@/features/invitations/slug";
 
 const INVITATION_LIMIT_DEFAULT = 12;
 const INVITATION_LIMIT_MAX = 30;
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
     const limit = parseLimit(url.searchParams.get("limit"), INVITATION_LIMIT_DEFAULT, INVITATION_LIMIT_MAX);
     const cursor = decodeCursor(url.searchParams.get("cursor"));
     const sortConfig = invitationSorts[sort];
+    const paidInvitationIdsForUser = await getPaidInvitationIdsForUser(user.id);
 
     let query = supabase
         .from("invitations")
@@ -39,7 +41,7 @@ export async function GET(request: Request) {
         .eq("user_id", user.id);
 
     query = applyInvitationSearch(query, search);
-    query = applyInvitationStatusFilter(query, status);
+    query = applyInvitationStatusFilter(query, status, paidInvitationIdsForUser);
     query = applyCursor(query, sortConfig.field, sortConfig.ascending, cursor);
     query = query
         .order(sortConfig.field, { ascending: sortConfig.ascending, nullsFirst: false })
@@ -54,11 +56,15 @@ export async function GET(request: Request) {
 
     const rows = data || [];
     const pageRows = rows.slice(0, limit) as InvitationRowWithTemplate[];
-    const items = pageRows.map(mapInvitationRow);
+    const paidInvitationIds = await getPaidInvitationIds(user.id, pageRows.map((row) => row.id));
+    const items = pageRows.map((row) => {
+        const item = mapInvitationRow(row);
+        return paidInvitationIds.has(row.id) ? { ...item, paymentStatus: "paid" as const } : item;
+    });
     const lastRow = pageRows[pageRows.length - 1] as Record<string, unknown> | undefined;
     const hasMore = rows.length > limit;
     const [counts, stats] = await Promise.all([
-        getInvitationCounts(user.id, search),
+        getInvitationCounts(user.id, search, paidInvitationIdsForUser),
         getInvitationStats(pageRows.map((row) => row.id)),
     ]);
 
@@ -100,42 +106,51 @@ export async function POST(request: Request) {
     }
 
     const defaults = createDefaultInvitation();
-    const slug = `${defaults.primaryName}-${defaults.secondaryName || "invite"}-${crypto.randomUUID().slice(0, 8)}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
+    let data = null as InvitationRowWithTemplate | null;
+    let error = null as { code?: string; message?: string } | null;
 
-    const { data, error } = await supabase
-        .from("invitations")
-        .insert({
-            user_id: user.id,
-            template_id: template.id,
-            slug,
-            category: template.category,
-            title: defaults.title,
-            primary_name: defaults.primaryName,
-            secondary_name: defaults.secondaryName,
-            event_date: defaults.eventDate,
-            event_time: defaults.eventTime,
-            venue_name: defaults.venueName,
-            venue_address: defaults.venueAddress,
-            map_link: defaults.mapLink,
-            phone: defaults.phone,
-            message: defaults.message,
-            music_url: defaults.musicUrl,
-            theme: {
-                ...defaults.theme,
-                primaryColor: template.accent_color || defaults.theme.primaryColor,
-            },
-            sections: {},
-            gallery_urls: [],
-            status: "draft",
-        })
-        .select("*, invitation_templates(template_key)")
-        .single();
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const invitationId = crypto.randomUUID();
+        const slug = buildInvitationSlug(`${defaults.primaryName} ${defaults.secondaryName || ""}`, invitationId);
 
-    if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        const result = await supabase
+            .from("invitations")
+            .insert({
+                id: invitationId,
+                user_id: user.id,
+                template_id: template.id,
+                slug,
+                category: template.category,
+                title: defaults.title,
+                primary_name: defaults.primaryName,
+                secondary_name: defaults.secondaryName,
+                event_date: defaults.eventDate,
+                event_time: defaults.eventTime,
+                venue_name: defaults.venueName,
+                venue_address: defaults.venueAddress,
+                map_link: defaults.mapLink,
+                phone: defaults.phone,
+                secondary_phone: defaults.secondaryPhone,
+                message: defaults.message,
+                music_url: defaults.musicUrl,
+                theme: {
+                    ...defaults.theme,
+                    primaryColor: template.accent_color || defaults.theme.primaryColor,
+                },
+                sections: {},
+                gallery_urls: [],
+                status: "draft",
+            })
+            .select("*, invitation_templates(template_key)")
+            .single();
+
+        data = result.data as InvitationRowWithTemplate | null;
+        error = result.error;
+        if (!isUniqueSlugViolation(error)) break;
+    }
+
+    if (error || !data) {
+        return NextResponse.json({ error: error?.message || "Failed to create invitation" }, { status: 400 });
     }
 
     return NextResponse.json(mapInvitationRow(data), { status: 201 });
@@ -172,17 +187,41 @@ function applyInvitationSearch<T>(query: T, search: string): T {
     ].join(","));
 }
 
-function applyInvitationStatusFilter<T>(query: T, status: InvitationStatusFilter): T {
+function applyInvitationStatusFilter<T>(query: T, status: InvitationStatusFilter, paidInvitationIds: string[] = []): T {
     type Builder = {
         eq: (column: string, value: string) => Builder;
         neq: (column: string, value: string) => Builder;
+        not: (column: string, operator: string, value: string) => Builder;
         or: (filters: string) => Builder;
     };
     const builder = query as unknown as Builder;
 
-    if (status === "draft") return builder.eq("status", "draft") as T;
+    if (status === "draft") {
+        let draftQuery = builder
+            .eq("status", "draft")
+            .neq("payment_status", "paid")
+            .neq("lifecycle_status", "unpublished")
+            .neq("event_status", "unpublished");
+
+        if (paidInvitationIds.length) {
+            draftQuery = draftQuery.not("id", "in", `(${paidInvitationIds.join(",")})`);
+        }
+        return draftQuery as T;
+    }
     if (status === "completed") return builder.or("lifecycle_status.eq.completed,event_status.eq.completed,completed_at.not.is.null") as T;
-    if (status === "offline") return builder.neq("status", "published").neq("status", "draft") as T;
+    if (status === "offline") {
+        return builder.or(
+            [
+                paidInvitationIds.length
+                    ? `and(id.in.(${paidInvitationIds.join(",")}),first_published_at.is.null,status.eq.draft)`
+                    : "",
+                "and(payment_status.eq.paid,first_published_at.is.null,status.eq.draft)",
+                "lifecycle_status.eq.unpublished",
+                "event_status.eq.unpublished",
+                "and(status.neq.published,status.neq.draft)",
+            ].filter(Boolean).join(",")
+        ) as T;
+    }
     if (status === "upcoming") return builder.eq("status", "published").or("lifecycle_status.eq.published,event_status.eq.published") as T;
     return query;
 }
@@ -200,7 +239,7 @@ function applyCursor<T>(
     );
 }
 
-async function getInvitationCounts(userId: string, search: string) {
+async function getInvitationCounts(userId: string, search: string, paidInvitationIds: string[]) {
     const supabase = await createClient();
     const statuses: InvitationStatusFilter[] = ["all", "upcoming", "completed", "draft", "offline"];
     const entries = await Promise.all(statuses.map(async (status) => {
@@ -209,7 +248,7 @@ async function getInvitationCounts(userId: string, search: string) {
             .select("id", { count: "exact", head: true })
             .eq("user_id", userId);
         query = applyInvitationSearch(query, search);
-        query = applyInvitationStatusFilter(query, status);
+        query = applyInvitationStatusFilter(query, status, paidInvitationIds);
         const { count } = await query;
         return [status, count || 0] as const;
     }));
@@ -235,6 +274,32 @@ async function getInvitationStats(invitationIds: string[]) {
     ]));
 }
 
+async function getPaidInvitationIds(userId: string, invitationIds: string[]) {
+    if (!invitationIds.length) return new Set<string>();
+
+    const supabase = await createClient();
+    const { data } = await supabase
+        .from("payments")
+        .select("invitation_id")
+        .eq("user_id", userId)
+        .eq("status", "paid")
+        .in("invitation_id", invitationIds);
+
+    return new Set((data || []).map((row) => row.invitation_id).filter(Boolean));
+}
+
+async function getPaidInvitationIdsForUser(userId: string) {
+    const supabase = await createClient();
+    const { data } = await supabase
+        .from("payments")
+        .select("invitation_id")
+        .eq("user_id", userId)
+        .eq("status", "paid")
+        .not("invitation_id", "is", null);
+
+    return Array.from(new Set((data || []).map((row) => row.invitation_id).filter(Boolean)));
+}
+
 function encodeCursor(cursor: { value: string; id: string }) {
     return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
@@ -251,6 +316,10 @@ function decodeCursor(value: string | null): { value: string; id: string } | nul
     } catch {
         return null;
     }
+}
+
+function isUniqueSlugViolation(error: { code?: string; message?: string } | null) {
+    return error?.code === "23505" && (error.message || "").toLowerCase().includes("slug");
 }
 
 function escapeLike(value: string) {

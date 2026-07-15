@@ -1,8 +1,20 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { isInvitationCompleted } from "@/lib/lifecycle";
-import { isSlugAvailable } from "@/features/invitations/slug";
+import {
+    buildInvitationSlug,
+    getInvitationReadableName,
+    isSlugAvailable,
+    slugifyInvitationText,
+} from "@/features/invitations/slug";
 import { assessChangeRisk, EventIdentitySnapshot, generateEventFingerprint } from "@/features/invitations/abuse";
+
+type PublishedInvitationRow = {
+    id: string;
+    slug: string;
+    status: string;
+    published_at: string | null;
+};
 
 export async function publishInvitationAfterPayment({
     userId,
@@ -47,6 +59,15 @@ export async function publishInvitationAfterPayment({
         throw new Error("Invitation is completed and locked.");
     }
 
+    if (invite.status === "published" && invite.first_published_at) {
+        return {
+            slug: invite.slug,
+            status: invite.status,
+            publishedAt: invite.published_at,
+            publicUrl: getPublicInvitationUrl(invite.slug),
+        };
+    }
+
     // 2. Validate mandatory fields
     if (!invite.title?.trim()) {
         throw new Error("Title is required to publish");
@@ -62,6 +83,18 @@ export async function publishInvitationAfterPayment({
     }
     if (!invite.venue_name?.trim()) {
         throw new Error("Venue name is required to publish");
+    }
+    if (!invite.phone?.trim()) {
+        throw new Error("Primary phone is required to publish");
+    }
+    if (invite.phone.length !== 10) {
+        throw new Error("Primary phone must be 10 digits");
+    }
+    if (!invite.secondary_phone?.trim()) {
+        throw new Error("Secondary phone is required to publish");
+    }
+    if (invite.secondary_phone.length !== 10) {
+        throw new Error("Secondary phone must be 10 digits");
     }
     if (!invite.message?.trim()) {
         throw new Error("Invitation message is required to publish");
@@ -99,22 +132,23 @@ export async function publishInvitationAfterPayment({
         firstPaymentId = firstPaymentId || payment.id;
     }
 
-    // 4. Handle slug validation & preservation
-    let finalSlug = invite.slug;
-    const cleanSlug = customSlug?.toLowerCase().trim();
-    if (cleanSlug && cleanSlug !== invite.slug) {
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug) || cleanSlug.length < 3 || cleanSlug.length > 80) {
-            throw new Error("Invalid slug format");
-        }
+    const hasPublishedIdentity = Boolean(invite.first_published_at);
+    const readableSlugOverride = getReadableSlugOverride(customSlug, invite.slug);
+    let finalSlug = hasPublishedIdentity
+        ? invite.slug
+        : buildInvitationSlug(readableSlugOverride || getInvitationReadableName(invite), invitationId);
 
-        const isAvailable = await isSlugAvailable(cleanSlug, invitationId);
+    if (!hasPublishedIdentity) {
+        const isAvailable = await isSlugAvailable(finalSlug, invitationId);
         if (!isAvailable) {
-            throw new Error("The customized link is already taken");
+            finalSlug = buildInvitationSlug(readableSlugOverride || getInvitationReadableName(invite), invitationId, 80, 12);
+            const fallbackAvailable = await isSlugAvailable(finalSlug, invitationId);
+            if (!fallbackAvailable) {
+                throw new Error("SLUG_GENERATION_FAILED");
+            }
         }
-        finalSlug = cleanSlug;
     }
 
-    const hasPublishedIdentity = Boolean(invite.first_published_at);
     const firstPublishedAt = invite.first_published_at || new Date().toISOString();
     const originalCategory = hasPublishedIdentity ? invite.original_category || invite.category : invite.category;
     const originalPrimaryName = hasPublishedIdentity ? invite.original_primary_name || invite.primary_name : invite.primary_name;
@@ -187,22 +221,38 @@ export async function publishInvitationAfterPayment({
         updated_at: new Date().toISOString(),
     };
 
-    let { data: updatedInvite, error: updateError } = await supabase
-        .from("invitations")
-        .update(publishUpdate)
-        .eq("id", invitationId)
-        .select("id, slug, status, published_at")
-        .single();
+    let updatedInvite = null as PublishedInvitationRow | null;
+    let updateError = null as { code?: string; message?: string } | null;
 
-    if (isSchemaCacheColumnError(updateError)) {
-        const retry = await supabase
-            .from("invitations")
-            .update(stripNewEntitlementColumns(publishUpdate))
-            .eq("id", invitationId)
-            .select("id, slug, status, published_at")
-            .single();
-        updatedInvite = retry.data;
-        updateError = retry.error;
+    const retrySuffixLengths = hasPublishedIdentity ? [8] : [8, 12, 16, 32];
+    for (const suffixLength of retrySuffixLengths) {
+        if (!hasPublishedIdentity && suffixLength !== 8) {
+            finalSlug = buildInvitationSlug(readableSlugOverride || getInvitationReadableName(invite), invitationId, 80, suffixLength);
+            publishUpdate.slug = finalSlug;
+        }
+
+        const updateResult = await supabase.rpc("publish_invitation_with_identity_check", {
+            p_invitation_id: invitationId,
+            p_user_id: userId,
+            p_patch: publishUpdate,
+        });
+        updatedInvite = updateResult.data as PublishedInvitationRow | null;
+        updateError = updateResult.error;
+
+        if (isSchemaCacheColumnError(updateError)) {
+            const retry = await supabase
+                .from("invitations")
+                .update(stripNewEntitlementColumns(publishUpdate))
+                .eq("id", invitationId)
+                .select("id, slug, status, published_at")
+                .single();
+            updatedInvite = retry.data;
+            updateError = retry.error;
+        }
+
+        if (!isUniqueSlugViolation(updateError)) {
+            break;
+        }
     }
 
     if (updateError || !updatedInvite) {
@@ -219,6 +269,21 @@ export async function publishInvitationAfterPayment({
 
 function isSchemaCacheColumnError(error: { code?: string; message?: string } | null) {
     return error?.code === "PGRST204" || !!error?.message?.includes("schema cache");
+}
+
+function isUniqueSlugViolation(error: { code?: string; message?: string } | null) {
+    return error?.code === "23505" && (error.message || "").toLowerCase().includes("slug");
+}
+
+function getReadableSlugOverride(customSlug: string | undefined, existingSlug: string | null | undefined) {
+    const cleanSlug = customSlug?.toLowerCase().trim();
+    if (!cleanSlug || cleanSlug === existingSlug) return "";
+
+    const readableSlug = slugifyInvitationText(cleanSlug);
+    if (!readableSlug) {
+        throw new Error("Invalid slug format");
+    }
+    return readableSlug;
 }
 
 function stripNewEntitlementColumns<T extends Record<string, unknown>>(value: T) {

@@ -23,6 +23,7 @@ export function createDefaultInvitation(): InvitationData {
         mapLink: "https://www.google.com/maps/search/?api=1&query=The+Rose+Garden+Hall+MG+Road+Kochi",
 
         phone: "9000000000",
+        secondaryPhone: "9000000001",
         message: "Invite you to celebrate our wedding",
 
         musicUrl: "",

@@ -41,6 +41,7 @@ import { useSWRConfig } from "swr";
 import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 
 interface DashboardData {
     profile: {
@@ -60,6 +61,7 @@ interface DashboardData {
 interface ProfileInvitationsListProps {
     initialInvitations?: InvitationData[];
     invitationStats?: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
+    showAuthModalOnUnauthorized?: boolean;
 }
 
 type InvitationsPageResponse = {
@@ -74,6 +76,7 @@ type InvitationsPageResponse = {
 export default function ProfileInvitationsList({
     initialInvitations = [],
     invitationStats = {},
+    showAuthModalOnUnauthorized = true,
 }: ProfileInvitationsListProps) {
     const {
         invitationsSearch: searchTerm,
@@ -83,6 +86,7 @@ export default function ProfileInvitationsList({
     } = useNavigationState();
 
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
+    const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const {
         data,
         error,
@@ -103,23 +107,30 @@ export default function ProfileInvitationsList({
     }, null, {
         suspense: false,
         revalidateFirstPage: false,
+        onSuccess: (invitationPages) => {
+            const nextCounts = invitationPages?.[0]?.counts;
+            if (nextCounts) setCachedCounts(nextCounts);
+        },
     });
 
     const pages = data || [];
     const invitations = pages.flatMap((page) => page.items);
     const firstPage = pages[0];
-    const counts = firstPage?.counts || {
+    const fallbackCounts = {
         all: initialInvitations.length,
         upcoming: 0,
         completed: 0,
         draft: 0,
         offline: 0,
     };
+    const latestCounts = firstPage?.counts;
+    const counts = latestCounts || cachedCounts || fallbackCounts;
     const mergedStats = pages.reduce((acc, page) => ({ ...acc, ...page.stats }), invitationStats);
     const hasMore = Boolean(pages[pages.length - 1]?.hasMore);
     const shouldShowEndState = pages.length > 1 && !hasMore;
     const isSearching = searchTerm !== debouncedSearch;
     const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
+    const isLoadingInitialTabs = isLoading && !pages.length && !cachedCounts;
     const isLoadingNextPage = isValidating && pages.length > 0;
     const hasActiveFilters = Boolean(searchTerm) || statusFilter !== "all";
     const statusLabels: Record<string, string> = {
@@ -137,6 +148,7 @@ export default function ProfileInvitationsList({
         disabled: !hasMore || isLoadingNextPage,
         onLoadMore: () => setSize((current) => current + 1),
     });
+    const isUnauthorized = error?.status === 401;
 
     useEffect(() => {
         if (window.location.pathname !== "/invitations") return;
@@ -148,6 +160,19 @@ export default function ProfileInvitationsList({
         const nextUrl = params.toString() ? `/invitations?${params.toString()}` : "/invitations";
         window.history.replaceState(null, "", nextUrl);
     }, [debouncedSearch, statusFilter]);
+
+    useEffect(() => {
+        void mutate();
+    }, [mutate]);
+
+    if (isUnauthorized && showAuthModalOnUnauthorized) {
+        return (
+            <>
+                <AuthRequiredModal next="/invitations" forceOpen />
+                <InvitationListSkeleton />
+            </>
+        );
+    }
 
     const handleClearSearch = () => setSearchTerm("");
     const handleResetAll = () => {
@@ -187,34 +212,47 @@ export default function ProfileInvitationsList({
 
             <div className="profileInvitationsContainer">
                 <nav className="profileFilterTabs" aria-label="Invitation filters">
-                    <button
-                        type="button"
-                        className={`filterTabBtn ${statusFilter === "all" ? "active" : ""}`}
-                        onClick={() => setStatusFilter("all")}
-                    >
-                        All <span>{counts.all || 0}</span>
-                    </button>
-                    <button
-                        type="button"
-                        className={`filterTabBtn ${statusFilter === "upcoming" ? "active" : ""}`}
-                        onClick={() => setStatusFilter("upcoming")}
-                    >
-                        Upcoming <span className="pub">{counts.upcoming || 0}</span>
-                    </button>
-                    <button
-                        type="button"
-                        className={`filterTabBtn ${statusFilter === "completed" ? "active" : ""}`}
-                        onClick={() => setStatusFilter("completed")}
-                    >
-                        Completed <span>{counts.completed || 0}</span>
-                    </button>
-                    <button
-                        type="button"
-                        className={`filterTabBtn ${statusFilter === "draft" ? "active" : ""}`}
-                        onClick={() => setStatusFilter("draft")}
-                    >
-                        Drafts <span className="drf">{counts.draft || 0}</span>
-                    </button>
+                    {isLoadingInitialTabs ? (
+                        <InvitationTabsSkeleton />
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                className={`filterTabBtn ${statusFilter === "all" ? "active" : ""}`}
+                                onClick={() => setStatusFilter("all")}
+                            >
+                                All <span>{counts.all || 0}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`filterTabBtn ${statusFilter === "upcoming" ? "active" : ""}`}
+                                onClick={() => setStatusFilter("upcoming")}
+                            >
+                                Upcoming <span className="pub">{counts.upcoming || 0}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`filterTabBtn ${statusFilter === "completed" ? "active" : ""}`}
+                                onClick={() => setStatusFilter("completed")}
+                            >
+                                Completed <span>{counts.completed || 0}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`filterTabBtn ${statusFilter === "draft" ? "active" : ""}`}
+                                onClick={() => setStatusFilter("draft")}
+                            >
+                                Drafts <span className="drf">{counts.draft || 0}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`filterTabBtn ${statusFilter === "offline" ? "active" : ""}`}
+                                onClick={() => setStatusFilter("offline")}
+                            >
+                                Offline <span>{counts.offline || 0}</span>
+                            </button>
+                        </>
+                    )}
                 </nav>
 
             {isLoadingFirstPage ? (
@@ -226,6 +264,15 @@ export default function ProfileInvitationsList({
                             invitation={invitation}
                             key={invitation.id}
                             stats={mergedStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
+                            onInvitationDeleted={(deletedInvitation) => {
+                                mutate((currentPages) => removeInvitationFromPages(currentPages, deletedInvitation), { revalidate: false });
+                            }}
+                            onInvitationUpdated={(updatedInvitation, previousInvitation) => {
+                                mutate(
+                                    (currentPages) => updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, statusFilter),
+                                    { revalidate: false }
+                                );
+                            }}
                         />
                     ))}
                     {isLoadingNextPage ? <InvitationAppendSkeleton /> : null}
@@ -271,6 +318,95 @@ function InvitationListSkeleton() {
     );
 }
 
+function InvitationTabsSkeleton() {
+    return (
+        <>
+            <ButtonSkeleton className="filterTabBtn" width={70} height={36} />
+            <ButtonSkeleton className="filterTabBtn" width={112} height={36} />
+            <ButtonSkeleton className="filterTabBtn" width={120} height={36} />
+            <ButtonSkeleton className="filterTabBtn" width={92} height={36} />
+            <ButtonSkeleton className="filterTabBtn" width={94} height={36} />
+        </>
+    );
+}
+
+function removeInvitationFromPages(
+    pages: InvitationsPageResponse[] | undefined,
+    invitation: InvitationData
+) {
+    if (!pages) return pages;
+    const bucket = getInvitationFilterBucket(invitation);
+    return pages.map((page) => ({
+        ...page,
+        items: page.items.filter((item) => item.id !== invitation.id),
+        totalCount: Math.max(0, page.totalCount - 1),
+        counts: adjustInvitationCounts(page.counts, bucket, null),
+        stats: omitInvitationStat(page.stats, invitation.id),
+    }));
+}
+
+function updateInvitationInPages(
+    pages: InvitationsPageResponse[] | undefined,
+    updatedInvitation: InvitationData,
+    previousInvitation: InvitationData,
+    activeFilter: string
+) {
+    if (!pages) return pages;
+    const previousBucket = getInvitationFilterBucket(previousInvitation);
+    const nextBucket = getInvitationFilterBucket(updatedInvitation);
+    const shouldKeepInCurrentFilter = isInvitationVisibleInFilter(updatedInvitation, activeFilter);
+
+    return pages.map((page) => ({
+        ...page,
+        items: page.items
+            .map((item) => item.id === updatedInvitation.id ? updatedInvitation : item)
+            .filter((item) => item.id !== updatedInvitation.id || shouldKeepInCurrentFilter),
+        totalCount: page.totalCount + (shouldKeepInCurrentFilter ? 0 : -1),
+        counts: adjustInvitationCounts(page.counts, previousBucket, nextBucket),
+    }));
+}
+
+function getInvitationFilterBucket(invitation: InvitationData) {
+    const lifecycleStatus = getVisibleLifecycleStatus(invitation);
+    if (lifecycleStatus === "draft") return "draft";
+    if (lifecycleStatus === "offline") return "offline";
+    if (lifecycleStatus === "completed") return "completed";
+    return "upcoming";
+}
+
+function getVisibleLifecycleStatus(invitation: InvitationData): DashboardLifecycleStatus {
+    const isPaidPublishFailed = invitation.paymentStatus === "paid" &&
+        !invitation.firstPublishedAt &&
+        invitation.status !== "published";
+    return isPaidPublishFailed ? "offline" : getInvitationLifecycleStatus(invitation);
+}
+
+function isInvitationVisibleInFilter(invitation: InvitationData, activeFilter: string) {
+    if (activeFilter === "all") return true;
+    return getInvitationFilterBucket(invitation) === activeFilter;
+}
+
+function adjustInvitationCounts(
+    counts: Record<string, number>,
+    previousBucket: string | null,
+    nextBucket: string | null
+) {
+    const nextCounts = { ...counts };
+    if (previousBucket) nextCounts[previousBucket] = Math.max(0, (nextCounts[previousBucket] || 0) - 1);
+    if (nextBucket) nextCounts[nextBucket] = (nextCounts[nextBucket] || 0) + 1;
+    if (!nextBucket) nextCounts.all = Math.max(0, (nextCounts.all || 0) - 1);
+    return nextCounts;
+}
+
+function omitInvitationStat(
+    stats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>,
+    invitationId: string
+) {
+    const nextStats = { ...stats };
+    delete nextStats[invitationId];
+    return nextStats;
+}
+
 function InvitationAppendSkeleton() {
     return (
         <>
@@ -311,9 +447,13 @@ function InvitationSkeletonCard() {
 
 function InvitationRow({
     invitation,
+    onInvitationDeleted,
+    onInvitationUpdated,
 }: {
     invitation: InvitationData;
     stats: { rsvps: number; views: number; acceptsRsvps?: boolean };
+    onInvitationDeleted: (invitation: InvitationData) => void;
+    onInvitationUpdated: (updatedInvitation: InvitationData, previousInvitation: InvitationData) => void;
 }) {
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -331,7 +471,10 @@ function InvitationRow({
     const { mutate } = useSWRConfig();
     const refreshInvitationLists = () => mutate((key) => typeof key === "string" && key.startsWith("/api/invitations"));
 
-    const lifecycleStatus = getInvitationLifecycleStatus(invitation);
+    const isPaidPublishFailed = invitation.paymentStatus === "paid" &&
+        !invitation.firstPublishedAt &&
+        invitation.status !== "published";
+    const lifecycleStatus = isPaidPublishFailed ? "offline" : getInvitationLifecycleStatus(invitation);
     const isDraft = lifecycleStatus === "draft";
     const isUpcoming = lifecycleStatus === "upcoming";
     const isLiveToday = lifecycleStatus === "live_today";
@@ -403,6 +546,7 @@ function InvitationRow({
                 mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
+            onInvitationDeleted(invitation);
             showToast(isDraft ? "Draft deleted." : "Invitation deleted.", "success");
             mutate("/api/profile/dashboard");
             refreshInvitationLists();
@@ -456,6 +600,13 @@ function InvitationRow({
                 mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
+            onInvitationUpdated({
+                ...invitation,
+                status: "draft",
+                lifecycleStatus: "unpublished",
+                eventStatus: "unpublished",
+                updatedAt: new Date().toISOString(),
+            }, invitation);
             showToast("Invitation taken offline.", "success");
             mutate("/api/profile/dashboard");
             refreshInvitationLists();
@@ -469,6 +620,7 @@ function InvitationRow({
     }
 
     function handleMakeOnlineClick() {
+        setIsMoreOpen(false);
         setIsOnlineOpen(true);
     }
 
@@ -508,6 +660,17 @@ function InvitationRow({
                 mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
+            onInvitationUpdated({
+                ...invitation,
+                slug: result.slug || invitation.slug,
+                status: "published",
+                lifecycleStatus: "published",
+                eventStatus: "published",
+                paymentStatus: "paid",
+                publishedAt: result.published_at || invitation.publishedAt || new Date().toISOString(),
+                firstPublishedAt: invitation.firstPublishedAt || result.published_at || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            }, invitation);
             showToast("Invitation is online again.", "success");
             mutate("/api/profile/dashboard");
             refreshInvitationLists();
@@ -545,7 +708,9 @@ function InvitationRow({
 
                     <h3>{getDisplayNames(invitation)}</h3>
                     <p className="inviteMessage">
-                        {getDashboardInviteSummary(lifecycleStatus)}
+                        {isPaidPublishFailed
+                            ? "Paid, but publish did not complete. Edit and publish again."
+                            : getDashboardInviteSummary(lifecycleStatus)}
                     </p>
 
                     <div className="profileInviteMeta">
@@ -587,12 +752,16 @@ function InvitationRow({
                 <div className="profilePublicLinkWrap profilePublicLinkWrap--empty">
                     <span className="profilePublicLinkPlaceholder">
                         <Lock size={14} aria-hidden="true" />
-                        {isOffline ? "Offline. Public link disabled." : "Not published yet. Preview or edit to continue."}
+                        {isOffline
+                            ? isPaidPublishFailed
+                                ? "Paid, but not live yet. Edit and publish again."
+                                : "Offline. Public link disabled."
+                            : "Not published yet. Preview or edit to continue."}
                     </span>
                 </div>
             ) : null}
 
-            <div className={`profileInviteActions ${isCompleted ? "profileInviteActions--two" : isOffline ? "profileInviteActions--four" : isUpcoming || isLiveToday ? "profileInviteActions--published" : ""}`}>
+            <div className={`profileInviteActions ${isCompleted ? "profileInviteActions--two" : isOffline && hasAnalyticsAccess ? "profileInviteActions--published" : isUpcoming || isLiveToday ? "profileInviteActions--published" : ""}`}>
                 {isDraft ? (
                     <>
                         <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
@@ -659,19 +828,53 @@ function InvitationRow({
                                 <span>Analytics</span>
                             </Link>
                         ) : null}
-                        <button
-                            type="button"
-                            className="profileActionBtn profileActionBtn--online"
-                            onClick={handleMakeOnlineClick}
-                            disabled={isMakingOnline}
-                        >
-                            {isMakingOnline ? (
-                                <Loader2 size={14} className="spinner" aria-hidden="true" />
-                            ) : (
-                                <Wifi size={14} aria-hidden="true" />
-                            )}
-                            <span>Go Live</span>
-                        </button>
+                        {hasAnalyticsAccess ? (
+                            <div className="profileActionOverflow" ref={moreMenuRef}>
+                                <button
+                                    type="button"
+                                    className="profileActionBtn profileActionBtn--more"
+                                    onClick={() => setIsMoreOpen((open) => !open)}
+                                    aria-label={`More actions for ${invitation.title}`}
+                                    aria-haspopup="menu"
+                                    aria-expanded={isMoreOpen}
+                                >
+                                    <MoreVertical size={15} aria-hidden="true" />
+                                </button>
+                                {isMoreOpen ? (
+                                    <div className="profileActionMenu" role="menu" aria-label={`More actions for ${invitation.title}`}>
+                                        <button
+                                            ref={moreMenuFirstItemRef}
+                                            type="button"
+                                            className="profileActionMenuItem profileActionMenuItem--online"
+                                            onClick={handleMakeOnlineClick}
+                                            disabled={isMakingOnline}
+                                            role="menuitem"
+                                        >
+                                            {isMakingOnline ? (
+                                                <Loader2 size={14} className="spinner" aria-hidden="true" />
+                                            ) : (
+                                                <Wifi size={14} aria-hidden="true" />
+                                            )}
+                                            <span>Go Live</span>
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                className="profileActionBtn profileActionBtn--online"
+                                onClick={handleMakeOnlineClick}
+                                disabled={isMakingOnline}
+                            >
+                                {isMakingOnline ? (
+                                    <Loader2 size={14} className="spinner" aria-hidden="true" />
+                                ) : (
+                                    <Wifi size={14} aria-hidden="true" />
+                                )}
+                                <span>Go Live</span>
+                            </button>
+                        )}
                         {/* Keep for future use:
                         {!isSample && (
                             <button

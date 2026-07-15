@@ -29,19 +29,8 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
 
     const handleLogoutConfirm = async () => {
         setIsPending(true);
-        try {
-            showToast("Signing out...", "info");
-            await signOut();
-        } catch (error) {
-            // Note: redirect() throws a Next.js NEXT_REDIRECT error, which is caught here.
-            // We ignore NEXT_REDIRECT since it means the action succeeded and is navigating the user.
-            if (error instanceof Error && !error.message.includes("NEXT_REDIRECT")) {
-                showToast("Failed to sign out. Please try again.", "error");
-            }
-        } finally {
-            setIsPending(false);
-            setIsConfirmOpen(false);
-        }
+        showToast("Signing out...", "info");
+        await signOut();
     };
 
     return (

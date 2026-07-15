@@ -152,6 +152,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Failed to record transaction status" }, { status: 500 });
         }
 
+        const { error: markInvitationPaidError } = await supabaseAdmin
+            .from("invitations")
+            .update({
+                payment_status: "paid",
+                first_payment_id: localPayment.id,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", invitationId)
+            .eq("user_id", user.id);
+
+        if (markInvitationPaidError) {
+            console.error("Payment was recorded but invitation entitlement was not updated:", markInvitationPaidError);
+        }
+
         // 9. Call atomic publishing service
         try {
             const publishResult = await publishInvitationAfterPayment({
@@ -171,7 +185,7 @@ export async function POST(request: Request) {
             return NextResponse.json({
                 status: "paymentPaidPublishFailed",
                 error: "Payment completed, but publishing is not ready yet.",
-                message: "Your payment was verified. However, we could not launch your invitation (e.g. customized link is taken). Please edit your public link and click Publish Now to retry.",
+                message: "Your payment was verified. However, we could not launch your invitation yet. Please click Publish Now to retry.",
             });
         }
     } catch (err: unknown) {

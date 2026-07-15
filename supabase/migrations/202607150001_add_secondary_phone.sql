@@ -1,6 +1,10 @@
--- Fix PostgREST RPC signature and typed JSONB patch handling.
+alter table public.invitations
+  add column if not exists secondary_phone text;
 
-drop function if exists public.update_invitation_with_identity_check(uuid, uuid, jsonb);
+update public.invitations
+set secondary_phone = '9000000001'
+where nullif(secondary_phone, '') is null
+  and not public.vilique_is_completed_invitation(invitations);
 
 create or replace function public.update_invitation_with_identity_check(
   p_invitation_id uuid,
@@ -31,6 +35,14 @@ begin
     raise exception 'Invitation not found.' using errcode = 'P0002';
   end if;
 
+  if public.vilique_is_completed_invitation(invite) then
+    return jsonb_build_object(
+      'locked', true,
+      'code', 'INVITATION_COMPLETED_LOCKED',
+      'error', 'This invitation is completed and can no longer be edited.'
+    );
+  end if;
+
   snapshot := coalesce(invite.event_snapshot, invite.identity_snapshot);
 
   if invite.first_published_at is not null then
@@ -48,6 +60,16 @@ begin
     end if;
     if btrim(coalesce(p_patch->>'venueName', invite.venue_name, '')) = '' then
       required_errors := required_errors || jsonb_build_object('venueName', 'Enter the venue name before updating.');
+    end if;
+    if btrim(coalesce(p_patch->>'phone', invite.phone, '')) = '' then
+      required_errors := required_errors || jsonb_build_object('phone', 'Enter the primary phone number before updating.');
+    elsif length(coalesce(p_patch->>'phone', invite.phone)) <> 10 then
+      required_errors := required_errors || jsonb_build_object('phone', 'Primary phone number must be 10 digits.');
+    end if;
+    if btrim(coalesce(p_patch->>'secondaryPhone', invite.secondary_phone, '')) = '' then
+      required_errors := required_errors || jsonb_build_object('secondaryPhone', 'Enter the secondary phone number before updating.');
+    elsif length(coalesce(p_patch->>'secondaryPhone', invite.secondary_phone)) <> 10 then
+      required_errors := required_errors || jsonb_build_object('secondaryPhone', 'Secondary phone number must be 10 digits.');
     end if;
     if btrim(coalesce(p_patch->>'message', invite.message, '')) = '' then
       required_errors := required_errors || jsonb_build_object('message', 'Enter an invitation message before updating.');
@@ -87,7 +109,6 @@ begin
       gallery_urls = case when p_patch ? 'galleryUrls' then coalesce(p_patch->'galleryUrls', '[]'::jsonb) else gallery_urls end,
       theme = case when p_patch ? 'theme' then coalesce(p_patch->'theme', '{}'::jsonb) else theme end,
       sections = case when p_patch ? 'sections' then coalesce(p_patch->'sections', '{}'::jsonb) else sections end,
-      lifecycle_status = case when p_patch ? 'lifecycleStatus' then p_patch->>'lifecycleStatus' else lifecycle_status end,
       event_timezone = case when p_patch ? 'eventTimezone' then p_patch->>'eventTimezone' else event_timezone end,
       updated_at = now()
     where id = p_invitation_id
@@ -172,16 +193,6 @@ begin
     concat(risk->>'reason', case when jsonb_array_length(risk->'signals') > 0 then concat(' Signals: ', risk->>'signals') else '' end)
   );
 
-  if risk->>'decision' = 'blocked' then
-    return jsonb_build_object(
-      'blocked', true,
-      'code', 'EVENT_IDENTITY_CHANGED',
-      'riskLevel', risk->>'riskLevel',
-      'score', coalesce((risk->>'score')::integer, 0),
-      'reason', risk->>'reason'
-    );
-  end if;
-
   perform set_config('app.identity_checked', 'on', true);
 
   update public.invitations
@@ -205,7 +216,6 @@ begin
     gallery_urls = case when p_patch ? 'galleryUrls' then coalesce(p_patch->'galleryUrls', '[]'::jsonb) else gallery_urls end,
     theme = case when p_patch ? 'theme' then coalesce(p_patch->'theme', '{}'::jsonb) else theme end,
     sections = case when p_patch ? 'sections' then coalesce(p_patch->'sections', '{}'::jsonb) else sections end,
-    lifecycle_status = case when p_patch ? 'lifecycleStatus' then p_patch->>'lifecycleStatus' else lifecycle_status end,
     event_timezone = case when p_patch ? 'eventTimezone' then p_patch->>'eventTimezone' else event_timezone end,
     change_risk_status = risk->>'riskLevel',
     event_change_score = coalesce((risk->>'score')::integer, 0),

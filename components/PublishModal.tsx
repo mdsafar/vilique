@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket, CreditCard, ShieldCheck } from "lucide-react";
+import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket, LockKeyhole, ShieldCheck, PartyPopper } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { getPublicInvitationUrl } from "@/lib/config/site";
@@ -221,6 +221,10 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
     if (!invitation.primaryName?.trim()) validationErrors.push("Host/Couple name is required");
     if (!invitation.eventDate) validationErrors.push("Event date is required");
     if (!invitation.venueName?.trim()) validationErrors.push("Venue name is required");
+    if (!invitation.phone?.trim()) validationErrors.push("Primary phone is required");
+    else if (invitation.phone.length !== 10) validationErrors.push("Primary phone must be 10 digits");
+    if (!invitation.secondaryPhone?.trim()) validationErrors.push("Secondary phone is required");
+    else if (invitation.secondaryPhone.length !== 10) validationErrors.push("Secondary phone must be 10 digits");
     if (!invitation.message?.trim()) validationErrors.push("Invitation message is required");
 
     const hasValidationErrors = validationErrors.length > 0;
@@ -251,7 +255,10 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             const orderRes = await fetch("/api/payments/razorpay/order", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ invitationId: invitation.id }),
+                body: JSON.stringify({
+                    invitationId: invitation.id,
+                    slug: slug.toLowerCase().trim(),
+                }),
             });
 
             const orderData = await orderRes.json();
@@ -495,13 +502,18 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                     >
                         {/* Header */}
                         <div className="publishModalBanner">
-                            <div>
-                                <h2 className="publishModalBannerTitle">
-                                    {isPublished ? "🎉 Invitation is Live!" : "Publish Invitation"}
-                                </h2>
-                                <p className="publishModalBannerSub">
-                                    {isPublished ? "Share your link with guests!" : "Review your details and go live."}
-                                </p>
+                            <div className="publishModalBannerCopy">
+                                <span className="publishModalHeaderIcon" aria-hidden="true">
+                                    <PartyPopper size={26} />
+                                </span>
+                                <div>
+                                    <h2 className="publishModalBannerTitle">
+                                        {isPublished ? "Invitation is Live!" : "Publish Invitation"}
+                                    </h2>
+                                    <p className="publishModalBannerSub">
+                                        {isPublished ? "Share your link with guests!" : "Review your details and go live."}
+                                    </p>
+                                </div>
                             </div>
                             <button className="publishModalClose" onClick={onClose} aria-label="Close" disabled={isBusy}>
                                 <X size={18} />
@@ -561,15 +573,22 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                         <div className="premiumPricingLabel">
                                                             <span className="priceLabelText">Publishing Price</span>
                                                             <strong className="priceValText">{formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}</strong>
+                                                            <span className="paymentAssurancePill">
+                                                                <ShieldCheck size={15} />
+                                                                One-time payment · No hidden charges
+                                                            </span>
                                                         </div>
-                                                        <span className="premiumBadge">Lifetime Access</span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {!paymentInfo.isFree && !paymentInfo.alreadyPaid && (
                                                 <div className="includedFeaturesList">
-                                                    <p className="featuresTitle">Included with Premium</p>
+                                                    <div className="featuresTitleRow">
+                                                        <p className="featuresTitle">Included with Premium</p>
+                                                        <span />
+                                                        <i aria-hidden="true" />
+                                                    </div>
                                                     <ul>
                                                         <li>
                                                             <span className="checkIconWrapper">
@@ -646,11 +665,17 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                     <><Loader2 size={16} className="spinner" /> Verifying Payment…</>
                                                 )}
                                                 {paymentProcessingState === "idle" && (
-                                                    <><CreditCard size={16} /> {paymentInfo ? `Pay ${formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}` : "Pay"} & Publish</>
+                                                    <><LockKeyhole size={16} /> {paymentInfo ? `Pay ${formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}` : "Pay"} & Publish</>
                                                 )}
                                             </button>
                                         )}
                                     </div>
+                                    {!paymentInfo?.isFree && !paymentInfo?.alreadyPaid && (
+                                        <p className="securePaymentText">
+                                            <LockKeyhole size={13} />
+                                            Secure payment powered by Razorpay
+                                        </p>
+                                    )}
                                 </>
 							) : (
                                 <div className="publishSuccessState">

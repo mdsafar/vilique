@@ -40,7 +40,7 @@ a {
 
 .appLogo {
   display: inline-flex;
-  align-items: center;
+  align-items: start;
   gap: 0.35em;
   font-family: "Pacifico", "Brush Script MT", cursive;
   font-size: 24px;
@@ -96,7 +96,7 @@ a {
 .publicInviteSkeletonCard {
   min-height: 720px;
   justify-content: flex-start;
-  gap: 22px;
+  gap: 16px;
 }
 
 .loadingButton {
@@ -794,10 +794,10 @@ p {
 }
 
 .categoryScroller button.active {
-  background: linear-gradient(135deg, #7e5bd5, #db2777);
+  background: #ead8ff;
   border-color: transparent;
-  color: white;
-  box-shadow: 0 4px 12px rgba(126, 91, 213, 0.2);
+  color: #6f43e8;
+  box-shadow: 0 4px 12px rgba(140, 76, 243, 0.12);
 }
 
 /* Template Cards Grid */
@@ -1602,9 +1602,9 @@ p {
 }
 
 .bottomNav a.active {
-  background: #171717;
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(23, 23, 23, 0.16);
+  background: #ead8ff;
+  color: #6f43e8;
+  box-shadow: 0 10px 24px rgba(140, 76, 243, 0.12);
 }
 
 .profilePage {
@@ -1983,9 +1983,9 @@ p {
 }
 
 .profileTabList button.active {
-  background: #111827;
-  color: #ffffff;
-  box-shadow: 0 10px 20px rgba(17, 24, 39, 0.14);
+  background: #ead8ff;
+  color: #6f43e8;
+  box-shadow: 0 10px 20px rgba(140, 76, 243, 0.12);
 }
 
 .profileTabList button:focus-visible {
@@ -2033,7 +2033,7 @@ p {
 }
 
 .profileTemplateRatings .paymentsHeader p {
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .profileTemplateRatingsIcon {
@@ -3728,6 +3728,16 @@ p {
   transform: none;
 }
 
+.profileInviteActions .profileActionMenuItem--online {
+  color: #047857;
+}
+
+.profileInviteActions .profileActionMenuItem--online:hover:not(:disabled),
+.profileInviteActions .profileActionMenuItem--online:focus-visible {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
 .profileInviteActions .profileActionMenuItem:disabled {
   cursor: not-allowed;
   opacity: 0.68;
@@ -4770,7 +4780,7 @@ p {
   }
 
   .analyticsStat p {
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 
@@ -4825,9 +4835,9 @@ p {
 }
 
 .bottomNav a.active {
-  background: #171717;
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(23, 23, 23, 0.16);
+  background: #ead8ff;
+  color: #6f43e8;
+  box-shadow: 0 10px 24px rgba(140, 76, 243, 0.12);
 }
 
 .bottomNav a.bottomNavProfileLink {
@@ -4838,8 +4848,8 @@ p {
 }
 
 .bottomNav a.bottomNavProfileLink.active {
-  background: #171717;
-  box-shadow: 0 10px 24px rgba(23, 23, 23, 0.16);
+  background: #ead8ff;
+  box-shadow: 0 10px 24px rgba(140, 76, 243, 0.12);
 }
 
 .bottomNavAvatar {
@@ -5093,12 +5103,9 @@ p {
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: #fff;
-  color: #171717;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-weight: 950;
+  display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .oauthButton:disabled {
@@ -5169,7 +5176,7 @@ p {
   padding: 74px 22px 22px;
   gap: 10px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 252, 250, 0.96)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.98) 58%, rgba(251, 248, 255, 0.97) 100%),
     #fff;
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow:
@@ -5181,9 +5188,7 @@ p {
 .authInlinePanel::before {
   height: 102px;
   background:
-    radial-gradient(circle at 84% 26%, rgba(255, 255, 255, 0.28) 0 11px, transparent 12px),
-    radial-gradient(circle at 91% 18%, rgba(255, 255, 255, 0.34) 0 22px, transparent 23px),
-    linear-gradient(120deg, rgba(248, 223, 234, 0.96), rgba(232, 217, 251, 0.9));
+    linear-gradient(115deg, rgba(248, 223, 234, 0.96) 0%, rgba(238, 227, 252, 0.92) 58%, rgba(232, 217, 251, 0.9) 100%);
 }
 
 .authInlinePanel::after {
@@ -5193,9 +5198,10 @@ p {
   top: 72px;
   left: -8%;
   width: 116%;
-  height: 40px;
-  border-radius: 0 0 50% 50%;
-  background: #fff;
+  height: 36px;
+  border-radius: 0 0 42% 42%;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995), rgba(255, 255, 255, 0.96));
   transform: rotate(-2.5deg);
   pointer-events: none;
 }
@@ -5223,14 +5229,19 @@ p {
   gap: 8px;
 }
 
+.authInlinePanel .authPanelTop svg {
+  width: 16px;
+  height: 16px;
+}
+
 .authInlinePanel .authCopy {
   gap: 7px;
 }
 
 .authInlinePanel .authCopy > p:not(.eyebrow) {
   max-width: 350px;
-  font-size: 13px;
-  line-height: 1.38;
+  font-size: 12px;
+  line-height: 1.34;
 }
 
 .authInlinePanel .authCopy .eyebrow {
@@ -5253,19 +5264,26 @@ p {
 }
 
 .authInlinePanel h1 {
-  font-size: clamp(34px, 3.6vw, 46px);
+  font-size: clamp(28px, 3vw, 38px);
   letter-spacing: 0;
 }
 
 .authInlinePanel .authPanelTop span {
-  min-height: 34px;
+  min-height: 30px;
   border-radius: 999px;
-  padding: 0 12px;
+  padding: 0 10px;
   background: rgba(255, 255, 255, 0.86);
   color: #171717;
-  gap: 8px;
+  gap: 7px;
   box-shadow: 0 12px 30px rgba(42, 30, 36, 0.07);
-  font-size: 11px;
+  font-size: 9.5px;
+  line-height: 1;
+}
+
+.authInlinePanel .authPanelTop b {
+  min-width: 0;
+  font: inherit;
+  white-space: nowrap;
 }
 
 .authInlinePanel .authPanelTop span:last-child {
@@ -5277,44 +5295,81 @@ p {
   font-style: normal;
 }
 
+.authGoogleIcon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
 .authBenefitGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 0;
+  min-height: 50px;
+  border-radius: 14px;
+  padding: 4px;
+  background: rgba(250, 246, 255, 0.82);
+  border: 1px solid rgba(126, 91, 213, 0.1);
+  box-shadow:
+    0 12px 28px rgba(42, 30, 36, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .authBenefitGrid article {
-  min-height: 58px;
-  border-radius: 13px;
-  padding: 9px;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(23, 23, 23, 0.05);
-  box-shadow: 0 12px 36px rgba(42, 30, 36, 0.04);
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 10px;
+  padding: 5px 4px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   color: #655b62;
   display: grid;
+  justify-items: center;
   align-content: center;
-  gap: 5px;
+  gap: 3px;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+
+.authBenefitGrid article + article::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: rgba(126, 91, 213, 0.14);
 }
 
 .authBenefitGrid article > span {
-  width: 28px;
-  min-height: 28px;
-  border-radius: 9px;
-  background: #f2eaff;
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 8px;
+  background: rgba(242, 234, 255, 0.92);
   color: #7755c8;
   display: grid;
   place-items: center;
 }
 
 .authBenefitGrid svg {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
 }
 
 .authBenefitGrid strong {
   color: #171717;
-  font-size: 12px;
+  max-width: 100%;
+  font-size: 10.5px;
   font-weight: 950;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .authBenefitGrid p {
@@ -5339,6 +5394,14 @@ p {
   font-size: 23px;
   line-height: 1;
   cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.authCloseButton svg {
+  width: 18px;
+  height: 18px;
 }
 
 .authInlinePanel form {
@@ -5346,19 +5409,19 @@ p {
 }
 
 .authInlinePanel .oauthButton {
-  min-height: 46px;
+  min-height: 44px;
   border-radius: 14px;
-  font-size: 14px;
+  font-size: 11.5px;
+  gap: 7px;
   box-shadow:
     0 18px 42px rgba(23, 23, 23, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .authInlinePanel .googleMark {
-  width: 26px;
-  height: 26px;
+  width: 19px;
+  height: 19px;
   color: #4285f4;
-  font-size: 15px;
 }
 
 .authInlinePanel .authSwitch {
@@ -6743,8 +6806,8 @@ p {
 }
 
 .editorTabs button.active {
-  background: #171717;
-  color: white;
+  background: #ead8ff;
+  color: #6f43e8;
 }
 
 .editorForm {
@@ -7440,9 +7503,9 @@ p {
 }
 
 .previewScreenToggle button.active {
-  background: #171717;
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(23, 23, 23, 0.12);
+  background: #ead8ff;
+  color: #6f43e8;
+  box-shadow: 0 2px 6px rgba(140, 76, 243, 0.12);
 }
 
 .previewScreenToggle button:not(.active):hover {
@@ -7770,10 +7833,10 @@ p {
 }
 
 .editorTabs button.active {
-  background: #171717;
-  color: white;
+  background: #ead8ff;
+  color: #6f43e8;
   box-shadow:
-    0 8px 18px rgba(23, 23, 23, 0.22),
+    0 8px 18px rgba(140, 76, 243, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
@@ -7941,6 +8004,99 @@ p {
   flex: 0 0 auto;
 }
 
+.customPickerSheetOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.18), transparent 30%),
+    rgba(28, 22, 34, 0.42);
+  backdrop-filter: blur(7px);
+}
+
+.customPickerSheet {
+  width: min(100%, 380px);
+  max-height: min(720px, calc(100svh - 48px));
+  overflow: hidden;
+  border-radius: 24px;
+  padding: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(255, 251, 254, 0.98)),
+    rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(225, 213, 232, 0.92);
+  box-shadow:
+    0 30px 90px rgba(42, 30, 48, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.customPickerSheet--time {
+  width: min(100%, 410px);
+}
+
+.customPickerSheetHandle {
+  display: none;
+}
+
+.customPickerSheetHeader {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 14px;
+}
+
+.customPickerSheetHeader strong {
+  color: #251635;
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.customPickerSheetClose {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(244, 241, 243, 0.92);
+  color: #5e5664;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(225, 213, 232, 0.78);
+}
+
+.customPickerSheetClose:hover {
+  background: rgba(244, 241, 243, 0.92);
+  color: #5e5664;
+  box-shadow: inset 0 0 0 1px rgba(225, 213, 232, 0.78);
+  opacity: 0.82;
+}
+
+.customPickerSheet .customPickerPopover {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  transform: none !important;
+}
+
+.customPickerSheet .datePickerPopover {
+  padding-top: 2px;
+}
+
 .customPickerPopover {
   position: absolute;
   top: calc(100% + 8px);
@@ -7959,17 +8115,21 @@ p {
 }
 
 .customPickerHeader {
-  min-height: 32px;
+  min-height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(248, 246, 249, 0.84);
+  border: 1px solid rgba(225, 213, 232, 0.58);
 }
 
 .customPickerHeader strong {
   color: #251635;
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 .customPickerHeader div {
@@ -7980,8 +8140,8 @@ p {
 .customPickerHeader button,
 .customPickerFooter button {
   border: 0;
-  min-height: 30px;
-  border-radius: 6px;
+  min-height: 34px;
+  border-radius: 10px;
   background: #f4f1f3;
   color: #251635;
   display: inline-grid;
@@ -7998,7 +8158,8 @@ p {
 .datePickerGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
+  gap: 6px;
+  padding: 2px;
 }
 
 .datePickerGrid b {
@@ -8013,7 +8174,7 @@ p {
 .datePickerGrid button,
 .timePickerColumn button {
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: #251635;
   height: 32px;
@@ -8059,63 +8220,225 @@ p {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .customPickerFooter.single {
-  justify-content: flex-end;
+  justify-content: stretch;
 }
 
 .customPickerFooter button:last-child {
   background: #171717;
   color: #fff;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 13px;
 }
 
 .timePickerPopover {
-  width: 250px;
+  width: 270px;
   max-width: calc(100vw - 32px);
+  padding: 10px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 251, 254, 0.96)),
+    rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 18px 44px rgba(42, 30, 48, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset;
+}
+
+.timePickerSummary {
+  min-height: 44px;
+  border-radius: 11px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background:
+    linear-gradient(135deg, rgba(140, 76, 243, 0.09), rgba(197, 111, 180, 0.08)),
+    rgba(250, 247, 252, 0.9);
+  border: 1px solid rgba(140, 76, 243, 0.12);
+  margin-bottom: 8px;
+}
+
+.timePickerSummary span {
+  color: #7e7587;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.timePickerSummary strong {
+  color: #251635;
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .timePickerColumns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0;
+  grid-template-columns: 1fr 1fr 0.92fr;
+  gap: 6px;
 }
 
 .timePickerColGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
   align-items: stretch;
+  padding: 6px;
+  border-radius: 11px;
+  background: rgba(248, 246, 249, 0.78);
+  border: 1px solid rgba(225, 213, 232, 0.55);
 }
 
 .timePickerColGroup:not(:last-child) {
-  border-right: 1px solid rgba(225, 213, 232, 0.5);
-  padding-right: 8px;
-  margin-right: 8px;
+  margin-right: 0;
 }
 
 .timePickerColLabel {
-  font-size: 10px;
-  font-weight: 800;
-  color: #8e88a4;
+  min-height: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 900;
+  color: #766c83;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-align: center;
   user-select: none;
-  padding-bottom: 2px;
-  border-bottom: 1px solid rgba(225, 213, 232, 0.35);
 }
 
 .timePickerColumn {
-  max-height: 164px;
+  max-height: 132px;
   overflow-y: auto;
   display: grid;
   gap: 4px;
-  padding-right: 4px;
+  padding: 1px 2px 1px 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(140, 76, 243, 0.25) transparent;
+}
+
+.timePickerColumn button {
+  min-height: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.timePickerColumn button:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.timePickerColumn button:disabled,
+.timePickerColumn button.disabled {
+  color: #c9c1cb;
+  cursor: not-allowed;
+  opacity: 0.45;
+  background: transparent;
+  box-shadow: none;
+}
+
+.timePickerColumn button:disabled:hover,
+.timePickerColumn button.disabled:hover {
+  background: transparent;
+}
+
+.timePickerColumn button.selected {
+  background: linear-gradient(135deg, #8c4cf3, #c56fb4);
+  color: #fff;
+  box-shadow:
+    0 10px 22px rgba(140, 76, 243, 0.23),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.timePickerColumn button.selected:hover {
+  background: linear-gradient(135deg, #8c4cf3, #c56fb4);
+  color: #fff;
+}
+
+.timePickerColGroup:last-child .timePickerColumn {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+  align-content: start;
+}
+
+.timePickerColGroup:last-child .timePickerColumn button {
+  min-height: 36px;
+  height: 36px;
+}
+
+.timePickerPopover .customPickerFooter {
+  margin-top: 8px;
+}
+
+.timePickerPopover .customPickerFooter button {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 10px;
+}
+
+.customPickerSheet--time .timePickerSummary {
+  min-height: 50px;
+  padding: 10px 12px;
+  border-radius: 13px;
+  margin-bottom: 10px;
+}
+
+.customPickerSheet--time .timePickerSummary span {
+  font-size: 10px;
+}
+
+.customPickerSheet--time .timePickerSummary strong {
+  font-size: 18px;
+}
+
+.customPickerSheet--time .timePickerColumns {
+  gap: 8px;
+}
+
+.customPickerSheet--time .timePickerColGroup {
+  padding: 8px;
+  border-radius: 14px;
+}
+
+.customPickerSheet--time .timePickerColLabel {
+  min-height: 22px;
+  font-size: 10px;
+}
+
+.customPickerSheet--time .timePickerColumn {
+  max-height: 156px;
+  gap: 5px;
+}
+
+.customPickerSheet--time .timePickerColumn button {
+  min-height: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.customPickerSheet--time .timePickerColGroup:last-child .timePickerColumn button {
+  min-height: 44px;
+  height: 44px;
+}
+
+.customPickerSheet--time .timePickerPopover .customPickerFooter {
+  margin-top: 10px;
+}
+
+.customPickerSheet--time .timePickerPopover .customPickerFooter button {
+  min-height: 42px;
+  border-radius: 13px;
+  font-size: 14px;
 }
 
 .timePickerColumn::-webkit-scrollbar {
@@ -8136,14 +8459,146 @@ p {
 }
 
 @media (max-width: 480px) {
-  .customPickerPopover {
-    left: 50% !important;
-    right: auto !important;
-    transform: translateX(-50%) !important;
+  .customPickerSheetOverlay {
+    align-items: end;
+    justify-items: stretch;
+    padding: 0;
+  }
+
+  .customPickerSheet {
+    width: 100%;
+    max-height: calc(100svh - 44px);
+    border-radius: 24px 24px 0 0;
+    padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  .customPickerSheet--time {
+    width: 100%;
+  }
+
+  .customPickerSheetHandle {
+    display: block;
+    width: 42px;
+    height: 5px;
+    border-radius: 999px;
+    margin: 0 auto 8px;
+    background: rgba(135, 122, 148, 0.28);
+  }
+
+  .customPickerSheetHeader {
+    min-height: 52px;
+    padding-bottom: 14px;
+  }
+
+  .customPickerSheetHeader strong {
+    font-size: 21px;
+  }
+
+  .customPickerSheetClose {
+    width: 42px;
+    height: 42px;
+    min-height: 42px;
+  }
+
+  .customPickerHeader {
+    min-height: 54px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+
+  .customPickerHeader strong {
+    font-size: 16px;
+  }
+
+  .customPickerHeader button {
+    min-height: 42px;
+    min-width: 42px;
+    border-radius: 13px;
+  }
+
+  .datePickerGrid {
+    gap: 8px;
+  }
+
+  .datePickerGrid b {
+    min-height: 30px;
+    font-size: 12px;
+  }
+
+  .datePickerGrid button {
+    min-height: 38px;
+    height: 38px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  .customPickerFooter {
+    margin-top: 16px;
+  }
+
+  .customPickerFooter button:last-child {
+    min-height: 54px;
+    border-radius: 16px;
+    font-size: 16px;
+  }
+
+  .timePickerPopover {
     max-width: calc(100vw - 40px) !important;
   }
-  .timePickerPopover {
-    max-width: 250px !important;
+
+  .customPickerSheet--time .timePickerSummary {
+    min-height: 58px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border-radius: 15px;
+  }
+
+  .customPickerSheet--time .timePickerSummary span {
+    font-size: 11px;
+  }
+
+  .customPickerSheet--time .timePickerSummary strong {
+    font-size: 20px;
+  }
+
+  .customPickerSheet--time .timePickerColumns {
+    gap: 10px;
+  }
+
+  .customPickerSheet--time .timePickerColGroup {
+    padding: 9px;
+    border-radius: 15px;
+  }
+
+  .customPickerSheet--time .timePickerColLabel {
+    min-height: 26px;
+    font-size: 11px;
+  }
+
+  .customPickerSheet--time .timePickerColumn {
+    max-height: 184px;
+    gap: 6px;
+  }
+
+  .customPickerSheet--time .timePickerColumn button {
+    min-height: 42px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 15.5px;
+  }
+
+  .customPickerSheet--time .timePickerColGroup:last-child .timePickerColumn button {
+    min-height: 52px;
+    height: 52px;
+  }
+
+  .customPickerSheet--time .timePickerPopover .customPickerFooter button {
+    min-height: 54px;
+    border-radius: 16px;
+    font-size: 16px;
   }
 }
 
@@ -8235,43 +8690,79 @@ p {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.92), transparent 32%),
-    radial-gradient(circle at 85% 5%, rgba(243, 232, 255, 0.82), transparent 30%),
-    linear-gradient(135deg, #fffaf6 0%, #fae8f3 48%, #f0f7ff 100%);
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.92), transparent 28%),
+    linear-gradient(135deg, #fffaf8 0%, #faeef5 52%, #f4f8ff 100%);
 }
 
 .builderLoadingCard {
-  min-width: min(100%, 320px);
-  min-height: 112px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(225, 213, 232, 0.72);
-  box-shadow: 0 24px 70px rgba(78, 55, 70, 0.12);
-  display: inline-flex;
+  width: min(100%, 360px);
+  min-height: 108px;
+  border-radius: 18px;
+  padding: 22px 24px 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(229, 221, 235, 0.9);
+  box-shadow:
+    0 18px 50px rgba(72, 52, 76, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  display: grid;
+  grid-template-columns: 32px 1fr;
   align-items: center;
-  justify-content: center;
   gap: 14px;
   color: #251635;
+  backdrop-filter: blur(14px);
+  position: relative;
+  overflow: hidden;
 }
 
-.builderLoadingCard svg {
+.builderLoadingCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(140, 76, 243, 0.1);
+}
+
+.builderLoadingCard::after {
+  content: "";
+  position: absolute;
+  left: -40%;
+  bottom: 0;
+  width: 40%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8c4cf3, #c56fb4);
+  animation: builderLoadingBar 1.35s ease-in-out infinite;
+}
+
+.builderLoadingSpinner {
   color: #8c4cf3;
 }
 
-.builderLoadingCard div {
+.builderLoadingCopy {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
 }
 
-.builderLoadingCard strong {
-  font-size: 16px;
-  line-height: 1.1;
+.builderLoadingCopy strong {
+  font-size: 18px;
+  line-height: 1.08;
+  letter-spacing: 0;
 }
 
-.builderLoadingCard span {
-  color: #6b7280;
+.builderLoadingCopy span {
+  color: #6f6778;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 750;
+}
+
+@keyframes builderLoadingBar {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(210%); }
+  100% { transform: translateX(350%); }
 }
 
 @media (max-width: 899px) {
@@ -8334,7 +8825,7 @@ p {
   .builderWorkspace {
     display: block;
     min-height: calc(100svh - 62px);
-    padding: calc(74px + env(safe-area-inset-top)) 10px calc(70px + env(safe-area-inset-bottom));
+    padding: calc(74px + env(safe-area-inset-top)) 10px calc(112px + env(safe-area-inset-bottom));
   }
 
   .builderToolRail {
@@ -8344,7 +8835,7 @@ p {
   .builderCanvas {
     min-height: calc(100svh - 128px - env(safe-area-inset-bottom));
     border-radius: 22px;
-    padding: 14px 0 calc(82px + env(safe-area-inset-bottom));
+    padding: 14px 0 calc(130px + env(safe-area-inset-bottom));
     overflow: visible;
     display: grid;
     place-items: start center;
@@ -8357,15 +8848,32 @@ p {
   .previewLabel {
     width: min(100%, 330px);
     padding: 0 2px;
-    font-size: 11px;
+    font-size: 12px;
+    gap: 10px;
+  }
+
+  .previewScreenToggle {
+    height: 34px;
+    padding: 4px;
+    gap: 3px;
+    border-radius: 9px;
+  }
+
+  .previewScreenToggle button {
+    height: 26px;
+    min-height: 26px;
+    border-radius: 6px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 850;
   }
 
   .previewDevice {
     --preview-scale: 0.76;
     width: min(calc(100vw - 48px), 330px);
-    height: clamp(590px, 72svh, 670px);
-    min-height: 590px;
-    max-height: 670px;
+    height: clamp(540px, calc(100svh - 260px), 620px);
+    min-height: 540px;
+    max-height: 620px;
     border-radius: 28px;
     box-shadow:
       0 16px 42px rgba(95, 55, 90, 0.18),
@@ -8400,8 +8908,8 @@ p {
     right: 0;
     bottom: 0;
     z-index: 160;
-    height: min(74svh, 620px);
-    max-height: min(74svh, 620px);
+    height: min(78svh, 660px);
+    max-height: min(78svh, 660px);
     overflow: hidden;
     overscroll-behavior: contain;
     margin: 0;
@@ -8411,7 +8919,7 @@ p {
     backdrop-filter: blur(24px);
     border: 1px solid rgba(35, 28, 34, 0.08);
     border-radius: 22px 22px 0 0;
-    padding: 10px 0 calc(18px + env(safe-area-inset-bottom));
+    padding: 12px 0 calc(20px + env(safe-area-inset-bottom));
     box-shadow: 0 -18px 54px rgba(35, 28, 34, 0.22);
     transform: translateY(calc(100% + 24px));
     transition: transform 0.24s ease;
@@ -8451,7 +8959,7 @@ p {
     gap: 7px;
     position: fixed;
     left: 50%;
-    bottom: calc(66px + env(safe-area-inset-bottom));
+    bottom: calc(76px + env(safe-area-inset-bottom));
     z-index: 105;
     transform: translateX(-50%);
     min-height: 42px;
@@ -8471,12 +8979,12 @@ p {
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    margin: 0 16px 10px;
+    margin: 0 18px 12px;
   }
 
   .mobileSheetHeader p {
     color: #86747f;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 900;
     letter-spacing: 0.08em;
     line-height: 1;
@@ -8485,14 +8993,14 @@ p {
 
   .mobileSheetHeader h2 {
     margin-top: 3px;
-    font-size: 22px;
+    font-size: 25px;
     line-height: 1;
     text-transform: capitalize;
   }
 
   .mobileSheetHeader button {
-    width: 40px;
-    min-height: 40px;
+    width: 44px;
+    min-height: 44px;
     border: 0;
     border-radius: 999px;
     background: #f1edf0;
@@ -8517,15 +9025,15 @@ p {
     gap: 5px;
     overflow: visible;
     padding: 5px;
-    margin: 0 0 12px;
+    margin: 0 0 14px;
     z-index: 2;
     background: #f4f1f3;
   }
 
   .mobileBuilderSheet .editorTabs button {
-    min-height: 40px;
-    padding: 0 6px;
-    font-size: 12px;
+    min-height: 46px;
+    padding: 0 8px;
+    font-size: 13px;
     min-width: 0;
   }
 
@@ -8534,53 +9042,87 @@ p {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    gap: 9px;
+    gap: 11px;
     align-content: start;
     grid-auto-rows: max-content;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
   }
 
   .mobileBuilderSheet .editorForm label {
-    gap: 7px;
-    padding: 10px;
-    border-radius: 12px;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 14px;
   }
 
   .mobileBuilderSheet .editorForm label > span,
   .mobileBuilderSheet .editorFieldLabel {
-    font-size: 10px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
   }
 
-  .editorForm input,
-  .editorForm textarea {
-    min-height: 42px;
-    border-radius: 10px;
-    padding: 8px 11px;
-    font-size: 14px;
+  .mobileBuilderSheet .editorForm input,
+  .mobileBuilderSheet .editorForm textarea,
+  .mobileBuilderSheet .editorForm select,
+  .mobileBuilderSheet .customPickerTrigger {
+    min-height: 48px;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 15px;
   }
 
-  .editorForm textarea {
-    min-height: 72px;
+  .mobileBuilderSheet .editorForm textarea {
+    min-height: 88px;
+  }
+
+  .mobileBuilderSheet .editorSoundField {
+    --sound-icon-font: 24px;
+    --sound-title-font: 14px;
+    --sound-subtitle-font: 12px;
+    --sound-badge-font: 9px;
+    --sound-helper-font: 12px;
+    --sound-upload-icon-font: 14px;
+    --sound-upload-font: 13px;
+    --sound-duration-font: 14px;
+    --sound-remove-font: 10.5px;
+    --sound-play-size: 38px;
+  }
+
+  .mobileBuilderSheet .editorSoundField > .editorFieldLabel {
+    font-size: 11.5px;
+  }
+
+  .mobileBuilderSheet .soundPreviewMain {
+    gap: 12px !important;
+    padding: 13px 14px !important;
+  }
+
+  .mobileBuilderSheet .soundUploadRow {
+    padding: 11px 14px !important;
+  }
+
+  .mobileBuilderSheet .soundDurationOptions button {
+    min-height: 42px !important;
   }
 
   .builderBottomBar {
-    width: min(calc(100vw - 28px), 320px);
-    min-height: 50px;
-    padding: 5px;
-    gap: 5px;
-    bottom: max(7px, env(safe-area-inset-bottom));
+    width: min(calc(100vw - 26px), 356px);
+    min-height: 58px;
+    padding: 7px;
+    gap: 6px;
+    bottom: max(8px, env(safe-area-inset-bottom));
   }
 
   .builderBottomBar button,
   .builderBottomBar a {
-    min-height: 38px;
-    gap: 5px;
-    font-size: 12px;
+    min-height: 44px;
+    gap: 7px;
+    font-size: 13.5px;
+    border-radius: 18px;
   }
 
   .builderBottomBar svg {
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -10057,29 +10599,45 @@ p {
 
   .authInlinePanel .authPanelTop {
     top: 14px;
-    left: 14px;
-    right: 54px;
+    left: 12px;
+    right: 52px;
     min-height: 34px;
-    gap: 6px;
+    gap: 5px;
+    display: flex;
+    justify-content: flex-start;
   }
 
   .authInlinePanel .authPanelTop span {
-    min-height: 34px;
-    padding: 0 10px;
-    gap: 6px;
-    font-size: 11px;
+    min-height: 30px;
+    width: auto;
+    flex: 0 0 auto;
+    padding: 0 8px;
+    gap: 5px;
+    font-size: 9.5px;
+    white-space: nowrap;
+    justify-content: center;
+  }
+
+  .authInlinePanel .authPanelTop svg,
+  .authInlinePanel .authGoogleIcon {
+    width: 14px;
+    height: 14px;
   }
 
   .authInlinePanel .authPanelTop span:last-child {
-    display: none;
+    display: inline-flex;
   }
 
   .authCloseButton {
-    top: 14px;
-    right: 14px;
+    top: 13px;
+    right: 13px;
     width: 34px;
     min-height: 34px;
-    font-size: 22px;
+  }
+
+  .authCloseButton svg {
+    width: 17px;
+    height: 17px;
   }
 
   .authInlinePanel .authCopy {
@@ -10097,40 +10655,43 @@ p {
   }
 
   .authInlinePanel h1 {
-    font-size: clamp(32px, 10vw, 40px);
+    font-size: clamp(28px, 8.5vw, 34px);
   }
 
   .authInlinePanel .authCopy > p:not(.eyebrow) {
-    font-size: 13px;
-    line-height: 1.35;
+    font-size: 12px;
+    line-height: 1.32;
   }
 
   .authBenefitGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: 0;
+    min-height: 50px;
+    padding: 4px;
   }
 
   .authBenefitGrid article {
-    min-height: 54px;
+    min-height: 42px;
     display: grid;
     grid-template-columns: 1fr;
     justify-items: center;
     align-items: center;
-    gap: 4px;
-    padding: 8px 6px;
-    border-radius: 12px;
+    gap: 3px;
+    padding: 5px 3px;
+    border-radius: 10px;
     text-align: center;
   }
 
   .authBenefitGrid article > span {
-    width: 26px;
-    min-height: 26px;
+    width: 23px;
+    min-width: 23px;
+    min-height: 23px;
     border-radius: 8px;
     grid-row: auto;
   }
 
   .authBenefitGrid strong {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .authBenefitGrid p {
@@ -10140,13 +10701,13 @@ p {
   .authInlinePanel .oauthButton {
     min-height: 44px;
     border-radius: 13px;
-    font-size: 14px;
+    font-size: 12.5px;
+    gap: 8px;
   }
 
   .authInlinePanel .googleMark {
-    width: 26px;
-    height: 26px;
-    font-size: 15px;
+    width: 20px;
+    height: 20px;
   }
 
   .authInlinePanel .authSwitch {
@@ -10329,6 +10890,7 @@ body:has(.publicInvitationWrapper) {
   .thanksName,
   .thanksBox,
   .locationCard,
+  .phonePillGroup,
   .phonePill,
   .countdownTitle,
   .countdownGrid,
@@ -10346,7 +10908,7 @@ body:has(.publicInvitationWrapper) {
 .pastelWeddingPage.stateAccepted .thanksCard > :where(.thanksName) { animation-delay: 0.3s; }
 .pastelWeddingPage.stateAccepted .thanksCard > :where(.thanksBox) { animation-delay: 0.4s; }
 .pastelWeddingPage.stateAccepted .thanksCard > :where(.locationCard) { animation-delay: 0.5s; }
-.pastelWeddingPage.stateAccepted .thanksCard > :where(.phonePill) { animation-delay: 0.6s; }
+.pastelWeddingPage.stateAccepted .thanksCard > :where(.phonePillGroup, .phonePill) { animation-delay: 0.6s; }
 .pastelWeddingPage.stateAccepted .thanksCard > :where(.countdownTitle) { animation-delay: 0.7s; }
 .pastelWeddingPage.stateAccepted .thanksCard > :where(.countdownGrid, .eventStateMessage) { animation-delay: 0.8s; }
 .pastelWeddingPage.stateAccepted .thanksCard > :where(.rsvpChangeBtn) { animation-delay: 0.9s; }
@@ -10911,6 +11473,13 @@ body:has(.publicInvitationWrapper) {
   box-shadow:
     0 12px 24px rgba(80, 160, 120, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.phonePillGroup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  width: 100%;
+  gap: 8px;
 }
 
 .phonePill {
@@ -12440,19 +13009,23 @@ body:has(.publicInvitationWrapper) {
 .publishModalBackdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 10, 25, 0.4);
-  backdrop-filter: blur(16px);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.16), transparent 28%),
+    rgba(18, 14, 28, 0.46);
+  backdrop-filter: blur(18px);
   cursor: pointer;
 }
 
 .publishModalPanel {
   position: relative;
   z-index: 1;
-  width: min(100%, 440px);
+  width: min(100%, 520px);
   border-radius: 24px;
-  background: #fff;
-  border: 1px solid rgba(140, 76, 243, 0.15);
-  box-shadow: 0 25px 50px -12px rgba(140, 76, 243, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: #ffffff;
+  border: 1px solid rgba(226, 221, 232, 0.95);
+  box-shadow:
+    0 30px 90px rgba(35, 25, 48, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.95) inset;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -12463,22 +13036,44 @@ body:has(.publicInvitationWrapper) {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 22px 22px 18px;
-  border-bottom: 1px solid rgba(23, 23, 23, 0.06);
+  padding: 22px 26px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(31, 18, 53, 0.07);
+}
+
+.publishModalBannerCopy {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 0;
+}
+
+.publishModalHeaderIcon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #8c4cf3;
+  background: #f3eaff;
+  box-shadow: inset 0 0 0 1px rgba(140, 76, 243, 0.08);
 }
 
 .publishModalBannerTitle {
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 800;
   color: #1f1235;
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.15;
 }
 
 .publishModalBannerSub {
-  font-size: 13px;
-  color: #7c6f8a;
+  font-size: 14px;
+  color: #6f627d;
   margin: 0;
+  line-height: 1.35;
 }
 
 .publishModalBannerIcon {
@@ -12486,12 +13081,12 @@ body:has(.publicInvitationWrapper) {
 }
 
 .publishModalClose {
-  background: rgba(23, 23, 23, 0.05);
-  border: 1px solid rgba(23, 23, 23, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(112, 92, 130, 0.12);
   color: #6b7280;
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -12503,18 +13098,19 @@ body:has(.publicInvitationWrapper) {
 }
 
 .publishModalClose:hover {
-  background: rgba(23, 23, 23, 0.1);
+  background: rgba(255, 255, 255, 0.95);
   color: #1f1235;
 }
 
 /* Content */
 .publishModalContent {
-  padding: 20px 22px 22px;
+  padding: 22px 26px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  max-height: calc(90svh - 90px);
+  max-height: calc(90svh - 100px);
+  background: #ffffff;
 }
 
 .publishModalTitle {
@@ -12661,14 +13257,14 @@ body:has(.publicInvitationWrapper) {
 .publishActions {
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: 14px;
 }
 
 .publishBtnPrimary {
   flex: 1.4;
-  min-height: 44px;
-  border-radius: 14px;
-  font-size: 14px;
+  min-height: 54px;
+  border-radius: 16px;
+  font-size: 16px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.2s;
@@ -12676,15 +13272,26 @@ body:has(.publicInvitationWrapper) {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, #8c4cf3 0%, #7030d9 100%);
+  white-space: nowrap;
+  background: linear-gradient(135deg, #9a5cff 0%, #7a35e6 58%, #6425cf 100%);
   border: none;
   color: #fff;
-  box-shadow: 0 4px 14px rgba(140, 76, 243, 0.3);
+  box-shadow:
+    0 14px 28px rgba(112, 48, 217, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.25) inset;
+}
+
+.publishBtnPrimary svg {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
 }
 
 .publishBtnPrimary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(140, 76, 243, 0.38);
+  box-shadow:
+    0 16px 34px rgba(112, 48, 217, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.28) inset;
 }
 
 .publishBtnPrimary:disabled {
@@ -12695,15 +13302,27 @@ body:has(.publicInvitationWrapper) {
 
 .publishBtnCancel {
   flex: 1;
-  min-height: 44px;
-  border-radius: 14px;
-  font-size: 13.5px;
+  min-height: 54px;
+  border-radius: 16px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  background: #ffffff;
-  border: 1.5px solid rgba(140, 76, 243, 0.15);
+  background: rgba(255, 255, 255, 0.84);
+  border: 1.5px solid rgba(140, 76, 243, 0.16);
   color: #7c6f8a;
+  box-shadow: 0 10px 24px rgba(66, 45, 86, 0.05);
+}
+
+.securePaymentText {
+  margin: -8px 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #80768f;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .publishBtnCancel:hover:not(:disabled) {
@@ -13739,18 +14358,29 @@ body:has(.publicInvitationWrapper) {
 }
 
 .publishTemplateSummary {
-  background: linear-gradient(135deg, #ffffff 0%, #fcfaff 100%);
-  border: 1px solid rgba(140, 76, 243, 0.15);
-  border-radius: 20px;
-  padding: 20px;
+  position: relative;
+  background: #ffffff;
+  border: 1px solid rgba(218, 208, 230, 0.9);
+  border-radius: 18px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  box-shadow: 0 10px 25px -5px rgba(140, 76, 243, 0.05), 0 8px 16px -6px rgba(140, 76, 243, 0.05);
+  gap: 14px;
+  box-shadow:
+    0 18px 46px rgba(37, 22, 53, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.95) inset;
+  overflow: hidden;
+}
+
+.publishTemplateSummary::before {
+  display: none;
 }
 .pricingDetailBlock {
   display: flex;
   align-items: center;
+  position: relative;
+  z-index: 1;
+  padding: 0;
 }
 
 .premiumPricingContainer {
@@ -13758,39 +14388,75 @@ body:has(.publicInvitationWrapper) {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 16px;
 }
 
 .premiumPricingLabel {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label price"
+    "helper price";
+  align-items: center;
+  gap: 3px 14px;
+  min-width: 0;
+  width: 100%;
+  min-height: 0;
+  padding: 18px 22px 0;
+  border-bottom: 0;
 }
 
 .priceLabelText {
-  font-size: 11.5px;
-  color: #7c6f8a;
-  font-weight: 600;
+  grid-area: label;
+  font-size: 12px;
+  color: #8a8298;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .priceValText {
-  color: #1f1235;
-  font-weight: 800;
-  font-size: 24px;
-  line-height: 1.1;
+  grid-area: price;
+  align-self: start;
+  font-weight: 900;
+  font-size: 46px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #8c4cf3;
+  background: linear-gradient(135deg, #8c4cf3 0%, #c84eb8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 10px 18px rgba(140, 76, 243, 0.14));
+}
+
+.paymentAssurancePill {
+  grid-area: helper;
+  min-height: 0;
+  border-radius: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #6f38dd;
+  background: transparent;
+  border: 0;
+  font-size: 11.5px;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .premiumBadge {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #8c4cf3;
   background: rgba(140, 76, 243, 0.08);
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid rgba(140, 76, 243, 0.15);
+  white-space: nowrap;
 }
 
 .freePricingLabel {
@@ -13803,7 +14469,7 @@ body:has(.publicInvitationWrapper) {
 .freePriceVal {
   color: #16a34a;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .alreadyPaidStatusTag {
@@ -13821,38 +14487,79 @@ body:has(.publicInvitationWrapper) {
 }
 
 .includedFeaturesList {
-  border-top: 1px solid rgba(140, 76, 243, 0.08);
-  padding-top: 16px;
+  margin: 0 16px 14px;
+  padding: 10px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+}
+
+.featuresTitleRow {
+  display: grid;
+  grid-template-columns: auto minmax(24px, 1fr) 26px;
+  align-items: center;
+  gap: 11px;
+}
+
+.featuresTitleRow span {
+  height: 1px;
+  background: rgba(140, 76, 243, 0.14);
+}
+
+.featuresTitleRow i {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f3eaff;
+  border: 1px solid rgba(140, 76, 243, 0.12);
+  position: relative;
+}
+
+.featuresTitleRow i::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  background: #8c4cf3;
+  transform: rotate(45deg);
+  border-radius: 2px;
 }
 
 .includedFeaturesList .featuresTitle {
-  font-size: 11.5px;
+  font-size: 13px;
   text-transform: uppercase;
-  font-weight: 700;
-  color: #7c6f8a;
+  font-weight: 800;
+  color: #8c4cf3;
   letter-spacing: 0.06em;
   margin: 0;
+  white-space: nowrap;
 }
 
 .includedFeaturesList ul {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
 }
 
 .includedFeaturesList li {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: #4b3c5c;
-  font-weight: 500;
+  gap: 8px;
+  font-size: 14px;
+  color: #1f1235;
+  font-weight: 650;
+  line-height: 1.35;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .checkIconWrapper {
@@ -13862,14 +14569,17 @@ body:has(.publicInvitationWrapper) {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(140, 76, 243, 0.1);
-  color: #8c4cf3;
+  background: linear-gradient(135deg, #a875ff, #7656e9);
+  color: #ffffff;
   flex-shrink: 0;
+  box-shadow: 0 8px 16px rgba(118, 86, 233, 0.2);
 }
 
 .payAndPublishBtn {
-  background: linear-gradient(135deg, #8c4cf3 0%, #7030d9 100%) !important;
-  box-shadow: 0 4px 14px rgba(140, 76, 243, 0.35) !important;
+  background: linear-gradient(135deg, #9a5cff 0%, #7a35e6 58%, #6425cf 100%) !important;
+  box-shadow:
+    0 15px 30px rgba(112, 48, 217, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.28) inset !important;
   border: none !important;
   color: #fff !important;
 }
@@ -13891,6 +14601,169 @@ body:has(.publicInvitationWrapper) {
   margin: 0;
 }
 
+@media (min-width: 481px) {
+  .publishModalPanel {
+    width: min(100%, 410px);
+    border-radius: 20px;
+    max-height: calc(100svh - 52px);
+  }
+
+  .publishModalBanner {
+    padding: 16px 22px 14px;
+  }
+
+  .publishModalBannerCopy {
+    gap: 12px;
+  }
+
+  .publishModalHeaderIcon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+  }
+
+  .publishModalHeaderIcon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .publishModalBannerTitle {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .publishModalBannerSub {
+    font-size: 13px;
+  }
+
+  .publishModalClose {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+  }
+
+  .publishModalContent {
+    padding: 10px 12px 16px;
+    gap: 12px;
+  }
+
+  .publishTemplateSummary {
+    border-radius: 17px;
+    padding: 0;
+    gap: 10px;
+  }
+
+  .pricingDetailBlock {
+    padding: 0;
+  }
+
+  .premiumPricingContainer {
+    gap: 12px;
+  }
+
+  .premiumPricingLabel {
+    gap: 2px 12px;
+    padding: 14px 18px 0;
+  }
+
+  .priceLabelText,
+  .includedFeaturesList .featuresTitle {
+    font-size: 13px;
+  }
+
+  .priceValText {
+    font-size: 34px;
+    filter: drop-shadow(0 8px 14px rgba(140, 76, 243, 0.12));
+  }
+
+  .paymentAssurancePill {
+    min-height: 0;
+    padding: 0;
+    gap: 5px;
+    font-size: 10px;
+  }
+
+  .paymentAssurancePill svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .includedFeaturesList {
+    margin: 0 14px 12px;
+    padding: 8px 10px 7px;
+    border: 0;
+    background: transparent;
+    gap: 9px;
+  }
+
+  .featuresTitleRow {
+    display: grid;
+    grid-template-columns: auto minmax(18px, 1fr) 20px;
+    gap: 8px;
+  }
+
+  .featuresTitleRow span {
+    display: block;
+  }
+
+  .featuresTitleRow i {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
+
+  .featuresTitleRow i::before {
+    inset: 6px;
+  }
+
+  .includedFeaturesList ul {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .includedFeaturesList li {
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    min-height: 24px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .checkIconWrapper {
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, #a875ff, #7656e9);
+    color: #ffffff;
+    box-shadow: 0 6px 12px rgba(118, 86, 233, 0.16);
+  }
+
+  .publishActions {
+    gap: 10px;
+  }
+
+  .publishBtnPrimary,
+  .publishBtnCancel {
+    min-height: 46px;
+    border-radius: 13px;
+  }
+
+  .publishBtnPrimary {
+    font-size: 13.5px;
+  }
+
+  .publishBtnCancel {
+    font-size: 13px;
+  }
+
+  .securePaymentText {
+    display: inline-flex;
+    margin-top: -4px;
+    font-size: 10.5px;
+  }
+}
+
 @media (max-width: 480px) {
   .publishModalPanel {
     width: 100%;
@@ -13902,6 +14775,95 @@ body:has(.publicInvitationWrapper) {
   .publishModalOverlay {
     padding: 0;
     align-items: flex-end;
+  }
+
+  .publishModalBanner {
+    padding: 22px 22px 18px;
+  }
+
+  .publishModalBannerCopy {
+    gap: 13px;
+  }
+
+  .publishModalHeaderIcon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .publishModalHeaderIcon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .publishModalBannerTitle {
+    font-size: 20px;
+  }
+
+  .publishModalBannerSub {
+    font-size: 14px;
+  }
+
+  .publishModalContent {
+    padding: 12px 8px 18px;
+    gap: 14px;
+  }
+
+  .pricingDetailBlock {
+    padding: 0;
+  }
+
+  .premiumPricingContainer {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .premiumPricingLabel {
+    min-height: 0;
+    flex: 1 1 auto;
+    max-width: none;
+    gap: 3px 12px;
+    padding: 20px 22px 0;
+  }
+
+  .priceValText {
+    font-size: 46px;
+  }
+
+  .paymentAssurancePill {
+    display: inline-flex;
+    font-size: 11px;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .includedFeaturesList {
+    margin: 0 14px 16px;
+    padding: 10px 12px;
+  }
+
+  .includedFeaturesList ul {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .featuresTitleRow {
+    grid-template-columns: auto minmax(18px, 1fr) 26px;
+    gap: 10px;
+  }
+
+  .featuresTitleRow i {
+    width: 26px;
+    height: 26px;
+  }
+
+  .publishActions {
+    gap: 12px;
+  }
+
+  .publishBtnPrimary,
+  .publishBtnCancel {
+    min-height: 50px;
+    font-size: 15px;
   }
 }
 
@@ -14717,8 +15679,8 @@ body:has(.publicInvitationWrapper) {
 .templatesPage .categoryScroller {
   position: relative;
   z-index: 1;
-  min-height: 40px;
-  padding: 10px 18px 8px;
+  min-height: 44px;
+  padding: 8px 18px;
   gap: 8px;
   background:
     linear-gradient(180deg, rgba(252, 249, 246, 0.98), rgba(252, 249, 246, 0.92));
@@ -14730,15 +15692,22 @@ body:has(.publicInvitationWrapper) {
 
 .templatesPage .categoryScroller button {
   min-height: 36px;
-  padding-inline: 18px;
+  padding-inline: 16px;
   border-radius: 12px;
   background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.9);
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 800;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.templatesPage .categoryScroller .categoryTabSkeleton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-radius: 12px;
 }
 
 .templatesPage .categoryScroller button span {
@@ -14759,13 +15728,13 @@ body:has(.publicInvitationWrapper) {
 }
 
 .templatesPage .categoryScroller button.active {
-  background: #111827;
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.16);
+  background: #ead8ff;
+  color: #6f43e8;
+  box-shadow: 0 8px 18px rgba(140, 76, 243, 0.12);
 }
 
 .templatesPage .categoryScroller button.active span {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(111, 67, 232, 0.16);
 }
 
 .templatesPage .templateGrid {
@@ -14923,16 +15892,17 @@ body:has(.publicInvitationWrapper) {
   }
 
   .templatesPage .categoryScroller {
-    min-height: 50px;
-    padding: 10px 12px 8px;
+    min-height: 48px;
+    padding: 8px 12px;
+    gap: 8px;
     border-radius: 0;
   }
 
   .templatesPage .categoryScroller button {
-    min-height: 40px;
-    padding-inline: 18px;
+    min-height: 38px;
+    padding-inline: 16px;
     border-radius: 12px;
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   .templatesPage .templateGrid {
@@ -15163,10 +16133,10 @@ body:has(.invitationsPage) {
 }
 
 .filterTabBtn.active {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
-  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.16);
+  background: #ead8ff;
+  color: #6f43e8;
+  border-color: #ead8ff;
+  box-shadow: 0 8px 18px rgba(140, 76, 243, 0.12);
 }
 
 .filterTabBtn span {
@@ -15185,8 +16155,8 @@ body:has(.invitationsPage) {
 .filterTabBtn.active span,
 .filterTabBtn.active span.pub,
 .filterTabBtn.active span.drf {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: rgba(111, 67, 232, 0.16);
+  color: #6f43e8;
 }
 
 @media (max-width: 900px) {

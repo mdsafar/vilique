@@ -14,10 +14,10 @@ export default function InvitationsLoading() {
 
                 <div className="profileInvitationsContainer">
                     <nav className="profileFilterTabs" aria-hidden="true">
-                        <ButtonSkeleton width={70} height={36} />
-                        <ButtonSkeleton width={112} height={36} />
-                        <ButtonSkeleton width={120} height={36} />
-                        <ButtonSkeleton width={92} height={36} />
+                        <ButtonSkeleton className="filterTabBtn" width={70} height={36} />
+                        <ButtonSkeleton className="filterTabBtn" width={112} height={36} />
+                        <ButtonSkeleton className="filterTabBtn" width={120} height={36} />
+                        <ButtonSkeleton className="filterTabBtn" width={92} height={36} />
                     </nav>
 
                     <div className="profileInvitationList" aria-hidden="true">

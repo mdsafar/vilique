@@ -109,6 +109,7 @@ export async function getBuilderInvitation(options: {
             venue_address: fallback.venueAddress,
             map_link: fallback.mapLink,
             phone: fallback.phone,
+            secondary_phone: fallback.secondaryPhone,
             message: fallback.message,
             theme: {
                 ...fallback.theme,

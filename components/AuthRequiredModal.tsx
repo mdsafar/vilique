@@ -1,20 +1,26 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, PencilLine, Send, ShieldCheck, Sparkles } from "lucide-react";
+import { FileText, PencilLine, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { signInWithGoogle } from "@/app/auth/actions";
+import GoogleOAuthButton from "@/components/GoogleOAuthButton";
 import { createClient } from "@/lib/supabase/client";
 
 type Props = {
     next: string;
+    forceOpen?: boolean;
 };
 
-export default function AuthRequiredModal({ next }: Props) {
+export default function AuthRequiredModal({ next, forceOpen = false }: Props) {
     const router = useRouter();
     const [status, setStatus] = useState<"checking" | "authed" | "guest">("checking");
+    const effectiveStatus = forceOpen ? "guest" : status;
 
     useEffect(() => {
+        if (forceOpen) return;
+
         let active = true;
         const supabase = createClient();
 
@@ -34,10 +40,10 @@ export default function AuthRequiredModal({ next }: Props) {
         return () => {
             active = false;
         };
-    }, []);
+    }, [forceOpen]);
 
     useEffect(() => {
-        if (status !== "guest") return;
+        if (effectiveStatus !== "guest") return;
 
         const scrollY = window.scrollY;
         const previousBodyOverflow = document.body.style.overflow;
@@ -60,9 +66,9 @@ export default function AuthRequiredModal({ next }: Props) {
             document.body.style.width = previousBodyWidth;
             window.scrollTo(0, scrollY);
         };
-    }, [status]);
+    }, [effectiveStatus]);
 
-    if (status !== "guest") return null;
+    if (effectiveStatus !== "guest") return null;
 
     const authBenefits = [
         {
@@ -78,7 +84,7 @@ export default function AuthRequiredModal({ next }: Props) {
         {
             description: "Publish and share your websites",
             icon: Send,
-            title: "Publishing",
+            title: "Publish",
         },
     ];
 
@@ -108,17 +114,17 @@ export default function AuthRequiredModal({ next }: Props) {
                     onClick={leaveProtectedPage}
                     type="button"
                 >
-                    ×
+                    <X size={18} aria-hidden="true" />
                 </button>
 
                 <div className="authPanelTop">
                     <span>
-                        <i className="authGoogleIcon" aria-hidden="true">G</i>
-                        Google account
+                        <Image className="authGoogleIcon" src="/google-logo.png" alt="" width={16} height={16} aria-hidden="true" />
+                        <b>Google account</b>
                     </span>
                     <span>
                         <ShieldCheck size={18} aria-hidden="true" />
-                        Secure sign in
+                        <b>Secure sign in</b>
                     </span>
                 </div>
 
@@ -150,10 +156,7 @@ export default function AuthRequiredModal({ next }: Props) {
 
                 <form action={signInWithGoogle}>
                     <input type="hidden" name="next" value={next} />
-                    <button className="oauthButton" type="submit">
-                        <span className="googleMark" aria-hidden="true">G</span>
-                        Continue with Google
-                    </button>
+                    <GoogleOAuthButton />
                 </form>
             </section>
         </div>

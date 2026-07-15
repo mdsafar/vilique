@@ -55,7 +55,8 @@ export function mapInvitationRow(row: InvitationRowWithTemplate): InvitationData
         venueName: row.venue_name || "",
         venueAddress: row.venue_address || "",
         mapLink: row.map_link || "",
-        phone: row.phone || "",
+        phone: row.phone || fallback.phone,
+        secondaryPhone: row.secondary_phone || fallback.secondaryPhone,
         whatsapp: row.whatsapp || "",
         message: row.message || "",
         musicUrl,
@@ -70,6 +71,7 @@ export function mapInvitationRow(row: InvitationRowWithTemplate): InvitationData
         },
         sections: isObject(row.sections) ? row.sections as Record<string, unknown> : {},
         status: row.status,
+        paymentStatus: row.payment_status,
         publishedAt: row.published_at || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -99,6 +101,7 @@ type InvitationUpdateInput = {
     venueAddress?: string | null;
     mapLink?: string | null;
     phone?: string | null;
+    secondaryPhone?: string | null;
     whatsapp?: string | null;
     message?: string | null;
     musicUrl?: string | null;
@@ -123,6 +126,7 @@ export function toInvitationUpdate(values: InvitationUpdateInput) {
         venue_address: values.venueAddress,
         map_link: values.mapLink,
         phone: values.phone,
+        secondary_phone: values.secondaryPhone,
         whatsapp: values.whatsapp,
         message: values.message,
         music_url: values.musicUrl,

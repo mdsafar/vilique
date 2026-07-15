@@ -81,7 +81,27 @@ type PaginatedPayments = {
     paymentsError?: string | null;
 };
 
-export default function ProfilePageClient() {
+type DashboardData = {
+    profile: {
+        email: string;
+        name: string;
+        avatarUrl: string | null;
+    } | null;
+    invitations: InvitationData[];
+    dashboard: {
+        published: number;
+        drafts: number;
+        views: number;
+        rsvps: number;
+        totalSpent?: number;
+    };
+};
+
+type Props = {
+    initialDashboardData?: DashboardData;
+};
+
+export default function ProfilePageClient({ initialDashboardData }: Props) {
     const isClient = useIsClient();
     const [activeTab, setActiveTab] = useState<ProfileTab>(() => getInitialProfileTab());
     const [hasOpenedTransactions, setHasOpenedTransactions] = useState(() => getInitialProfileTab() === "transactions");
@@ -91,7 +111,10 @@ export default function ProfilePageClient() {
         data: dashboardData,
         error: dashboardError,
         mutate: mutateDashboard,
-    } = useSWR(isClient ? "/api/profile/dashboard" : null, null, { suspense: false });
+    } = useSWR<DashboardData>(isClient ? "/api/profile/dashboard" : null, null, {
+        fallbackData: initialDashboardData,
+        suspense: false,
+    });
     const {
         data: templateRatingsPages,
         error: templateRatingsError,
@@ -140,7 +163,7 @@ export default function ProfilePageClient() {
     if (isClient && dashboardError?.status === 401) {
         return (
             <>
-                <AuthRequiredModal next="/profile" />
+                <AuthRequiredModal next="/profile" forceOpen />
                 <main className="profilePage" aria-busy="true">
                     <ProfilePageSkeleton />
                 </main>
@@ -243,8 +266,6 @@ export default function ProfilePageClient() {
 
     return (
         <main className="profilePage">
-            <AuthRequiredModal next="/profile" />
-
             <section className="profileOverview" aria-label="Profile overview">
                 <ProfileCard
                     profile={profile}

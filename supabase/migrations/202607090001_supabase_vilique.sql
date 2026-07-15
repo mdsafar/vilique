@@ -55,6 +55,7 @@ create table if not exists public.invitations (
   venue_address text,
   map_link text,
   phone text,
+  secondary_phone text,
   whatsapp text,
   message text,
   music_url text,
@@ -344,4 +345,3 @@ create policy "admins_manage_template_assets" on storage.objects
 for all to authenticated
 using (bucket_id = 'template-assets' and public.is_admin())
 with check (bucket_id = 'template-assets' and public.is_admin());
-

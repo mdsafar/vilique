@@ -1,21 +1,21 @@
-import { ArrowLeft } from "lucide-react";
 import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 
 export default function TemplateDetailsSkeleton() {
     return (
         <main className="page templateDetailsPage" aria-busy="true">
-            <header className="templateDetailTopbar">
+            <header className="templateDetailTopbar analyticsHeader analyticsHeader--skeleton">
                 <div className="templateDetailCrumb" aria-hidden="true">
-                    <span>
-                        <ArrowLeft size={16} />
-                        <TextSkeleton width={78} height={14} />
-                    </span>
+                    <ButtonSkeleton className="analyticsBackBtn" width={44} height={38} />
                 </div>
-                <ButtonSkeleton width={150} height={36} />
+                <div className="analyticsHeaderText">
+                    <TextSkeleton width={180} height={20} />
+                    <TextSkeleton width={112} height={14} />
+                </div>
+                <ButtonSkeleton className="templateDetailSelect analyticsHeaderPill" width={168} height={34} />
             </header>
 
             <section className="templateDetailHero">
-                <Skeleton className="templateDetailPreview" style={{ minHeight: 500 }} rounded="xl" />
+                <Skeleton className="templateDetailPreview templateLivePreview" style={{ minHeight: 540 }} rounded="xl" />
 
                 <div className="templateDetailContent">
                     <div className="templateDetailHeader">
@@ -45,8 +45,25 @@ export default function TemplateDetailsSkeleton() {
                         <ButtonSkeleton width={150} height={46} />
                     </div>
 
-                    <Skeleton style={{ width: "100%", height: 160 }} rounded="xl" />
-                    <Skeleton style={{ width: "100%", height: 120 }} rounded="xl" />
+                    <div className="detailBlock">
+                        <TextSkeleton width={118} height={14} />
+                        <div className="detailFeatureGrid">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <ButtonSkeleton height={38} key={index} width="100%" />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="detailPerfectFor">
+                        <TextSkeleton width={92} height={14} />
+                        <div className="detailPerfectForOptions">
+                            {Array.from({ length: 3 }).map((_, index) => (
+                                <ButtonSkeleton height={38} key={index} width="100%" />
+                            ))}
+                        </div>
+                    </div>
+
+                    <Skeleton className="detailCustomizable" style={{ width: "100%" }} rounded="lg" />
                 </div>
             </section>
         </main>

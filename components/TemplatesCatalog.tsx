@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, Star } from "lucide-react";
 import useSWRInfinite from "swr/infinite";
@@ -12,6 +12,7 @@ import { formatTemplateRating } from "@/lib/templateRatingFormat";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import TemplateCardSkeleton from "@/components/skeletons/TemplateCardSkeleton";
+import { ButtonSkeleton } from "@/components/ui/Skeleton";
 
 type TemplateItem = {
     id: string;
@@ -59,6 +60,7 @@ export default function TemplatesCatalog() {
         setTemplatesFilter: setActiveCategory,
     } = useNavigationState();
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
+    const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const {
         data,
         error,
@@ -79,6 +81,10 @@ export default function TemplatesCatalog() {
     }, null, {
         suspense: false,
         revalidateFirstPage: false,
+        onSuccess: (templatePages) => {
+            const nextCounts = templatePages?.[0]?.counts;
+            if (nextCounts) setCachedCounts(nextCounts);
+        },
     });
     const todayLabel = new Intl.DateTimeFormat("en-US", {
         month: "short",
@@ -86,7 +92,8 @@ export default function TemplatesCatalog() {
     }).format(new Date()).toUpperCase();
     const pages = data || [];
     const templates = pages.flatMap((page) => page.items);
-    const counts = pages[0]?.counts || { all: 0 };
+    const latestCounts = pages[0]?.counts;
+    const counts = latestCounts || cachedCounts || { all: 0 };
     const categories = Object.keys(categoryLabels).filter((category) => category === "all" || counts[category] > 0) as (InvitationCategory | "all")[];
     const hasActiveFilters = Boolean(debouncedSearch) || activeCategory !== "all";
     const activeCategoryLabel = activeCategory in categoryLabels
@@ -100,6 +107,7 @@ export default function TemplatesCatalog() {
     const shouldShowEndState = pages.length > 1 && !hasMore;
     const isSearching = searchTerm !== debouncedSearch;
     const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
+    const isLoadingInitialTabs = isLoading && !pages.length && !cachedCounts;
     const isLoadingNextPage = isValidating && pages.length > 0;
     const sentinelRef = useInfiniteScroll<HTMLDivElement>({
         disabled: !hasMore || isLoadingNextPage,
@@ -145,16 +153,20 @@ export default function TemplatesCatalog() {
                 </section>
 
                 <nav className="categoryScroller" aria-label="Template categories">
-                    {categories.map((category) => (
-                        <button
-                            className={category === activeCategory ? "active" : ""}
-                            key={category}
-                            type="button"
-                            onClick={() => setActiveCategory(category)}
-                        >
-                            {categoryLabels[category]} <span>{counts[category] || 0}</span>
-                        </button>
-                    ))}
+                    {isLoadingInitialTabs ? (
+                        <TemplateCategoryTabsSkeleton />
+                    ) : (
+                        categories.map((category) => (
+                            <button
+                                className={category === activeCategory ? "active" : ""}
+                                key={category}
+                                type="button"
+                                onClick={() => setActiveCategory(category)}
+                            >
+                                {categoryLabels[category]} <span>{counts[category] || 0}</span>
+                            </button>
+                        ))
+                    )}
                 </nav>
             </div>
 
@@ -261,6 +273,16 @@ export default function TemplatesCatalog() {
                     variant="filtered"
                 />
             )}
+        </>
+    );
+}
+
+function TemplateCategoryTabsSkeleton() {
+    return (
+        <>
+            <ButtonSkeleton className="categoryTabSkeleton" width={72} height={36} />
+            <ButtonSkeleton className="categoryTabSkeleton" width={104} height={36} />
+            <ButtonSkeleton className="categoryTabSkeleton" width={96} height={36} />
         </>
     );
 }
