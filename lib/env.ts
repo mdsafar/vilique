@@ -1,6 +1,7 @@
 export function getSupabaseEnv() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const supabaseAnonKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
     if (!supabaseUrl || !supabaseAnonKey) {
         throw new Error(
@@ -11,13 +12,23 @@ export function getSupabaseEnv() {
     return { supabaseUrl, supabaseAnonKey };
 }
 
-const PLACEHOLDER_ENV_VALUES = new Set([
-    "your-own-webhook-secret",
+const PLACEHOLDER_SECRET_PARTS = [
+    "your-own",
     "changeme",
     "change-me",
     "example",
     "placeholder",
-]);
+    "replace-with",
+    "generated_webhook_secret",
+];
+
+function isPlaceholderSecret(value: string) {
+    const normalized = value.toLowerCase();
+
+    return PLACEHOLDER_SECRET_PARTS.some((part) =>
+        normalized.includes(part)
+    );
+}
 
 export function validateRazorpayWebhookSecret() {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
@@ -26,52 +37,103 @@ export function validateRazorpayWebhookSecret() {
         throw new Error("RAZORPAY_WEBHOOK_SECRET is required.");
     }
 
-    if (secret.length < 16 || PLACEHOLDER_ENV_VALUES.has(secret.toLowerCase())) {
-        throw new Error("RAZORPAY_WEBHOOK_SECRET is not configured with a valid server-side secret.");
+    if (secret.length < 32 || isPlaceholderSecret(secret)) {
+        throw new Error(
+            "RAZORPAY_WEBHOOK_SECRET is not configured with a valid server-side secret."
+        );
     }
 
     return secret;
 }
 
-export function validateProductionEnv() {
-    const isProductionDeployment = process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production";
-    const isPreviewDeployment = process.env.VERCEL_ENV === "preview" || process.env.APP_ENV === "preview";
-    const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
-    const publicRazorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+function getRazorpayMode(key?: string) {
+    if (key?.startsWith("rzp_test_")) return "test";
+    if (key?.startsWith("rzp_live_")) return "live";
+    return null;
+}
 
-    const required = [
+export function validateProductionEnv() {
+    const vercelEnv = process.env.VERCEL_ENV;
+    const appEnv = process.env.APP_ENV;
+
+    const isDeployment =
+        vercelEnv === "production" ||
+        vercelEnv === "preview" ||
+        appEnv === "production" ||
+        appEnv === "preview";
+
+    if (!isDeployment) {
+        return;
+    }
+
+    const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim();
+    const publicRazorpayKeyId =
+        process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim();
+
+    const serverMode = getRazorpayMode(razorpayKeyId);
+    const publicMode = getRazorpayMode(publicRazorpayKeyId);
+
+    const isLivePayments =
+        serverMode === "live" || publicMode === "live";
+
+    const requiredForDeployment = [
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
         "RAZORPAY_KEY_ID",
         "RAZORPAY_KEY_SECRET",
+        "NEXT_PUBLIC_RAZORPAY_KEY_ID",
         "RAZORPAY_WEBHOOK_SECRET",
         "PAYMENT_RECONCILIATION_SECRET",
-        "NEXT_PUBLIC_APP_URL",
-        "REQUEST_HASH_SECRET",
-        "SENTRY_DSN",
         "PAYMENT_OPERATIONS_SECRET",
-        "VILIQUE_LEGAL_ENTITY_NAME",
-        "VILIQUE_BUSINESS_ADDRESS",
-        "VILIQUE_SUPPORT_EMAIL",
-        "VILIQUE_GRIEVANCE_CONTACT",
-        "VILIQUE_JURISDICTION",
+        "REQUEST_HASH_SECRET",
     ];
 
-    if (isPreviewDeployment && (razorpayKeyId?.startsWith("rzp_live") || publicRazorpayKeyId?.startsWith("rzp_live"))) {
-        throw new Error("Preview deployments must not use Razorpay live credentials.");
+    const hasPublicSiteUrl = Boolean(
+        process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+        process.env.NEXT_PUBLIC_SITE_URL?.trim()
+    );
+
+    const requiredForLivePayments: string[] = [];
+
+    const required = isLivePayments
+        ? [...requiredForDeployment, ...requiredForLivePayments]
+        : requiredForDeployment;
+
+    const missing = required.filter((key) => {
+        const value = process.env[key];
+        return !value?.trim();
+    });
+
+    if (!hasPublicSiteUrl) {
+        missing.push(
+            "NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL"
+        );
     }
 
-    if (!isProductionDeployment) return;
-
-    const missing = required.filter((key) => !process.env[key]);
-    if (missing.length) {
-        throw new Error(`Missing production environment variables: ${missing.join(", ")}`);
+    if (missing.length > 0) {
+        throw new Error(
+            `Missing deployment environment variables: ${missing.join(", ")}`
+        );
     }
 
     validateRazorpayWebhookSecret();
 
-    if (razorpayKeyId && publicRazorpayKeyId && razorpayKeyId.slice(0, 8) !== publicRazorpayKeyId.slice(0, 8)) {
-        throw new Error("Razorpay server and public key IDs must use the same mode.");
+    if (!serverMode || !publicMode) {
+        throw new Error(
+            "Razorpay key IDs must begin with rzp_test_ or rzp_live_."
+        );
+    }
+
+    if (serverMode !== publicMode) {
+        throw new Error(
+            "Razorpay server and public key IDs must use the same mode."
+        );
+    }
+
+    if (vercelEnv === "preview" && isLivePayments) {
+        throw new Error(
+            "Preview deployments must not use Razorpay Live credentials."
+        );
     }
 }

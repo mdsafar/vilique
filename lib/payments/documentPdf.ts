@@ -179,25 +179,26 @@ export async function renderRefundReceiptPdf(data: PaymentDocumentData) {
 }
 
 function getBillingConfig(): BillingConfig {
-    const isProduction = process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production";
-    const legalEntityName = process.env.VILIQUE_LEGAL_ENTITY_NAME?.trim();
-    const businessAddress = process.env.VILIQUE_BUSINESS_ADDRESS?.trim();
-    const supportEmail = process.env.VILIQUE_SUPPORT_EMAIL?.trim() || process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim();
+    const legalEntityName =
+        process.env.VILIQUE_LEGAL_ENTITY_NAME?.trim() || "Muhammed Safar";
 
-    if (isProduction && (!legalEntityName || !businessAddress || !supportEmail)) {
-        throw new Error("Missing production billing configuration for Vilique payment documents.");
-    }
+    const businessAddress =
+        process.env.VILIQUE_BUSINESS_ADDRESS?.trim() || "Kerala, India";
+
+    const supportEmail =
+        process.env.VILIQUE_SUPPORT_EMAIL?.trim() ||
+        process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() ||
+        "support@vilique.com";
 
     return {
-        legalEntityName: legalEntityName || "Vilique",
-        businessAddress: businessAddress || "Business address configured before production",
-        supportEmail: supportEmail || "support@vilique.com",
+        legalEntityName,
+        businessAddress,
+        supportEmail,
         gstin: process.env.VILIQUE_GSTIN?.trim() || null,
         pan: process.env.VILIQUE_PAN?.trim() || null,
         websiteUrl: siteConfig.url,
     };
 }
-
 async function createDocument(): Promise<DrawContext> {
     const doc = await PDFDocument.create();
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);

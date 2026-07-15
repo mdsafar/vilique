@@ -8,13 +8,34 @@ type Section = {
 };
 
 export const policyMeta = {
-    effectiveDate: process.env.VILIQUE_POLICY_EFFECTIVE_DATE || "15 July 2026",
-    lastUpdated: process.env.VILIQUE_POLICY_LAST_UPDATED || "15 July 2026",
-    supportEmail: process.env.VILIQUE_SUPPORT_EMAIL || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@vilique.com",
-    legalEntityName: process.env.VILIQUE_LEGAL_ENTITY_NAME || "Vilique legal entity configured before production",
-    businessAddress: process.env.VILIQUE_BUSINESS_ADDRESS || "Registered business address configured before production",
-    grievanceContact: process.env.VILIQUE_GRIEVANCE_CONTACT || "Grievance contact configured before production",
-    jurisdiction: process.env.VILIQUE_JURISDICTION || "jurisdiction configured before production",
+    effectiveDate:
+        process.env.VILIQUE_POLICY_EFFECTIVE_DATE || "15 July 2026",
+
+    lastUpdated:
+        process.env.VILIQUE_POLICY_LAST_UPDATED || "15 July 2026",
+
+    supportEmail:
+        process.env.VILIQUE_SUPPORT_EMAIL ||
+        process.env.NEXT_PUBLIC_SUPPORT_EMAIL ||
+        "support@vilique.com",
+
+    legalEntityName:
+        process.env.VILIQUE_LEGAL_ENTITY_NAME ||
+        "Muhammed Safar",
+
+    businessAddress:
+        process.env.VILIQUE_BUSINESS_ADDRESS ||
+        "Kerala, India",
+
+    grievanceContact:
+        process.env.VILIQUE_GRIEVANCE_CONTACT ||
+        process.env.VILIQUE_SUPPORT_EMAIL ||
+        process.env.NEXT_PUBLIC_SUPPORT_EMAIL ||
+        "support@vilique.com",
+
+    jurisdiction:
+        process.env.VILIQUE_JURISDICTION ||
+        "India",
 };
 
 export function LegalPage({

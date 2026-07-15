@@ -1,9 +1,16 @@
 import * as Sentry from "@sentry/nextjs";
 
-if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+if (dsn) {
     Sentry.init({
-        dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-        tracesSampleRate: Number(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE || "0.05"),
-        environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV,
+        dsn,
+        tracesSampleRate: Number(
+            process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE || "0.05"
+        ),
+        environment:
+            process.env.NEXT_PUBLIC_VERCEL_ENV ||
+            process.env.NEXT_PUBLIC_APP_ENV ||
+            process.env.NODE_ENV,
     });
 }
