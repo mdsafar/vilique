@@ -8,6 +8,7 @@ import {
     slugifyInvitationText,
 } from "@/features/invitations/slug";
 import { assessChangeRisk, EventIdentitySnapshot, generateEventFingerprint } from "@/features/invitations/abuse";
+import { looseSupabase } from "@/lib/supabase/loose";
 
 type PublishedInvitationRow = {
     id: string;
@@ -15,6 +16,100 @@ type PublishedInvitationRow = {
     status: string;
     published_at: string | null;
 };
+
+type FinalizePaidInvitationPublishInput = {
+    payment: {
+        id: string;
+        user_id: string;
+        invitation_id: string | null;
+        template_id: string | null;
+        provider_order_id: string | null;
+        amount_paise: number;
+        currency: string;
+        metadata?: unknown;
+    };
+    providerPaymentId: string;
+    providerStatus: string;
+    providerPayload: unknown;
+    actorType: "user" | "webhook" | "cron" | "system";
+    correlationId?: string | null;
+    customSlug?: string;
+};
+
+type FinalizePaidInvitationPublishResult = {
+    status: "published" | "recovery_pending";
+    slug?: string;
+    publishedAt?: string | null;
+    publicUrl?: string;
+    message?: string;
+    error?: string;
+};
+
+export async function finalizePaidInvitationPublish({
+    payment,
+    providerPaymentId,
+    providerStatus,
+    providerPayload,
+    actorType,
+    correlationId,
+    customSlug,
+}: FinalizePaidInvitationPublishInput): Promise<FinalizePaidInvitationPublishResult> {
+    if (!payment.invitation_id || !payment.template_id || !payment.provider_order_id) {
+        throw new Error("Payment attempt is missing required reconciliation identifiers");
+    }
+
+    const supabase = createAdminClient();
+    const publishPatch = await buildPublishPatch({
+        supabase,
+        userId: payment.user_id,
+        invitationId: payment.invitation_id,
+        paymentId: payment.id,
+        customSlug,
+    });
+
+    const { data, error } = await looseSupabase(supabase).rpc("finalize_paid_invitation_publish", {
+        p_payment_id: payment.id,
+        p_user_id: payment.user_id,
+        p_invitation_id: payment.invitation_id,
+        p_template_id: payment.template_id,
+        p_provider_order_id: payment.provider_order_id,
+        p_provider_payment_id: providerPaymentId,
+        p_amount_paise: payment.amount_paise,
+        p_currency: payment.currency,
+        p_provider_status: providerStatus,
+        p_provider_payload: providerPayload,
+        p_publish_patch: publishPatch,
+        p_actor_type: actorType,
+        p_correlation_id: correlationId || null,
+    });
+
+    if (error) {
+        throw new Error(error.message || "Payment finalization failed");
+    }
+
+    const result = (data || {}) as {
+        status?: string;
+        slug?: string;
+        published_at?: string | null;
+        message?: string;
+        error?: string;
+    };
+
+    if (result.status === "published" && result.slug) {
+        return {
+            status: "published",
+            slug: result.slug,
+            publishedAt: result.published_at || null,
+            publicUrl: getPublicInvitationUrl(result.slug),
+        };
+    }
+
+    return {
+        status: "recovery_pending",
+        message: result.message || "Your payment was successful, but publishing is still being completed. Please do not pay again.",
+        error: result.error,
+    };
+}
 
 export async function publishInvitationAfterPayment({
     userId,
@@ -264,6 +359,169 @@ export async function publishInvitationAfterPayment({
         status: updatedInvite.status,
         publishedAt: updatedInvite.published_at,
         publicUrl: getPublicInvitationUrl(updatedInvite.slug),
+    };
+}
+
+async function buildPublishPatch({
+    supabase,
+    userId,
+    invitationId,
+    paymentId,
+    customSlug,
+}: {
+    supabase: ReturnType<typeof createAdminClient>;
+    userId: string;
+    invitationId: string;
+    paymentId: string;
+    customSlug?: string;
+}) {
+    const { data: invite, error: inviteError } = await supabase
+        .from("invitations")
+        .select("*, invitation_templates(*)")
+        .eq("id", invitationId)
+        .single();
+
+    if (inviteError || !invite) {
+        throw new Error("Invitation not found");
+    }
+
+    if (invite.user_id !== userId) {
+        throw new Error("Unauthorized: You do not own this invitation");
+    }
+
+    if (invite.status === "archived" || invite.lifecycle_status === "archived") {
+        throw new Error("Cannot publish an archived invitation");
+    }
+
+    if (isInvitationCompleted({
+        eventDate: invite.event_date,
+        eventTime: invite.event_time,
+        eventTimezone: invite.event_timezone,
+        status: invite.status,
+        lifecycleStatus: invite.lifecycle_status,
+        eventStatus: invite.event_status,
+        first_published_at: invite.first_published_at,
+        published_at: invite.published_at,
+    })) {
+        throw new Error("Invitation is completed and locked.");
+    }
+
+    if (invite.status === "published" && invite.first_published_at) {
+        return {
+            slug: invite.slug,
+            status: "published",
+            lifecycle_status: "published",
+            event_status: "published",
+            published_at: invite.published_at || new Date().toISOString(),
+            first_published_at: invite.first_published_at,
+            first_payment_id: invite.first_payment_id || paymentId,
+            publish_version: invite.publish_version || 1,
+            first_publish_version: invite.first_publish_version || 1,
+            payment_status: "paid",
+            updated_at: new Date().toISOString(),
+        };
+    }
+
+    if (!invite.title?.trim()) throw new Error("Title is required to publish");
+    if (!invite.primary_name?.trim()) throw new Error("Host/Couple name is required to publish");
+    if (!invite.event_date) throw new Error("Event date is required to publish");
+    if (!invite.event_time?.trim()) throw new Error("Event time is required to publish");
+    if (!invite.venue_name?.trim()) throw new Error("Venue name is required to publish");
+    if (!invite.phone?.trim()) throw new Error("Primary phone is required to publish");
+    if (invite.phone.length !== 10) throw new Error("Primary phone must be 10 digits");
+    if (!invite.secondary_phone?.trim()) throw new Error("Secondary phone is required to publish");
+    if (invite.secondary_phone.length !== 10) throw new Error("Secondary phone must be 10 digits");
+    if (!invite.message?.trim()) throw new Error("Invitation message is required to publish");
+
+    const template = invite.invitation_templates;
+    const templateId = invite.template_id || template?.id || null;
+    if (!templateId) {
+        throw new Error("Template entitlement could not be verified");
+    }
+
+    const hasPublishedIdentity = Boolean(invite.first_published_at);
+    const readableSlugOverride = getReadableSlugOverride(customSlug, invite.slug);
+    let finalSlug = hasPublishedIdentity
+        ? invite.slug
+        : buildInvitationSlug(readableSlugOverride || getInvitationReadableName(invite), invitationId);
+
+    if (!hasPublishedIdentity) {
+        const isAvailable = await isSlugAvailable(finalSlug, invitationId);
+        if (!isAvailable) {
+            finalSlug = buildInvitationSlug(readableSlugOverride || getInvitationReadableName(invite), invitationId, 80, 12);
+            const fallbackAvailable = await isSlugAvailable(finalSlug, invitationId);
+            if (!fallbackAvailable) {
+                throw new Error("SLUG_GENERATION_FAILED");
+            }
+        }
+    }
+
+    const firstPublishedAt = invite.first_published_at || new Date().toISOString();
+    const originalCategory = hasPublishedIdentity ? invite.original_category || invite.category : invite.category;
+    const originalPrimaryName = hasPublishedIdentity ? invite.original_primary_name || invite.primary_name : invite.primary_name;
+    const originalSecondaryName = hasPublishedIdentity ? invite.original_secondary_name || invite.secondary_name : invite.secondary_name;
+    const originalEventDate = hasPublishedIdentity ? invite.original_event_date || invite.event_date : invite.event_date;
+    const originalTemplateId = hasPublishedIdentity ? invite.original_template_id || templateId : templateId;
+    const nextPublishVersion = (invite.publish_version || 0) + 1;
+    const firstPublishVersion = invite.first_publish_version || nextPublishVersion;
+    const identityFingerprint = invite.identity_fingerprint || generateEventFingerprint({
+        category: originalCategory,
+        primaryName: originalPrimaryName,
+        secondaryName: originalSecondaryName,
+        eventDate: originalEventDate || "",
+        userId,
+        templateId: originalTemplateId || "",
+    });
+
+    const storedSnapshot = hasPublishedIdentity ? (invite.identity_snapshot || invite.event_snapshot) as EventIdentitySnapshot | null : null;
+    const identitySnapshot: EventIdentitySnapshot = storedSnapshot || {
+        original_category: originalCategory,
+        original_primary_name: originalPrimaryName,
+        original_secondary_name: originalSecondaryName,
+        original_event_date: originalEventDate,
+        original_template_id: originalTemplateId || "",
+        original_venue_name: invite.venue_name,
+        original_venue_address: invite.venue_address,
+        original_message: invite.message,
+        first_published_at: firstPublishedAt,
+        first_payment_id: paymentId,
+        first_publish_version: firstPublishVersion,
+        owner_id: userId,
+    };
+
+    const risk = assessChangeRisk(identitySnapshot, {
+        category: invite.category,
+        primaryName: invite.primary_name,
+        secondaryName: invite.secondary_name,
+        eventDate: invite.event_date,
+        venueName: invite.venue_name,
+        venueAddress: invite.venue_address,
+        message: invite.message,
+        templateId,
+    });
+
+    return {
+        slug: finalSlug,
+        status: "published",
+        lifecycle_status: "published",
+        event_status: "published",
+        published_at: invite.published_at || new Date().toISOString(),
+        first_published_at: firstPublishedAt,
+        first_payment_id: invite.first_payment_id || paymentId,
+        publish_version: nextPublishVersion,
+        first_publish_version: firstPublishVersion,
+        payment_status: "paid",
+        original_category: originalCategory,
+        original_primary_name: originalPrimaryName,
+        original_secondary_name: originalSecondaryName,
+        original_event_date: originalEventDate,
+        original_template_id: originalTemplateId,
+        event_snapshot: identitySnapshot,
+        identity_snapshot: identitySnapshot,
+        identity_fingerprint: identityFingerprint,
+        event_change_score: risk.score,
+        change_risk_status: risk.riskLevel,
+        updated_at: new Date().toISOString(),
     };
 }
 

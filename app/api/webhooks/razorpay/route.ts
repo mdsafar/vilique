@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { verifyRazorpayWebhookSignature } from "@/lib/razorpay";
+import { razorpay, verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { publishInvitationAfterPayment } from "@/features/invitations/publish";
+import { looseSupabase } from "@/lib/supabase/loose";
+import { finalizePaidInvitationPublish } from "@/features/invitations/publish";
 import { Json } from "@/types/database";
+import { logEvent, reportError } from "@/lib/observability";
 
 type RazorpayEntity = {
     id?: string;
@@ -23,21 +25,39 @@ type RazorpayWebhookPayload = {
     };
 };
 
+type RazorpayOrdersWithPayments = {
+    fetchPayments: (orderId: string) => Promise<{ items?: RazorpayEntity[] }>;
+};
+
+type ClaimedWebhookEvent = {
+    id: string;
+    provider_event_id: string;
+    event_type: string;
+    processing_status: "pending" | "processing" | "processed" | "failed" | "ignored" | "manual_review";
+    attempt_count: number;
+    claimed: boolean;
+};
+
+const PROCESSABLE_EVENT_TYPES = new Set([
+    "order.paid",
+    "payment.captured",
+    "payment.authorized",
+    "payment.failed",
+    "refund.created",
+    "refund.processed",
+]);
+
 export async function POST(request: Request) {
     try {
         const signature = request.headers.get("x-razorpay-signature");
         if (!signature) {
-            console.error("Missing x-razorpay-signature header");
             return NextResponse.json({ error: "Missing signature" }, { status: 400 });
         }
 
-        // Read the raw request body for verification
         const rawBody = await request.text();
 
-        // Verify the webhook signature using RAZORPAY_WEBHOOK_SECRET
         const isValid = verifyRazorpayWebhookSignature(rawBody, signature);
         if (!isValid) {
-            console.error("Invalid Razorpay webhook signature");
             return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
         }
 
@@ -52,36 +72,58 @@ export async function POST(request: Request) {
 
         const supabaseAdmin = createAdminClient();
 
-        // 1. Idempotency Check: Store webhook event in webhook_events table
-        const { data: insertedEvent, error: insertError } = await supabaseAdmin
-            .from("webhook_events")
-            .insert({
-                provider: "razorpay",
-                provider_event_id: eventId,
-                event_type: eventType,
-                payload: payload as Json,
-                processing_status: "pending",
-            })
-            .select()
-            .single();
+        const { data: claimedEventsData, error: claimError } = await looseSupabase(supabaseAdmin)
+            .rpc("claim_razorpay_webhook_event", {
+                p_provider_event_id: eventId,
+                p_event_type: eventType,
+                p_payload: payload as Json,
+            });
+        const claimedEvents = claimedEventsData as ClaimedWebhookEvent[] | null;
 
-        if (insertError) {
-            // Check for duplicate key violation
-            if (insertError.code === "23505") {
-                console.log(`Duplicate webhook event detected and ignored: ${eventId}`);
-                return NextResponse.json({ received: true, duplicate: true });
-            }
-            console.error("Failed to log webhook event in audit logs:", insertError);
-            return NextResponse.json({ error: "Database error logging event" }, { status: 500 });
+        if (claimError || !claimedEvents?.length) {
+            reportError(claimError || new Error("Webhook event claim returned no rows"), "webhook.claim_failed", { eventId, eventType });
+            return NextResponse.json({ error: "Database error claiming event" }, { status: 500 });
         }
 
-        // 2. Process webhook event
+        const claimedEvent = claimedEvents[0] as ClaimedWebhookEvent;
+
+        if (!claimedEvent.claimed) {
+            if (claimedEvent.processing_status === "processed" || claimedEvent.processing_status === "ignored") {
+                logEvent("info", "webhook.already_completed", {
+                    provider: "razorpay",
+                    eventId,
+                    eventType,
+                    status: claimedEvent.processing_status,
+                });
+                return NextResponse.json({ received: true, status: claimedEvent.processing_status });
+            }
+
+            logEvent("warn", "webhook.not_claimed", {
+                provider: "razorpay",
+                eventId,
+                eventType,
+                status: claimedEvent.processing_status,
+            });
+            return NextResponse.json({ error: "Event is already being processed" }, { status: 409 });
+        }
+
         try {
-            if (eventType === "order.paid" || eventType === "payment.captured") {
+            if (!PROCESSABLE_EVENT_TYPES.has(eventType)) {
+                await supabaseAdmin
+                    .from("webhook_events")
+                    .update({
+                        processing_status: "ignored",
+                        processed_at: new Date().toISOString(),
+                    })
+                    .eq("id", claimedEvent.id);
+
+                logEvent("info", "webhook.ignored", { provider: "razorpay", eventId, eventType });
+                return NextResponse.json({ received: true, status: "ignored" });
+            } else if (eventType === "order.paid" || eventType === "payment.captured" || eventType === "payment.authorized") {
                 const entity = eventType === "order.paid" ? payload.payload?.order?.entity : payload.payload?.payment?.entity;
                 if (!entity) throw new Error("Missing payment/order entity");
                 const orderId = eventType === "order.paid" ? entity.id : entity.order_id;
-                const paymentId = eventType === "order.paid" ? null : entity.id;
+                let paymentId = eventType === "order.paid" ? null : entity.id;
 
                 if (orderId) {
                     // Fetch local payment record
@@ -92,41 +134,49 @@ export async function POST(request: Request) {
                         .maybeSingle();
 
                     if (localPayment) {
-                        // If not already paid, update to paid
-                        if (localPayment.status !== "paid") {
-                            const { error: updatePaymentError } = await supabaseAdmin
-                                .from("payments")
-                                .update({
-                                    status: "paid",
-                                    provider_payment_id: paymentId || localPayment.provider_payment_id,
-                                    paid_at: new Date().toISOString(),
-                                    updated_at: new Date().toISOString(),
-                                    metadata: {
-                                        ...((localPayment.metadata as Record<string, Json>) || {}),
-                                        webhook_details: payload as Json,
-                                    },
-                                })
-                                .eq("id", localPayment.id);
-
-                            if (updatePaymentError) {
-                                throw new Error(`Failed to update local payment status: ${updatePaymentError.message}`);
+                        if ((localPayment.status as string) === "published") {
+                            logEvent("info", "webhook.payment_already_published", { eventId, paymentId: localPayment.id });
+                        } else {
+                            if (!paymentId) {
+                                const orderPayments = await (razorpay.orders as unknown as RazorpayOrdersWithPayments).fetchPayments(orderId);
+                                paymentId = orderPayments?.items?.find((item: RazorpayEntity) =>
+                                    item.id && item.order_id === orderId
+                                )?.id || null;
                             }
 
-                            // Reconcile and publish invitation atomically
-                            try {
-                                await publishInvitationAfterPayment({
-                                    userId: localPayment.user_id,
-                                    invitationId: localPayment.invitation_id,
-                                });
-                                console.log(`Successfully reconciled and published invitation ${localPayment.invitation_id} via webhook event ${eventId}`);
-                            } catch (publishError: unknown) {
-                                // Keep payment status as paid, but log the error (user can manually retry publishing)
-                                const message = publishError instanceof Error ? publishError.message : "Unknown publish error";
-                                console.error(`Webhook reconciled payment to paid, but publishing failed: ${message}`);
+                            if (!paymentId) {
+                                throw new Error(`Could not determine Razorpay payment id for order ${orderId}`);
                             }
+
+                            const providerPayment = await razorpay.payments.fetch(paymentId);
+                            if (
+                                providerPayment.order_id !== orderId ||
+                                providerPayment.amount !== localPayment.amount_paise ||
+                                providerPayment.currency !== localPayment.currency
+                            ) {
+                                throw new Error(`Provider payment mismatch for order ${orderId}`);
+                            }
+
+                            if (providerPayment.status !== "captured" && providerPayment.status !== "authorized") {
+                                throw new Error(`Provider payment ${paymentId} is not captured or authorized`);
+                            }
+
+                            const finalization = await finalizePaidInvitationPublish({
+                                payment: localPayment,
+                                providerPaymentId: paymentId,
+                                providerStatus: providerPayment.status,
+                                providerPayload: {
+                                    webhook: payload,
+                                    payment: providerPayment,
+                                },
+                                actorType: "webhook",
+                                correlationId: eventId,
+                            });
+
+                            logEvent("info", "webhook.payment_finalized", { eventId, paymentId: localPayment.id, status: finalization.status });
                         }
                     } else {
-                        console.warn(`Webhook received capture event for unknown local order id: ${orderId}`);
+                        logEvent("warn", "webhook.unknown_order", { eventId, orderId });
                     }
                 }
             } else if (eventType === "payment.failed") {
@@ -174,19 +224,46 @@ export async function POST(request: Request) {
                         .maybeSingle();
 
                     if (localPayment) {
-                        const newStatus = amountRefunded >= localPayment.amount_paise ? "refunded" : "partially_refunded";
+                        if (amountRefunded > localPayment.amount_paise) {
+                            throw new Error(`Provider refund amount exceeds payment amount for ${paymentId}`);
+                        }
+                        const isProcessedRefund = eventType === "refund.processed";
+                        const newStatus = isProcessedRefund
+                            ? (amountRefunded >= localPayment.amount_paise ? "refunded" : "partially_refunded")
+                            : "refund_pending";
+                        const now = new Date().toISOString();
                         await supabaseAdmin
                             .from("payments")
                             .update({
                                 status: newStatus,
-                                refunded_at: new Date().toISOString(),
-                                updated_at: new Date().toISOString(),
+                                payment_state: newStatus === "refunded" ? "refunded" : localPayment.payment_state,
+                                refund_state: isProcessedRefund ? "processed" : "pending",
+                                provider_refund_id: refundEntity.id || localPayment.provider_refund_id,
+                                refund_requested_at: localPayment.refund_requested_at || now,
+                                refund_processed_at: isProcessedRefund ? now : localPayment.refund_processed_at,
+                                refunded_at: isProcessedRefund ? now : localPayment.refunded_at,
+                                updated_at: now,
                                 metadata: {
                                     ...((localPayment.metadata as Record<string, Json>) || {}),
                                     refund_details: payload as Json,
                                 },
                             })
                             .eq("id", localPayment.id);
+
+                        const { data: refundRequest } = await looseSupabase(supabaseAdmin)
+                            .from("payment_refund_requests")
+                            .select("id")
+                            .eq("payment_id", localPayment.id)
+                            .maybeSingle();
+
+                        if (refundRequest && typeof refundRequest === "object" && "id" in refundRequest && refundEntity.id) {
+                            await looseSupabase(supabaseAdmin).rpc("mark_refund_provider_created", {
+                                p_refund_request_id: String(refundRequest.id),
+                                p_provider_refund_id: refundEntity.id,
+                                p_provider_payload: payload as Json,
+                                p_provider_status: isProcessedRefund ? "processed" : "pending",
+                            });
+                        }
 
                         // If fully refunded, mark payment_status as refunded on the invitation
                         if (newStatus === "refunded") {
@@ -202,33 +279,33 @@ export async function POST(request: Request) {
                 }
             }
 
-            // 3. Mark webhook event as processed
             await supabaseAdmin
                 .from("webhook_events")
                 .update({
                     processing_status: "processed",
                     processed_at: new Date().toISOString(),
                 })
-                .eq("id", insertedEvent.id);
+                .eq("id", claimedEvent.id);
 
             return NextResponse.json({ received: true });
         } catch (processError: unknown) {
-            console.error(`Error processing webhook event: ${eventId}`, processError);
+            reportError(processError, "webhook.processing_failed", { eventId, eventType });
             const message = processError instanceof Error ? processError.message : "Processing error";
 
             await supabaseAdmin
                 .from("webhook_events")
                 .update({
                     processing_status: "failed",
+                    failed_at: new Date().toISOString(),
+                    last_error: message,
                     error_message: message,
                 })
-                .eq("id", insertedEvent.id);
+                .eq("id", claimedEvent.id);
 
-            // Return 500 so Razorpay retries if it's a temporary database connection crash
             return NextResponse.json({ error: "Event processing failed" }, { status: 500 });
         }
     } catch (err: unknown) {
-        console.error("Webhook route unhandled crash:", err);
+        reportError(err, "webhook.unhandled");
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

@@ -146,12 +146,18 @@ export default async function PaymentHistoryPage() {
 
             <section className="paymentsSection">
                 {error && (
-                    <div className="paymentsErrorCard">
-                        <AlertTriangle size={20} />
-                        <div>
+                    <div className="paymentsErrorCard" role="alert">
+                        <span className="paymentsErrorIcon" aria-hidden="true">
+                            <AlertTriangle size={18} />
+                        </span>
+                        <div className="paymentsErrorBody">
                             <strong>Error Loading Records</strong>
-                            <p>We encountered a database error while retrieving your payments logs. Please reload the page.</p>
+                            <p>We encountered a database error while retrieving your payment logs.</p>
                         </div>
+                        <a href="/dashboard/payment-history" className="paymentsErrorAction">
+                            <RefreshCw size={14} />
+                            <span>Reload</span>
+                        </a>
                     </div>
                 )}
 

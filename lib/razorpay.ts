@@ -1,5 +1,6 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { validateRazorpayWebhookSecret } from "@/lib/env";
 
 if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
     console.warn("Razorpay credentials are not set in environment variables.");
@@ -37,8 +38,7 @@ export function verifyRazorpayWebhookSignature(
     rawBody: string,
     signature: string
 ): boolean {
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    if (!secret) return false;
+    const secret = validateRazorpayWebhookSecret();
 
     const generated = crypto
         .createHmac("sha256", secret)

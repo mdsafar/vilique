@@ -90,6 +90,7 @@ export default function ProfileInvitationsList({
     const {
         data,
         error,
+        size,
         setSize,
         isLoading,
         isValidating,
@@ -131,7 +132,7 @@ export default function ProfileInvitationsList({
     const isSearching = searchTerm !== debouncedSearch;
     const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
     const isLoadingInitialTabs = isLoading && !pages.length && !cachedCounts;
-    const isLoadingNextPage = isValidating && pages.length > 0;
+    const isLoadingNextPage = isValidating && pages.length > 0 && hasMore && size > pages.length;
     const hasActiveFilters = Boolean(searchTerm) || statusFilter !== "all";
     const statusLabels: Record<string, string> = {
         all: "All",

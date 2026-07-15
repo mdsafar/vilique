@@ -10,9 +10,7 @@ export const siteConfig = {
     tagline: "Create. Invite. Celebrate.",
     creatorLabel: "Created with Vilique",
     url:
-        process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        "http://localhost:3000",
+        getSiteUrl(),
     keywords: [
         "Vilique",
         "invitation website builder",
@@ -29,9 +27,16 @@ export const siteConfig = {
 } as const;
 
 export function getPublicInvitationUrl(slug: string) {
-    const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        "http://localhost:3000";
-    return `${baseUrl}/i/${slug}`;
+    return `${getSiteUrl()}/i/${slug}`;
+}
+
+export function getSiteUrl() {
+    const url = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+    const isProductionDeployment = process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production";
+
+    if (isProductionDeployment && (!url || url.includes("localhost"))) {
+        throw new Error("Production deployments require NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL with a non-localhost URL.");
+    }
+
+    return url || "http://localhost:3000";
 }

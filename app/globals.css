@@ -2463,6 +2463,20 @@ p {
   font-weight: 800;
 }
 
+.profileTransactionNotice {
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 11.25px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.profileTransactionNotice.recovery {
+  background: rgba(234, 88, 12, 0.08);
+  border: 1px solid rgba(234, 88, 12, 0.16);
+  color: #9a3412;
+}
+
 .profileTransactionMeta {
   display: grid;
   grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
@@ -2517,6 +2531,12 @@ p {
   text-transform: uppercase;
 }
 
+.profileTransactionAccessRevoked {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.14);
+}
+
 .profileTransactionAside {
   justify-self: end;
   display: grid;
@@ -2543,15 +2563,15 @@ p {
 
 .profileTransactionAction {
   min-height: 32px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
 .profileTransactions .paymentLinkAction,
 .profileTransactions .paymentInvoiceAction {
-  width: 100%;
+  flex: 1 1 150px;
   min-height: 32px;
   padding: 0 12px;
   border: 0;
@@ -2565,6 +2585,8 @@ p {
   font-size: 11px;
   font-weight: 850;
   cursor: pointer;
+  white-space: normal;
+  text-align: center;
 }
 
 .profileTransactions .paymentInvoiceAction {
@@ -2584,17 +2606,31 @@ p {
   color: #76510a;
 }
 
+.profileTransactions .paymentInvoiceAction:disabled,
+.profileTransactions .paymentLinkAction:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .profileTransactions .paymentNoAction {
-  width: 100%;
+  flex: 1 1 150px;
   min-height: 32px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   border-radius: 10px;
   background: rgba(148, 127, 159, 0.07);
   color: #a99db0;
   font-size: 11px;
   font-weight: 800;
+  text-align: center;
+}
+
+.profileTransactions .paymentProcessingAction {
+  color: #9a3412;
+  background: rgba(234, 88, 12, 0.08);
 }
 
 .profileStat {
@@ -8536,7 +8572,7 @@ p {
   }
 
   .customPickerFooter {
-    margin-top: 16px;
+    margin-top: 24px;
   }
 
   .customPickerFooter button:last-child {
@@ -12313,7 +12349,7 @@ body:has(.publicInvitationWrapper) {
     position: relative !important;
     top: unset !important;
     right: unset !important;
-    margin-top: -12px;
+    margin-top: 16px;
     gap: 8px;
     justify-content: stretch;
     width: 100%;
@@ -14977,27 +15013,98 @@ body:has(.publicInvitationWrapper) {
 }
 
 .paymentsErrorCard {
-  background: #fdf2f2;
-  border: 1.5px solid rgba(220, 38, 38, 0.18);
-  border-radius: 16px;
-  padding: 16px;
-  color: #c81e1e;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-height: 82px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 247, 0.92)),
+    #ffffff;
+  border: 1px solid rgba(220, 38, 38, 0.14);
+  border-radius: 18px;
+  padding: 16px 18px;
+  color: #7f1d1d;
   font-size: 13px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  box-shadow:
+    0 18px 42px rgba(80, 35, 55, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.paymentsErrorCard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.025), transparent 42%);
+}
+
+.paymentsErrorIcon {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(220, 38, 38, 0.12);
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: #fff1f1;
+  color: #c81e1e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.paymentsErrorBody {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
 }
 
 .paymentsErrorCard strong {
   display: block;
   font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 2px;
+  font-weight: 850;
+  margin-bottom: 4px;
+  line-height: 1.2;
+  color: #b91c1c;
 }
 
 .paymentsErrorCard p {
   margin: 0;
-  color: #9b5a5a;
+  color: #8f5a5a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.paymentsErrorAction {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-height: 40px;
+  border: 1px solid rgba(185, 28, 28, 0.12);
+  border-radius: 11px;
+  padding: 0 14px;
+  background: #b91c1c;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(185, 28, 28, 0.16);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.paymentsErrorAction:hover {
+  background: #991b1b;
+  box-shadow: 0 12px 26px rgba(153, 27, 27, 0.2);
+  transform: translateY(-1px);
 }
 
 .paymentsEmptyState {
@@ -15147,6 +15254,18 @@ body:has(.publicInvitationWrapper) {
   color: #2563eb;
 }
 
+.paymentStatusBadge.refundPending {
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.18);
+  color: #b45309;
+}
+
+.paymentStatusBadge.recovery {
+  background: rgba(234, 88, 12, 0.08);
+  border: 1px solid rgba(234, 88, 12, 0.18);
+  color: #ea580c;
+}
+
 .paymentStatusBadge.pending {
   background: rgba(217, 119, 6, 0.06);
   border: 1px solid rgba(217, 119, 6, 0.15);
@@ -15294,6 +15413,25 @@ body:has(.publicInvitationWrapper) {
   .paymentsHeader p {
     font-size: 11.5px;
     line-height: 1.35;
+  }
+
+  .paymentsErrorCard {
+    min-height: 0;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .paymentsErrorBody {
+    padding-top: 1px;
+  }
+
+  .paymentsErrorAction {
+    grid-column: 2;
+    width: fit-content;
+    min-height: 36px;
+    padding-inline: 12px;
   }
   
   .paymentRowMain {
@@ -15488,6 +15626,7 @@ body:has(.publicInvitationWrapper) {
 .invitationsPage {
   width: 100%;
   max-width: none;
+  min-height: 100svh;
   padding: 0 0 var(--bottom-nav-clearance);
 }
 
@@ -16635,4 +16774,383 @@ body:has(.invitationsPage) {
 @keyframes textFadeUp {
   0% { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
+}
+
+.siteFooter {
+  width: 100%;
+  margin: 26px 0 0;
+  padding: 0 8px 18px;
+}
+
+.siteFooter nav {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  min-height: 44px;
+  border-top: 1px solid rgba(89, 72, 88, 0.12);
+  padding: 14px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  justify-content: center;
+  align-items: center;
+}
+
+.siteFooter a {
+  min-height: 34px;
+  border-radius: 6px;
+  padding: 0 4px;
+  color: #72586a;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.legalBack,
+.legalToc a,
+.legalContent a,
+.paymentPolicyConsent a {
+  color: #6f3fb3;
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.siteFooter a:hover,
+.legalToc a:hover,
+.legalContent a:hover,
+.paymentPolicyConsent a:hover {
+  color: #4f2f82;
+}
+
+.siteFooter a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+body:has(.bottomNav) .siteFooter {
+  margin-top: 24px;
+  padding-bottom: calc(var(--bottom-nav-clearance) - 8px);
+}
+
+body:has(.builderShell) .siteFooter {
+  display: none;
+}
+
+.legalBack:hover {
+  color: #4f2f82;
+  border-color: rgba(126, 91, 213, 0.26);
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(74, 53, 92, 0.08);
+}
+
+.legalPage {
+  min-height: 100svh;
+  background:
+    linear-gradient(180deg, #fffdfb 0%, #faf5f1 45%, #f8f4f0 100%);
+  color: #2d252b;
+  padding: 28px 18px 44px;
+}
+
+.legalHero,
+.legalBodyShell,
+.legalContentShell {
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+.legalHero {
+  min-height: 300px;
+  border: 1px solid rgba(88, 61, 82, 0.1);
+  border-radius: 18px;
+  padding: clamp(20px, 4vw, 44px);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 248, 253, 0.9) 54%, rgba(246, 241, 255, 0.9));
+  box-shadow: 0 24px 70px rgba(82, 63, 75, 0.08);
+  display: grid;
+  align-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.legalHero::after {
+  content: "V";
+  position: absolute;
+  right: clamp(18px, 5vw, 68px);
+  bottom: -22px;
+  color: rgba(126, 91, 213, 0.07);
+  font-family: "Pacifico", "Brush Script MT", cursive;
+  font-size: clamp(110px, 18vw, 230px);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.legalHero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.legalBack {
+  width: fit-content;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(88, 61, 82, 0.14);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.74);
+  color: #58435a;
+  line-height: 1;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.legalHero h1 {
+  max-width: 760px;
+  margin: 26px 0 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.4rem, 5.7vw, 5.15rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: 0;
+  color: #201722;
+}
+
+.legalHero p {
+  max-width: 790px;
+  color: #5f535d;
+  font-size: clamp(1rem, 1.3vw, 1.2rem);
+  line-height: 1.7;
+}
+
+.legalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 24px 0 0;
+}
+
+.legalMeta div {
+  min-width: 162px;
+  border: 1px solid rgba(88, 61, 82, 0.1);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.legalMeta dt {
+  color: #81717b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.legalMeta dd {
+  margin: 5px 0 0;
+  color: #30262e;
+  font-weight: 850;
+}
+
+.legalBodyShell {
+  margin: 14px auto 0;
+  border: 1px solid rgba(88, 61, 82, 0.1);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 250, 247, 0.64));
+  box-shadow: 0 24px 70px rgba(82, 63, 75, 0.07);
+  overflow: clip;
+}
+
+.legalToc {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(88, 61, 82, 0.08);
+  border-radius: 18px 18px 0 0;
+  background: rgba(255, 255, 255, 0.72);
+  scrollbar-width: thin;
+}
+
+.legalToc a {
+  min-height: 44px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: #69535f;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.legalContentShell {
+  border: 0;
+  border-radius: 0;
+  padding: clamp(10px, 1.2vw, 14px);
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.legalContent {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.legalNotice {
+  border: 1px solid rgba(88, 61, 82, 0.08);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, #fbf6ff, #fff9fd);
+  padding: 16px 18px;
+  margin: 0;
+  color: #5a4659;
+  font-size: clamp(0.96rem, 1.1vw, 1.05rem);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(143, 95, 198, 0.08);
+}
+
+.legalContent section {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 18px;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid rgba(88, 61, 82, 0.08);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, #ffffff, #fffdfb 62%, #fbf7ff);
+  box-shadow:
+    0 14px 34px rgba(82, 63, 75, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  scroll-margin-top: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.legalContent section::after {
+  content: none;
+}
+
+.legalSectionNumber {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #f4edff;
+  color: #6f3fb3;
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px rgba(111, 63, 179, 0.1);
+}
+
+.legalSectionBody {
+  min-width: 0;
+}
+
+.legalContent h2 {
+  max-width: 780px;
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  line-height: 1.18;
+  margin: 0 0 12px;
+  letter-spacing: 0;
+  color: #231b22;
+}
+
+.legalContent p {
+  max-width: 850px;
+  color: #534951;
+  line-height: 1.72;
+  margin: 0;
+  font-size: clamp(0.98rem, 1.15vw, 1.08rem);
+}
+
+@media (max-width: 720px) {
+  .legalPage {
+    padding: 14px 12px 28px;
+  }
+
+  .legalHero {
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .legalHero h1 {
+    margin-top: 22px;
+  }
+
+  .legalMeta {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .legalToc {
+    padding: 10px 6px;
+  }
+
+  .legalContentShell {
+    padding: 6px;
+  }
+
+  .legalContent {
+    gap: 10px;
+  }
+
+  .legalContent section {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 18px;
+  }
+
+  .legalSectionNumber {
+    width: fit-content;
+    min-width: 44px;
+    height: 36px;
+    padding-inline: 10px;
+  }
+
+  .siteFooter {
+    margin-top: 16px;
+  }
+
+  .siteFooter nav {
+    justify-content: flex-start;
+  }
+}
+
+.paymentPolicyConsent,
+.paymentRecoveryNotice {
+  margin: 12px 0 0;
+  color: #5f4b59;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.paymentRecoveryNotice {
+  color: #795548;
+  font-weight: 700;
+}
+
+@media print {
+  .siteFooter,
+  .legalToc,
+  .legalBack {
+    display: none;
+  }
+
+  .legalPage,
+  .legalContent {
+    background: #fff;
+    border: 0;
+    padding: 0;
+  }
 }

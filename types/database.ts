@@ -333,7 +333,37 @@ export type Database = {
                     provider_signature: string | null;
                     amount_paise: number;
                     currency: string;
-                    status: "created" | "attempted" | "authorized" | "paid" | "failed" | "cancelled" | "refunded" | "partially_refunded";
+                    status: "created" | "pending" | "attempted" | "authorized" | "captured" | "reconciling" | "publish_pending" | "published" | "recovery_pending" | "refund_pending" | "refunded" | "partially_refunded" | "failed" | "cancelled" | "manual_review" | "paid";
+                    payment_state: "created" | "pending" | "authorized" | "captured" | "failed" | "cancelled" | "refunded";
+                    publish_state: "draft" | "publish_pending" | "published" | "failed";
+                    recovery_state: "none" | "pending" | "retrying" | "manual_review" | "unrecoverable" | "recovered";
+                    refund_state: "none" | "eligible" | "pending" | "processed" | "failed";
+                    provider_status: string | null;
+                    provider_captured_at: string | null;
+                    reconciled_at: string | null;
+                    publish_attempt_count: number;
+                    last_publish_attempt_at: string | null;
+                    last_reconciliation_at: string | null;
+                    next_reconciliation_at: string | null;
+                    last_error: string | null;
+                    provider_refund_id: string | null;
+                    refund_amount_paise: number | null;
+                    refund_approved_by: string | null;
+                    refund_approved_at: string | null;
+                    refund_initiated_by: string | null;
+                    refund_attempt_count: number;
+                    refund_requested_at: string | null;
+                    refund_processed_at: string | null;
+                    last_refund_reconciliation_at: string | null;
+                    next_refund_reconciliation_at: string | null;
+                    unrecoverable_at: string | null;
+                    manual_review_reason: string | null;
+                    invoice_number: string | null;
+                    invoice_issued_at: string | null;
+                    invoice_version: number;
+                    refund_receipt_number: string | null;
+                    refund_receipt_issued_at: string | null;
+                    refund_reason_public: string | null;
                     failure_code: string | null;
                     failure_description: string | null;
                     receipt: string | null;
@@ -354,7 +384,37 @@ export type Database = {
                     provider_signature?: string | null;
                     amount_paise: number;
                     currency?: string;
-                    status: "created" | "attempted" | "authorized" | "paid" | "failed" | "cancelled" | "refunded" | "partially_refunded";
+                    status: Database["public"]["Tables"]["payments"]["Row"]["status"];
+                    payment_state?: Database["public"]["Tables"]["payments"]["Row"]["payment_state"];
+                    publish_state?: Database["public"]["Tables"]["payments"]["Row"]["publish_state"];
+                    recovery_state?: Database["public"]["Tables"]["payments"]["Row"]["recovery_state"];
+                    refund_state?: Database["public"]["Tables"]["payments"]["Row"]["refund_state"];
+                    provider_status?: string | null;
+                    provider_captured_at?: string | null;
+                    reconciled_at?: string | null;
+                    publish_attempt_count?: number;
+                    last_publish_attempt_at?: string | null;
+                    last_reconciliation_at?: string | null;
+                    next_reconciliation_at?: string | null;
+                    last_error?: string | null;
+                    provider_refund_id?: string | null;
+                    refund_amount_paise?: number | null;
+                    refund_approved_by?: string | null;
+                    refund_approved_at?: string | null;
+                    refund_initiated_by?: string | null;
+                    refund_attempt_count?: number;
+                    refund_requested_at?: string | null;
+                    refund_processed_at?: string | null;
+                    last_refund_reconciliation_at?: string | null;
+                    next_refund_reconciliation_at?: string | null;
+                    unrecoverable_at?: string | null;
+                    manual_review_reason?: string | null;
+                    invoice_number?: string | null;
+                    invoice_issued_at?: string | null;
+                    invoice_version?: number;
+                    refund_receipt_number?: string | null;
+                    refund_receipt_issued_at?: string | null;
+                    refund_reason_public?: string | null;
                     failure_code?: string | null;
                     failure_description?: string | null;
                     receipt?: string | null;
@@ -396,8 +456,12 @@ export type Database = {
                     provider_event_id: string;
                     event_type: string;
                     payload: Json;
-                    processing_status: "pending" | "processed" | "failed";
+                    processing_status: "pending" | "processing" | "processed" | "failed" | "ignored" | "manual_review";
+                    attempt_count: number;
+                    processing_started_at: string | null;
                     processed_at: string | null;
+                    failed_at: string | null;
+                    last_error: string | null;
                     error_message: string | null;
                     created_at: string;
                     updated_at: string;
@@ -408,8 +472,12 @@ export type Database = {
                     provider_event_id: string;
                     event_type: string;
                     payload?: Json;
-                    processing_status?: "pending" | "processed" | "failed";
+                    processing_status?: "pending" | "processing" | "processed" | "failed" | "ignored" | "manual_review";
+                    attempt_count?: number;
+                    processing_started_at?: string | null;
                     processed_at?: string | null;
+                    failed_at?: string | null;
+                    last_error?: string | null;
                     error_message?: string | null;
                     created_at?: string;
                     updated_at?: string;
@@ -464,6 +532,70 @@ export type Database = {
                     }
                 ];
             };
+            payment_refund_requests: {
+                Row: {
+                    id: string;
+                    payment_id: string;
+                    invitation_id: string | null;
+                    provider_payment_id: string;
+                    provider_refund_id: string | null;
+                    amount_paise: number;
+                    currency: string;
+                    status: "processing" | "pending" | "processed" | "failed" | "manual_review";
+                    requested_by: string | null;
+                    requested_source: "admin" | "system" | "cron";
+                    public_reason: string;
+                    provider_payload: Json;
+                    last_error: string | null;
+                    attempt_count: number;
+                    requested_at: string;
+                    provider_created_at: string | null;
+                    processed_at: string | null;
+                    failed_at: string | null;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    payment_id: string;
+                    invitation_id?: string | null;
+                    provider_payment_id: string;
+                    provider_refund_id?: string | null;
+                    amount_paise: number;
+                    currency: string;
+                    status?: "processing" | "pending" | "processed" | "failed" | "manual_review";
+                    requested_by?: string | null;
+                    requested_source?: "admin" | "system" | "cron";
+                    public_reason: string;
+                    provider_payload?: Json;
+                    last_error?: string | null;
+                    attempt_count?: number;
+                    requested_at?: string;
+                    provider_created_at?: string | null;
+                    processed_at?: string | null;
+                    failed_at?: string | null;
+                    updated_at?: string;
+                };
+                Update: Partial<Database["public"]["Tables"]["payment_refund_requests"]["Insert"]>;
+                Relationships: [];
+            };
+            request_rate_limits: {
+                Row: {
+                    bucket_key: string;
+                    hit_count: number;
+                    reset_at: string;
+                    first_seen_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    bucket_key: string;
+                    hit_count?: number;
+                    reset_at: string;
+                    first_seen_at?: string;
+                    updated_at?: string;
+                };
+                Update: Partial<Database["public"]["Tables"]["request_rate_limits"]["Insert"]>;
+                Relationships: [];
+            };
             invitation_change_log: {
                 Row: {
                     id: string;
@@ -510,6 +642,61 @@ export type Database = {
         };
         Views: Record<string, never>;
         Functions: {
+            claim_razorpay_webhook_event: {
+                Args: {
+                    p_provider_event_id: string;
+                    p_event_type: string;
+                    p_payload: Json;
+                    p_stale_after?: string;
+                };
+                Returns: {
+                    id: string;
+                    provider_event_id: string;
+                    event_type: string;
+                    processing_status: "pending" | "processing" | "processed" | "failed" | "ignored" | "manual_review";
+                    attempt_count: number;
+                    claimed: boolean;
+                }[];
+            };
+            claim_unrecoverable_publish_refund: {
+                Args: {
+                    p_payment_id: string;
+                    p_requested_by: string | null;
+                    p_requested_source: string;
+                    p_public_reason: string;
+                    p_manual_approval?: boolean;
+                };
+                Returns: Json;
+            };
+            consume_rate_limit: {
+                Args: {
+                    p_bucket_key: string;
+                    p_limit: number;
+                    p_window_seconds: number;
+                };
+                Returns: {
+                    allowed: boolean;
+                    remaining: number;
+                    reset_at: string;
+                    hit_count: number;
+                }[];
+            };
+            mark_refund_provider_created: {
+                Args: {
+                    p_refund_request_id: string;
+                    p_provider_refund_id: string;
+                    p_provider_payload: Json;
+                    p_provider_status?: string;
+                };
+                Returns: Json;
+            };
+            mark_refund_provider_failed: {
+                Args: {
+                    p_refund_request_id: string;
+                    p_error: string;
+                };
+                Returns: undefined;
+            };
             can_rate_template: {
                 Args: {
                     p_template_id: string;

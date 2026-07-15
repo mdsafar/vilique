@@ -70,6 +70,7 @@ interface PaymentInfo {
     pricePaise: number;
     currency: string;
     alreadyPaid: boolean;
+    recoveryPending?: boolean;
     templateName: string;
 }
 
@@ -324,7 +325,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             // User is now marked as already paid so they can choose a new slug and retry publishing.
                             setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
                             setPaymentProcessingState("idle");
-                            setPublishError(verifyData.message || verifyData.error);
+                            setPublishError(verifyData.message || "Your payment was successful, but publishing is still being completed. Please do not pay again.");
                             onPublishSuccess({
                                 slug: invitation.slug,
                                 status: invitation.status || "draft",
@@ -561,7 +562,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                 {paymentInfo.alreadyPaid ? (
                                                     <div className="alreadyPaidStatusTag">
                                                         <ShieldCheck size={16} />
-                                                        <span>Template already paid</span>
+                                                        <span>{paymentInfo.recoveryPending ? "Payment received · publishing in progress" : "Template already paid"}</span>
                                                     </div>
                                                 ) : paymentInfo.isFree ? (
                                                     <div className="freePricingLabel">
@@ -622,6 +623,16 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                         </li>
                                                     </ul>
                                                 </div>
+                                            )}
+                                            {!paymentInfo.isFree && !paymentInfo.alreadyPaid && (
+                                                <p className="paymentPolicyConsent">
+                                                    By continuing, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and <a href="/refund-policy" target="_blank" rel="noreferrer">Refund Policy</a>.
+                                                </p>
+                                            )}
+                                            {paymentInfo.recoveryPending && (
+                                                <p className="paymentRecoveryNotice">
+                                                    Your payment was successful, but publishing is still being completed. Please do not pay again.
+                                                </p>
                                             )}
                                         </div>
                                     )}

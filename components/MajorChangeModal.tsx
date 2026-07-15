@@ -157,7 +157,7 @@ export default function MajorChangeModal({
                             </button>
 
                             <a
-                                href="mailto:support@vilique.com"
+                                href="mailto:tanjirookamaadoo@gmail.com"
                                 className="modalBtnCancel"
                                 style={{
                                     width: "100%",

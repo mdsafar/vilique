@@ -3,9 +3,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyRazorpaySignature, razorpay } from "@/lib/razorpay";
-import { publishInvitationAfterPayment } from "@/features/invitations/publish";
+import { finalizePaidInvitationPublish } from "@/features/invitations/publish";
 import { getPublicInvitationUrl } from "@/lib/config/site";
-import { Json } from "@/types/database";
+import { logEvent, reportError } from "@/lib/observability";
 
 const verifyInputSchema = z.object({
     invitationId: z.string().uuid(),
@@ -71,21 +71,7 @@ export async function POST(request: Request) {
 
         // Idempotency: a paid payment belongs only to this invitation. If it is already
         // published, return the existing link; otherwise retry publishing this invitation.
-        if (localPayment.status === "paid") {
-            if (invite.status !== "published") {
-                const publishResult = await publishInvitationAfterPayment({
-                    userId: user.id,
-                    invitationId,
-                    customSlug,
-                });
-
-                return NextResponse.json({
-                    status: "success",
-                    publicUrl: publishResult.publicUrl,
-                    slug: publishResult.slug,
-                });
-            }
-
+        if ((localPayment.status as string) === "published" && invite.status === "published") {
             const publicUrl = getPublicInvitationUrl(invite.slug);
             return NextResponse.json({
                 status: "success",
@@ -97,7 +83,7 @@ export async function POST(request: Request) {
         // 5. Recreate expected signature and verify with timing-safe method
         const isSignatureValid = verifyRazorpaySignature(orderId, paymentId, signature);
         if (!isSignatureValid) {
-            console.error(`Invalid payment signature for order: ${orderId}, payment: ${paymentId}`);
+            logEvent("warn", "payment.signature_invalid", { orderId, paymentId, invitationId });
             return NextResponse.json({ error: "Payment verification signature failed" }, { status: 400 });
         }
 
@@ -106,7 +92,7 @@ export async function POST(request: Request) {
         try {
             providerPayment = await razorpay.payments.fetch(paymentId);
         } catch (fetchError) {
-            console.error(`Failed to fetch payment details from Razorpay for id ${paymentId}:`, fetchError);
+            reportError(fetchError, "payment.provider_fetch_failed", { paymentId, orderId, invitationId });
             return NextResponse.json({ error: "Failed to confirm payment details with provider" }, { status: 502 });
         }
 
@@ -115,7 +101,7 @@ export async function POST(request: Request) {
             providerPayment.amount !== localPayment.amount_paise ||
             providerPayment.currency !== localPayment.currency
         ) {
-            console.error("Razorpay payment details do not match local database records:", {
+            logEvent("warn", "payment.provider_mismatch", {
                 orderId: providerPayment.order_id,
                 localOrderId: orderId,
                 amount: providerPayment.amount,
@@ -127,69 +113,46 @@ export async function POST(request: Request) {
         }
 
         if (providerPayment.status !== "captured" && providerPayment.status !== "authorized") {
-            console.error(`Payment ${paymentId} is not in captured or authorized status: ${providerPayment.status}`);
+            logEvent("warn", "payment.provider_not_captured", { paymentId, orderId, providerStatus: providerPayment.status });
             return NextResponse.json({ error: "Payment was not completed successfully" }, { status: 400 });
         }
 
-        // 8. Update payment status to paid
-        const { error: updatePaymentError } = await supabaseAdmin
+        const { error: signaturePersistError } = await supabaseAdmin
             .from("payments")
             .update({
-                provider_payment_id: paymentId,
                 provider_signature: signature,
-                status: "paid",
-                paid_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                metadata: {
-                    ...((localPayment.metadata as Record<string, Json>) || {}),
-                    payment_details: providerPayment as unknown as Json,
-                },
             })
             .eq("id", localPayment.id);
 
-        if (updatePaymentError) {
-            console.error("Error updating local payment record to paid:", updatePaymentError);
-            return NextResponse.json({ error: "Failed to record transaction status" }, { status: 500 });
+        if (signaturePersistError) {
+            reportError(signaturePersistError, "payment.signature_persist_failed", { paymentId, orderId, paymentAttemptId: localPayment.id });
         }
 
-        const { error: markInvitationPaidError } = await supabaseAdmin
-            .from("invitations")
-            .update({
-                payment_status: "paid",
-                first_payment_id: localPayment.id,
-                updated_at: new Date().toISOString(),
-            })
-            .eq("id", invitationId)
-            .eq("user_id", user.id);
+        const finalization = await finalizePaidInvitationPublish({
+            payment: localPayment,
+            providerPaymentId: paymentId,
+            providerStatus: providerPayment.status,
+            providerPayload: providerPayment,
+            actorType: "user",
+            correlationId: paymentId,
+            customSlug,
+        });
 
-        if (markInvitationPaidError) {
-            console.error("Payment was recorded but invitation entitlement was not updated:", markInvitationPaidError);
-        }
-
-        // 9. Call atomic publishing service
-        try {
-            const publishResult = await publishInvitationAfterPayment({
-                userId: user.id,
-                invitationId,
-                customSlug,
-            });
-
+        if (finalization.status === "published") {
             return NextResponse.json({
                 status: "success",
-                publicUrl: publishResult.publicUrl,
-                slug: publishResult.slug,
-            });
-        } catch (publishErr: unknown) {
-            console.error("Verification marked payment as PAID but publishing service failed:", publishErr);
-            // Re-verify that payment is still recorded as PAID. Return success block indicating recovery required.
-            return NextResponse.json({
-                status: "paymentPaidPublishFailed",
-                error: "Payment completed, but publishing is not ready yet.",
-                message: "Your payment was verified. However, we could not launch your invitation yet. Please click Publish Now to retry.",
+                publicUrl: finalization.publicUrl,
+                slug: finalization.slug,
             });
         }
+
+        return NextResponse.json({
+            status: "paymentPaidPublishFailed",
+            error: "Payment completed, but publishing is not ready yet.",
+            message: finalization.message || "Your payment was successful, but publishing is still being completed. Please do not pay again.",
+        }, { status: 202 });
     } catch (err: unknown) {
-        console.error("Unhandled error verifying Razorpay payment:", err);
+        reportError(err, "payment.verify_unhandled");
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

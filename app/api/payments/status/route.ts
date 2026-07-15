@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { looseSupabase } from "@/lib/supabase/loose";
 
 export async function GET(request: Request) {
     try {
@@ -39,18 +40,23 @@ export async function GET(request: Request) {
 
         // Query payments table to check for verified payments using admin client
         const supabaseAdmin = createAdminClient();
-        const { data: payment } = await supabaseAdmin
+        const { data: payment } = await looseSupabase(supabaseAdmin)
             .from("payments")
-            .select("id")
+            .select("id, status, publish_state, recovery_state")
             .eq("invitation_id", invitationId)
-            .eq("status", "paid")
+            .in("status", ["paid", "captured", "publish_pending", "published", "recovery_pending", "manual_review"])
+            .order("created_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
+
+        const paymentStatus = payment as { status?: string; recovery_state?: string } | null;
 
         return NextResponse.json({
             isFree: template.is_free,
             pricePaise: template.price_paise,
             currency: template.currency,
             alreadyPaid: !!payment,
+            recoveryPending: paymentStatus?.status === "recovery_pending" || paymentStatus?.recovery_state === "pending",
         });
     } catch (err: unknown) {
         console.error("Error fetching payment status:", err);

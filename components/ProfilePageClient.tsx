@@ -14,6 +14,7 @@ import {
     ExternalLink,
     Eye,
     HelpCircle,
+    Loader2,
     PencilLine,
     Receipt,
     RefreshCw,
@@ -26,6 +27,7 @@ import ProfileCard from "@/components/ProfileCard";
 import { Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { formatPaiseToCurrency } from "@/lib/currency";
+import { getTransactionLifecycle, TransactionLifecycleState } from "@/lib/payments/transactionLifecycle";
 import { useScrollPreservation } from "./NavigationStateProvider";
 import { InvitationData } from "@/types/invitation";
 import { useToast } from "./Toast";
@@ -38,6 +40,14 @@ type PaymentRecord = {
     amount_paise: number;
     currency: string;
     status: string;
+    payment_status?: string | null;
+    publish_status?: string | null;
+    refund_status?: string | null;
+    recovery_status?: string | null;
+    refund_reason?: string | null;
+    refund_reference?: string | null;
+    refund_processed_at?: string | null;
+    published_at?: string | null;
     receipt: string | null;
     created_at: string;
     templateName: string | null;
@@ -132,6 +142,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
     const {
         data: paymentsPages,
         error: paymentsFetchError,
+        mutate: mutatePayments,
         setSize: setPaymentsSize,
         isLoading: isPaymentsInitialLoading,
         isValidating: isPaymentsValidating,
@@ -330,6 +341,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
                             hasMore={Boolean(paymentsLastPage?.hasMore)}
                             pageCount={paymentsPages?.length || 0}
                             onLoadMore={() => setPaymentsSize((current) => current + 1)}
+                            onRetry={() => mutatePayments()}
                         />
                     }
                 />
@@ -477,13 +489,18 @@ function ProfileUsedTemplates({
                 {isLoading ? (
                     <ProfileTemplateRatingsSkeleton />
                 ) : hasError ? (
-                    <div className="paymentsErrorCard">
-                        <AlertTriangle size={20} />
-                        <div>
+                    <div className="paymentsErrorCard" role="alert">
+                        <span className="paymentsErrorIcon" aria-hidden="true">
+                            <AlertTriangle size={18} />
+                        </span>
+                        <div className="paymentsErrorBody">
                             <strong>Error Loading Used Templates</strong>
                             <p>We could not retrieve your used templates.</p>
-                            <button type="button" className="profileTabRetryBtn" onClick={onRetry}>Retry</button>
                         </div>
+                        <button type="button" className="paymentsErrorAction" onClick={onRetry}>
+                            <RefreshCw size={14} />
+                            <span>Retry</span>
+                        </button>
                     </div>
                 ) : ratings.length === 0 ? (
                     <div className="paymentsEmptyState">
@@ -746,6 +763,7 @@ function ProfileTransactions({
     hasMore,
     pageCount,
     onLoadMore,
+    onRetry,
 }: {
     payments: PaymentRecord[];
     hasError: boolean;
@@ -754,6 +772,7 @@ function ProfileTransactions({
     hasMore: boolean;
     pageCount: number;
     onLoadMore: () => void;
+    onRetry: () => void;
 }) {
     const sentinelRef = useInfiniteScroll<HTMLDivElement>({
         disabled: !hasMore || isLoadingMore,
@@ -766,12 +785,18 @@ function ProfileTransactions({
                 {isLoading ? (
                     <ProfileTransactionsSkeleton />
                 ) : hasError ? (
-                    <div className="paymentsErrorCard">
-                        <AlertTriangle size={20} />
-                        <div>
+                    <div className="paymentsErrorCard" role="alert">
+                        <span className="paymentsErrorIcon" aria-hidden="true">
+                            <AlertTriangle size={18} />
+                        </span>
+                        <div className="paymentsErrorBody">
                             <strong>Error Loading Records</strong>
-                            <p>We could not retrieve your transaction logs. Please reload the page.</p>
+                            <p>We could not retrieve your transaction logs.</p>
                         </div>
+                        <button type="button" className="paymentsErrorAction" onClick={onRetry}>
+                            <RefreshCw size={14} />
+                            <span>Reload</span>
+                        </button>
                     </div>
                 ) : payments.length === 0 ? (
                     <div className="paymentsEmptyState">
@@ -851,6 +876,8 @@ function PaymentSkeletonCard() {
 }
 
 function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
+    const [downloadingDocument, setDownloadingDocument] = useState<"invoice" | "refund" | null>(null);
+    const { showToast } = useToast();
     const templateName = payment.templateName || "Premium Design";
     const invitationTitle = payment.invitationTitle || "Deleted Invitation";
     const publicUrl = payment.invitationSlug ? getPublicInvitationUrl(payment.invitationSlug) : null;
@@ -861,8 +888,36 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
         hour: "2-digit",
         minute: "2-digit",
     });
-    const status = getPaymentStatus(payment.status);
+    const lifecycle = getTransactionLifecycle(payment);
+    const status = getPaymentStatus(lifecycle);
     const StatusIcon = status.icon;
+    const amountLabel = lifecycle === "refunded"
+        ? `Refunded ${formatPaiseToCurrency(payment.amount_paise, payment.currency)}`
+        : formatPaiseToCurrency(payment.amount_paise, payment.currency);
+    const refundDate = payment.refund_processed_at
+        ? new Date(payment.refund_processed_at).toLocaleDateString("en-IN", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        })
+        : null;
+    const refundReference = payment.refund_reference || null;
+    const refundReason = payment.refund_reason || (lifecycle === "refunded" ? "Failed publication recovery refund" : null);
+    const invitationAccessRevoked = lifecycle === "refunded" && !publicUrl;
+    const isDownloadingInvoice = downloadingDocument === "invoice";
+    const isDownloadingRefund = downloadingDocument === "refund";
+
+    async function handleDownloadDocument(kind: "invoice" | "refund") {
+        if (downloadingDocument) return;
+        setDownloadingDocument(kind);
+        try {
+            await downloadServerDocument(payment.id, kind);
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : "Unable to download document.", "error");
+        } finally {
+            setDownloadingDocument(null);
+        }
+    }
 
     return (
         <article className="profileTransactionCard">
@@ -886,10 +941,16 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
                 </div>
 
                 <div className="profileTransactionAside">
-                    <strong>{formatPaiseToCurrency(payment.amount_paise, payment.currency)}</strong>
+                    <strong>{amountLabel}</strong>
                     <span>{payment.currency}</span>
                 </div>
             </div>
+
+            {status.message ? (
+                <div className={`profileTransactionNotice ${status.className}`}>
+                    {status.message}
+                </div>
+            ) : null}
 
             <div className="profileTransactionMeta">
                 <span className="profileTransactionDate">
@@ -902,141 +963,124 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
                         <code>{payment.receipt}</code>
                     </span>
                 ) : null}
+                {refundDate ? (
+                    <span className="profileTransactionRef">
+                        <span className="refLabel">Refund Date</span>
+                        <code>{refundDate}</code>
+                    </span>
+                ) : null}
+                {refundReference ? (
+                    <span className="profileTransactionRef">
+                        <span className="refLabel">Refund Ref</span>
+                        <code>{refundReference}</code>
+                    </span>
+                ) : null}
+                {refundReason ? (
+                    <span className="profileTransactionRef">
+                        <span className="refLabel">Reason</span>
+                        <code>{refundReason}</code>
+                    </span>
+                ) : null}
+                {invitationAccessRevoked ? (
+                    <span className="profileTransactionRef profileTransactionAccessRevoked">
+                        Invitation access revoked.
+                    </span>
+                ) : null}
             </div>
 
             <div className="profileTransactionAction">
-                {publicUrl && payment.status === "paid" ? (
+                {lifecycle === "paid" && publicUrl ? (
                     <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="paymentLinkAction">
                         <ExternalLink size={13} />
-                        <span>View Site</span>
+                        <span>View Invitation</span>
+                    </a>
+                ) : lifecycle === "refund_pending" ? (
+                    <span className="paymentNoAction paymentProcessingAction">
+                        <Loader2 size={13} className="spinner" />
+                        <span>Refund Pending</span>
+                    </span>
+                ) : lifecycle === "refunded" ? (
+                    <button type="button" className="paymentLinkAction" onClick={() => showRefundDetails(payment)}>
+                        <HelpCircle size={13} />
+                        <span>View Refund Details</span>
+                    </button>
+                ) : lifecycle === "recovery_pending" ? (
+                    <span className="paymentNoAction paymentProcessingAction">
+                        <Loader2 size={13} className="spinner" />
+                        Processing...
+                    </span>
+                ) : lifecycle === "failed" ? (
+                    <a href={`/builder?id=${payment.invitation_id}&from=transactions`} className="paymentLinkAction">
+                        <RefreshCw size={13} />
+                        <span>Retry Payment</span>
                     </a>
                 ) : (
-                    <span className="paymentNoAction">No public link</span>
+                    <span className="paymentNoAction">Processing...</span>
                 )}
-                <button
-                    type="button"
-                    className="paymentInvoiceAction"
-                    onClick={() => downloadPaymentInvoice({ dateString, invitationTitle, payment, statusLabel: status.label, templateName })}
-                >
-                    <Download size={13} />
-                    <span>Invoice</span>
-                </button>
+
+                {lifecycle === "failed" || lifecycle === "recovery_pending" ? null : (
+                    <button
+                        type="button"
+                        className="paymentInvoiceAction"
+                        onClick={() => handleDownloadDocument("invoice")}
+                        disabled={Boolean(downloadingDocument)}
+                    >
+                        {isDownloadingInvoice ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
+                        <span>{isDownloadingInvoice ? "Preparing invoice..." : "Download Invoice"}</span>
+                    </button>
+                )}
+
+                {lifecycle === "refunded" && refundReference ? (
+                    <button
+                        type="button"
+                        className="paymentInvoiceAction"
+                        onClick={() => handleDownloadDocument("refund")}
+                        disabled={Boolean(downloadingDocument)}
+                    >
+                        {isDownloadingRefund ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
+                        <span>{isDownloadingRefund ? "Preparing refund receipt..." : "Download Refund Receipt"}</span>
+                    </button>
+                ) : lifecycle === "refund_pending" ? (
+                    <span className="paymentNoAction">Refund receipt available after completion</span>
+                ) : null}
             </div>
         </article>
     );
 }
 
-function downloadPaymentInvoice({
-    dateString,
-    invitationTitle,
-    payment,
-    statusLabel,
-    templateName,
-}: {
-    dateString: string;
-    invitationTitle: string;
-    payment: PaymentRecord;
-    statusLabel: string;
-    templateName: string;
-}) {
-    const invoiceNumber = payment.receipt || payment.id;
-    const fileName = `vilique-invoice-${sanitizeFileName(invoiceNumber)}.html`;
-    const html = buildInvoiceHtml({
-        amount: formatPaiseToCurrency(payment.amount_paise, payment.currency),
-        currency: payment.currency,
-        dateString,
-        invitationTitle,
-        invoiceNumber,
-        statusLabel,
-        templateName,
-    });
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+function showRefundDetails(payment: PaymentRecord) {
+    const lines = [
+        payment.refund_reference ? `Refund reference: ${payment.refund_reference}` : null,
+        payment.refund_processed_at ? `Refund date: ${new Date(payment.refund_processed_at).toLocaleDateString("en-IN")}` : null,
+        payment.refund_reason ? `Reason: ${payment.refund_reason}` : null,
+    ].filter(Boolean);
+
+    window.alert(lines.length ? lines.join("\n") : "Refund details are being reconciled. Please contact support with this transaction reference.");
+}
+
+async function downloadServerDocument(transactionId: string, kind: "invoice" | "refund") {
+    const response = await fetch(`/api/profile/transactions/${encodeURIComponent(transactionId)}/${kind === "invoice" ? "invoice" : "refund-receipt"}`);
+    if (!response.ok) {
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(result?.error || "Unable to download document.");
+    }
+
+    const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = fileName;
+    link.download = getDownloadFileName(response.headers.get("Content-Disposition"), kind, transactionId);
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
 }
 
-function buildInvoiceHtml({
-    amount,
-    currency,
-    dateString,
-    invitationTitle,
-    invoiceNumber,
-    statusLabel,
-    templateName,
-}: {
-    amount: string;
-    currency: string;
-    dateString: string;
-    invitationTitle: string;
-    invoiceNumber: string;
-    statusLabel: string;
-    templateName: string;
-}) {
-    return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Vilique Invoice ${escapeHtml(invoiceNumber)}</title>
-  <style>
-    body { margin: 0; padding: 32px; color: #1f1235; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fbf7ff; }
-    .invoice { max-width: 720px; margin: 0 auto; border: 1px solid #eadff3; border-radius: 20px; padding: 28px; background: #fff; box-shadow: 0 24px 70px rgba(42, 30, 36, .08); }
-    header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid #eee6f5; padding-bottom: 18px; }
-    h1 { margin: 0; font-size: 28px; }
-    .brand { color: #7e3ff2; font-size: 13px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-    .amount { text-align: right; }
-    .amount strong { display: block; font-size: 32px; line-height: 1; }
-    .amount span, .muted { color: #8b7c9f; font-size: 13px; font-weight: 750; }
-    dl { display: grid; grid-template-columns: 180px 1fr; gap: 12px 20px; margin: 24px 0 0; }
-    dt { color: #8b7c9f; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-    dd { margin: 0; font-weight: 800; }
-    .status { color: #16a34a; }
-    footer { margin-top: 26px; padding-top: 16px; border-top: 1px solid #eee6f5; color: #8b7c9f; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <main class="invoice">
-    <header>
-      <div>
-        <div class="brand">Vilique</div>
-        <h1>Invoice</h1>
-        <p class="muted">${escapeHtml(invoiceNumber)}</p>
-      </div>
-      <div class="amount">
-        <strong>${escapeHtml(amount)}</strong>
-        <span>${escapeHtml(currency)}</span>
-      </div>
-    </header>
-    <dl>
-      <dt>Template</dt><dd>${escapeHtml(templateName)}</dd>
-      <dt>Invitation</dt><dd>${escapeHtml(invitationTitle)}</dd>
-      <dt>Date</dt><dd>${escapeHtml(dateString)}</dd>
-      <dt>Status</dt><dd class="status">${escapeHtml(statusLabel)}</dd>
-      <dt>Reference</dt><dd>${escapeHtml(invoiceNumber)}</dd>
-    </dl>
-    <footer>This invoice was generated from your Vilique transaction history.</footer>
-  </main>
-</body>
-</html>`;
-}
-
-function sanitizeFileName(value: string) {
-    return value.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "transaction";
-}
-
-function escapeHtml(value: string) {
-    return value
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+function getDownloadFileName(contentDisposition: string | null, kind: "invoice" | "refund", fallback: string) {
+    const match = contentDisposition?.match(/filename="([^"]+)"/i);
+    if (match?.[1]) return match[1];
+    return `vilique-${kind === "invoice" ? "invoice" : "refund"}-${fallback}.pdf`;
 }
 
 function formatCategoryLabel(category: string) {
@@ -1071,23 +1115,28 @@ function updateProfileTabUrl(tab: ProfileTab) {
     window.history.replaceState(null, "", url.toString());
 }
 
-function getPaymentStatus(status: string) {
+function getPaymentStatus(status: TransactionLifecycleState) {
     if (status === "paid") {
         return { label: "Paid", className: "paid", icon: CheckCircle2 };
     }
     if (status === "failed") {
         return { label: "Failed", className: "failed", icon: AlertTriangle };
     }
+    if (status === "refund_pending") {
+        return { label: "Refund Pending", className: "refundPending", icon: RefreshCw };
+    }
     if (status === "refunded") {
         return { label: "Refunded", className: "refunded", icon: RefreshCw };
     }
-    if (status === "cancelled") {
-        return { label: "Cancelled", className: "cancelled", icon: AlertTriangle };
+    if (status === "recovery_pending") {
+        return {
+            label: "Publishing...",
+            className: "recovery",
+            icon: Loader2,
+            message: "Your payment was successful. Publishing is being completed automatically. Please do not pay again.",
+        };
     }
-    if (status === "partially_refunded") {
-        return { label: "Part. Refunded", className: "refunded", icon: RefreshCw };
-    }
-    return { label: "Pending", className: "pending", icon: HelpCircle };
+    return { label: "Processing", className: "pending", icon: HelpCircle };
 }
 
 function getGreeting() {

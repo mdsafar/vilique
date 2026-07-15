@@ -4,6 +4,7 @@ import { mapInvitationRow, type InvitationRowWithTemplate } from "@/features/inv
 import { createClient } from "@/lib/supabase/server";
 import { invitationCreateSchema } from "@/features/invitations/validation";
 import { buildInvitationSlug } from "@/features/invitations/slug";
+import { getInvitationLifecycle } from "@/lib/lifecycle";
 
 const INVITATION_LIMIT_DEFAULT = 12;
 const INVITATION_LIMIT_MAX = 30;
@@ -37,35 +38,38 @@ export async function GET(request: Request) {
 
     let query = supabase
         .from("invitations")
-        .select("*, invitation_templates(template_key, default_music_url, default_tick_sound_url)", { count: "exact" })
+        .select("*, invitation_templates(template_key, default_music_url, default_tick_sound_url)")
         .eq("user_id", user.id);
 
     query = applyInvitationSearch(query, search);
-    query = applyInvitationStatusFilter(query, status, paidInvitationIdsForUser);
-    query = applyCursor(query, sortConfig.field, sortConfig.ascending, cursor);
     query = query
         .order(sortConfig.field, { ascending: sortConfig.ascending, nullsFirst: false })
         .order("id", { ascending: sortConfig.ascending })
-        .limit(limit + 1);
+        .range(0, 999);
 
-    const { data, error, count } = await query;
+    const { data, error } = await query;
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    const rows = data || [];
-    const pageRows = rows.slice(0, limit) as InvitationRowWithTemplate[];
-    const paidInvitationIds = await getPaidInvitationIds(user.id, pageRows.map((row) => row.id));
-    const items = pageRows.map((row) => {
+    const rows = (data || []) as InvitationRowWithTemplate[];
+    const itemsWithRows = rows.map((row) => {
         const item = mapInvitationRow(row);
-        return paidInvitationIds.has(row.id) ? { ...item, paymentStatus: "paid" as const } : item;
+        return {
+            item: paidInvitationIdsForUser.includes(row.id) ? { ...item, paymentStatus: "paid" as const } : item,
+            row,
+        };
     });
-    const lastRow = pageRows[pageRows.length - 1] as Record<string, unknown> | undefined;
-    const hasMore = rows.length > limit;
+    const filteredItemsWithRows = itemsWithRows.filter(({ item }) => isInvitationVisibleForStatus(item, status));
+    const cursorFilteredItemsWithRows = applyCursorToItems(filteredItemsWithRows, sortConfig.field, sortConfig.ascending, cursor);
+    const pageItemsWithRows = cursorFilteredItemsWithRows.slice(0, limit);
+    const items = pageItemsWithRows.map(({ item }) => item);
+    const lastRow = pageItemsWithRows[pageItemsWithRows.length - 1]?.row as Record<string, unknown> | undefined;
+    const hasMore = cursorFilteredItemsWithRows.length > limit;
     const [counts, stats] = await Promise.all([
         getInvitationCounts(user.id, search, paidInvitationIdsForUser),
-        getInvitationStats(pageRows.map((row) => row.id)),
+        getInvitationStats(pageItemsWithRows.map(({ row }) => row.id)),
     ]);
 
     return NextResponse.json({
@@ -74,7 +78,7 @@ export async function GET(request: Request) {
             ? encodeCursor({ value: String(lastRow[sortConfig.field] || ""), id: String(lastRow.id) })
             : null,
         hasMore,
-        totalCount: count || 0,
+        totalCount: filteredItemsWithRows.length,
         counts,
         stats,
     });
@@ -187,72 +191,41 @@ function applyInvitationSearch<T>(query: T, search: string): T {
     ].join(","));
 }
 
-function applyInvitationStatusFilter<T>(query: T, status: InvitationStatusFilter, paidInvitationIds: string[] = []): T {
-    type Builder = {
-        eq: (column: string, value: string) => Builder;
-        neq: (column: string, value: string) => Builder;
-        not: (column: string, operator: string, value: string) => Builder;
-        or: (filters: string) => Builder;
-    };
-    const builder = query as unknown as Builder;
-
-    if (status === "draft") {
-        let draftQuery = builder
-            .eq("status", "draft")
-            .neq("payment_status", "paid")
-            .neq("lifecycle_status", "unpublished")
-            .neq("event_status", "unpublished");
-
-        if (paidInvitationIds.length) {
-            draftQuery = draftQuery.not("id", "in", `(${paidInvitationIds.join(",")})`);
-        }
-        return draftQuery as T;
-    }
-    if (status === "completed") return builder.or("lifecycle_status.eq.completed,event_status.eq.completed,completed_at.not.is.null") as T;
-    if (status === "offline") {
-        return builder.or(
-            [
-                paidInvitationIds.length
-                    ? `and(id.in.(${paidInvitationIds.join(",")}),first_published_at.is.null,status.eq.draft)`
-                    : "",
-                "and(payment_status.eq.paid,first_published_at.is.null,status.eq.draft)",
-                "lifecycle_status.eq.unpublished",
-                "event_status.eq.unpublished",
-                "and(status.neq.published,status.neq.draft)",
-            ].filter(Boolean).join(",")
-        ) as T;
-    }
-    if (status === "upcoming") return builder.eq("status", "published").or("lifecycle_status.eq.published,event_status.eq.published") as T;
-    return query;
-}
-
-function applyCursor<T>(
-    query: T,
+function applyCursorToItems<T extends { row: Record<string, unknown> }>(
+    items: T[],
     field: string,
     ascending: boolean,
     cursor: { value: string; id: string } | null
-): T {
-    if (!cursor?.value || !cursor.id) return query;
-    const operator = ascending ? "gt" : "lt";
-    return (query as { or: (filters: string) => T }).or(
-        `${field}.${operator}.${cursor.value},and(${field}.eq.${cursor.value},id.${operator}.${cursor.id})`
-    );
+) {
+    if (!cursor?.value || !cursor.id) return items;
+    return items.filter(({ row }) => {
+        const rowValue = String(row[field] || "");
+        const rowId = String(row.id || "");
+        if (rowValue === cursor.value) return ascending ? rowId > cursor.id : rowId < cursor.id;
+        return ascending ? rowValue > cursor.value : rowValue < cursor.value;
+    });
 }
 
 async function getInvitationCounts(userId: string, search: string, paidInvitationIds: string[]) {
     const supabase = await createClient();
     const statuses: InvitationStatusFilter[] = ["all", "upcoming", "completed", "draft", "offline"];
-    const entries = await Promise.all(statuses.map(async (status) => {
-        let query = supabase
-            .from("invitations")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", userId);
-        query = applyInvitationSearch(query, search);
-        query = applyInvitationStatusFilter(query, status, paidInvitationIds);
-        const { count } = await query;
-        return [status, count || 0] as const;
-    }));
-    return Object.fromEntries(entries);
+    let query = supabase
+        .from("invitations")
+        .select("*, invitation_templates(template_key, default_music_url, default_tick_sound_url)")
+        .eq("user_id", userId)
+        .range(0, 999);
+
+    query = applyInvitationSearch(query, search);
+    const { data } = await query;
+    const items = ((data || []) as InvitationRowWithTemplate[]).map((row) => {
+        const item = mapInvitationRow(row);
+        return paidInvitationIds.includes(row.id) ? { ...item, paymentStatus: "paid" as const } : item;
+    });
+
+    return Object.fromEntries(statuses.map((status) => [
+        status,
+        items.filter((item) => isInvitationVisibleForStatus(item, status)).length,
+    ]));
 }
 
 async function getInvitationStats(invitationIds: string[]) {
@@ -274,20 +247,6 @@ async function getInvitationStats(invitationIds: string[]) {
     ]));
 }
 
-async function getPaidInvitationIds(userId: string, invitationIds: string[]) {
-    if (!invitationIds.length) return new Set<string>();
-
-    const supabase = await createClient();
-    const { data } = await supabase
-        .from("payments")
-        .select("invitation_id")
-        .eq("user_id", userId)
-        .eq("status", "paid")
-        .in("invitation_id", invitationIds);
-
-    return new Set((data || []).map((row) => row.invitation_id).filter(Boolean));
-}
-
 async function getPaidInvitationIdsForUser(userId: string) {
     const supabase = await createClient();
     const { data } = await supabase
@@ -298,6 +257,27 @@ async function getPaidInvitationIdsForUser(userId: string) {
         .not("invitation_id", "is", null);
 
     return Array.from(new Set((data || []).map((row) => row.invitation_id).filter(Boolean)));
+}
+
+function isInvitationVisibleForStatus(
+    invitation: ReturnType<typeof mapInvitationRow> & { paymentStatus?: string },
+    status: InvitationStatusFilter
+) {
+    if (status === "all") return true;
+    return getInvitationFilterBucket(invitation) === status;
+}
+
+function getInvitationFilterBucket(invitation: ReturnType<typeof mapInvitationRow> & { paymentStatus?: string }) {
+    const isPaidPublishFailed = invitation.paymentStatus === "paid" &&
+        !invitation.firstPublishedAt &&
+        invitation.status !== "published";
+    if (isPaidPublishFailed) return "offline";
+
+    const lifecycleStatus = getInvitationLifecycle(invitation);
+    if (lifecycleStatus === "draft") return "draft";
+    if (lifecycleStatus === "offline") return "offline";
+    if (lifecycleStatus === "completed") return "completed";
+    return "upcoming";
 }
 
 function encodeCursor(cursor: { value: string; id: string }) {

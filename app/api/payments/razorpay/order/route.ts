@@ -7,6 +7,8 @@ import { Json } from "@/types/database";
 import { isInvitationCompleted } from "@/lib/lifecycle";
 import { buildInvitationSlug, getInvitationReadableName, isSlugAvailable, slugifyInvitationText } from "@/features/invitations/slug";
 import crypto from "crypto";
+import { looseSupabase } from "@/lib/supabase/loose";
+import { getClientIp, rateLimit, rateLimitResponse } from "@/lib/security/requestGuard";
 
 const orderInputSchema = z.object({
     invitationId: z.string().uuid(),
@@ -15,6 +17,12 @@ const orderInputSchema = z.object({
 
 export async function POST(request: Request) {
     try {
+        if (process.env.PAYMENTS_ENABLED === "false") {
+            return NextResponse.json({
+                error: "Payments are temporarily unavailable. Existing published invitations remain accessible.",
+            }, { status: 503 });
+        }
+
         // Validate required environment variables
         const keyId = process.env.RAZORPAY_KEY_ID;
         const keySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -31,6 +39,15 @@ export async function POST(request: Request) {
 
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const limit = await rateLimit({
+            key: `payment-order:${user.id}:${getClientIp(request)}`,
+            limit: 6,
+            windowMs: 10 * 60 * 1000,
+        });
+        if (!limit.ok) {
+            return rateLimitResponse(limit.resetAt);
         }
 
         // 2. Validate input
@@ -76,11 +93,12 @@ export async function POST(request: Request) {
 
         // 7. Check if already paid
         const supabaseAdmin = createAdminClient();
-        const { data: existingPaidPayment } = await supabaseAdmin
+        const looseAdmin = looseSupabase(supabaseAdmin);
+        const { data: existingPaidPayment } = await looseAdmin
             .from("payments")
             .select("id")
             .eq("invitation_id", invitationId)
-            .eq("status", "paid")
+            .in("status", ["paid", "published"])
             .maybeSingle();
 
         if (existingPaidPayment) {
@@ -94,25 +112,31 @@ export async function POST(request: Request) {
 
         // 9. Check for a reusable pending order created in the last 15 minutes
         const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-        const { data: reusablePayment } = await supabaseAdmin
+        const { data: reusablePayment } = await looseAdmin
             .from("payments")
             .select("*")
             .eq("invitation_id", invitationId)
             .eq("amount_paise", amountPaise)
             .eq("currency", currency)
-            .in("status", ["created", "attempted"])
+            .in("status", ["created", "pending", "attempted"])
             .gt("created_at", fifteenMinutesAgo)
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-        if (reusablePayment && reusablePayment.provider_order_id) {
-            console.log(`Reusing pending order ${reusablePayment.provider_order_id} for invitation ${invitationId}`);
+        const reusable = reusablePayment as {
+            provider_order_id?: string;
+            amount_paise?: number;
+            currency?: string;
+        } | null;
+
+        if (reusable?.provider_order_id) {
+            console.log(`Reusing pending order ${reusable.provider_order_id} for invitation ${invitationId}`);
             return NextResponse.json({
                 status: "orderCreated",
-                orderId: reusablePayment.provider_order_id,
-                amount: reusablePayment.amount_paise,
-                currency: reusablePayment.currency,
+                orderId: reusable.provider_order_id,
+                amount: reusable.amount_paise,
+                currency: reusable.currency,
                 keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || keyId,
                 name: "Vilique Premium Publication",
                 description: `Publishing: ${template.name}`,
@@ -139,7 +163,7 @@ export async function POST(request: Request) {
         }
 
         // 11. Store local payment row
-        const { error: insertError } = await supabaseAdmin
+        const { data: insertedPayment, error: insertError } = await looseAdmin
             .from("payments")
             .insert({
                 user_id: user.id,
@@ -150,13 +174,40 @@ export async function POST(request: Request) {
                 amount_paise: amountPaise,
                 currency: currency,
                 status: "created",
+                payment_state: "created",
+                publish_state: "draft",
+                recovery_state: "none",
+                refund_state: "none",
                 receipt: receipt,
                 metadata: order as unknown as Json,
-            });
+            })
+            .select("id")
+            .single();
 
         if (insertError) {
             console.error("Failed to insert payment record in DB:", insertError);
             return NextResponse.json({ error: "Database registration failure" }, { status: 500 });
+        }
+
+        const paymentId = typeof insertedPayment === "object" && insertedPayment && "id" in insertedPayment
+            ? String(insertedPayment.id)
+            : "";
+
+        if (paymentId) {
+            const { error: policyError } = await looseAdmin
+                .from("policy_acceptances")
+                .insert({
+                    user_id: user.id,
+                    invitation_id: invitationId,
+                    payment_id: paymentId,
+                    terms_version: "2026-07-15",
+                    refund_policy_version: "2026-07-15",
+                });
+
+            if (policyError) {
+                console.error("Failed to record payment policy acceptance:", policyError);
+                return NextResponse.json({ error: "Could not record policy acceptance" }, { status: 500 });
+            }
         }
 
         // 12. Return safe checkout details

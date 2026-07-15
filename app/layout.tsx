@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { siteConfig } from "@/lib/config/site";
+import { validateProductionEnv } from "@/lib/env";
 import StableDocumentTitle from "@/components/StableDocumentTitle";
 import { ToastProvider } from "@/components/Toast";
+import { LegalFooter } from "@/components/LegalPage";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -54,6 +56,8 @@ export const metadata: Metadata = {
   },
 };
 
+validateProductionEnv();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -65,6 +69,7 @@ export default function RootLayout({
         <StableDocumentTitle />
         <ToastProvider>
           {children}
+          <LegalFooter />
         </ToastProvider>
       </body>
     </html>
