@@ -1,27 +1,36 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { siteConfig } from "@/lib/config/site";
 import { createClient } from "@/lib/supabase/server";
 
-function getRedirectPath(formData: FormData) {
+function getRedirectPath(formData: FormData): string {
     const next = String(formData.get("next") || "/profile");
-    return next.startsWith("/") ? next : "/profile";
+
+    // Prevent external redirects such as //malicious-site.com
+    return next.startsWith("/") && !next.startsWith("//")
+        ? next
+        : "/profile";
 }
 
-export async function signInWithEmail(formData: FormData) {
-    const supabase = await createClient();
-    const email = String(formData.get("email") || "");
-    const password = String(formData.get("password") || "");
-    const next = getRedirectPath(formData);
+async function getRequestOrigin(): Promise<string> {
+    const headerStore = await headers();
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const forwardedHost = headerStore.get("x-forwarded-host");
+    const host = forwardedHost || headerStore.get("host");
 
-    if (error) {
-        redirect(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
+    const forwardedProtocol = headerStore.get("x-forwarded-proto");
+
+    if (host) {
+        const protocol =
+            forwardedProtocol ||
+            (host.includes("localhost") ? "http" : "https");
+
+        return `${protocol}://${host}`;
     }
 
-    redirect(next);
+    return siteConfig.url;
 }
 
 export async function signInWithGoogle(formData: FormData) {
@@ -29,23 +38,30 @@ export async function signInWithGoogle(formData: FormData) {
 
     if (process.env.GOOGLE_AUTH_ENABLED !== "true") {
         redirect(
-            `/login?error=${encodeURIComponent("Google login is not enabled for this Supabase project yet.")}&next=${encodeURIComponent(next)}`
+            `/login?error=${encodeURIComponent(
+                "Google login is not enabled."
+            )}&next=${encodeURIComponent(next)}`
         );
     }
 
     const supabase = await createClient();
-    const origin = siteConfig.url;
+    const origin = await getRequestOrigin();
+
+    const callbackUrl =
+        `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+            redirectTo: callbackUrl,
         },
     });
 
     if (error || !data.url) {
         redirect(
-            `/login?error=${encodeURIComponent(error?.message || "Unable to start Google login.")}&next=${encodeURIComponent(next)}`
+            `/login?error=${encodeURIComponent(
+                error?.message || "Unable to start Google login."
+            )}&next=${encodeURIComponent(next)}`
         );
     }
 
