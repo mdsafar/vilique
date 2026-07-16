@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, PencilLine, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import GoogleOAuthButton from "@/components/GoogleOAuthButton";
@@ -14,8 +14,10 @@ type Props = {
 
 export default function AuthRequiredModal({ next, forceOpen = false }: Props) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [status, setStatus] = useState<"checking" | "authed" | "guest">("checking");
     const effectiveStatus = forceOpen ? "guest" : status;
+    const authError = searchParams.get("authError");
 
     useEffect(() => {
         if (forceOpen) return;
@@ -148,6 +150,8 @@ export default function AuthRequiredModal({ next, forceOpen = false }: Props) {
                         </article>
                     ))}
                 </div>
+
+                {authError ? <div className="authError">{authError}</div> : null}
 
                 <form action={signInWithGoogle}>
                     <input type="hidden" name="next" value={next} />

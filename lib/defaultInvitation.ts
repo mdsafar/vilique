@@ -1,22 +1,26 @@
 import { InvitationData } from "@/types/invitation";
 import { getTemplateAudioDefaults } from "@/lib/config/templateAudio";
 
+const DEFAULT_EVENT_START_OFFSET_MS = 60 * 60 * 1000;
+const DEFAULT_EVENT_DURATION_MINUTES = 3 * 60 + 30;
+
 export function createDefaultInvitation(): InvitationData {
     const audioDefaults = getTemplateAudioDefaults("pastel-floral-wedding");
     const now = new Date();
-    const eventTime = getDefaultEventTime(now);
+    const eventStart = new Date(now.getTime() + DEFAULT_EVENT_START_OFFSET_MS);
+    const eventTime = getDefaultEventTime(eventStart);
 
     return {
         id: "default-draft-placeholder-id",
-        slug: "maya-arjun-wedding",
+        slug: "name-1-name-2-wedding",
         category: "wedding",
         templateId: "pastel-floral-wedding",
 
         title: "Wedding Invitation",
-        primaryName: "Maya",
-        secondaryName: "Arjun",
+        primaryName: "Name 1",
+        secondaryName: "Name 2",
 
-        eventDate: toDateInputValue(now),
+        eventDate: toDateInputValue(eventStart),
         eventTime,
         venueName: "The Rose Garden Hall",
         venueAddress: "MG Road, Kochi",
@@ -50,11 +54,9 @@ function toDateInputValue(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function getDefaultEventTime(date: Date) {
-    const nowMinutes = date.getHours() * 60 + date.getMinutes();
-    const nextSlot = Math.ceil((nowMinutes + 1) / 15) * 15;
-    const startMinutes = Math.min(Math.max(nextSlot, 9 * 60), 23 * 60 + 58);
-    const endMinutes = Math.min(startMinutes + 3 * 60 + 30, 23 * 60 + 59);
+function getDefaultEventTime(startDate: Date) {
+    const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+    const endMinutes = Math.min(startMinutes + DEFAULT_EVENT_DURATION_MINUTES, 23 * 60 + 59);
 
     return `${formatTimeLabel(startMinutes)} - ${formatTimeLabel(endMinutes)}`;
 }

@@ -67,6 +67,7 @@ export default async function TemplateDetailsPage({ params }: Props) {
         count: template.ratingCount ?? 0,
     };
     const ratingLabel = formatTemplateRating(ratingSummary);
+    const detailBadge = getTemplateDetailBadge(template);
 
     return (
         <main className="page templateDetailsPage">
@@ -83,9 +84,7 @@ export default async function TemplateDetailsPage({ params }: Props) {
                     <p>Template details</p>
                 </div>
 
-                <button className="templateDetailSelect analyticsHeaderPill" type="button">
-                    {categoryLabels[template.category]} template
-                </button>
+                <div className="analyticsHeaderSpacer" aria-hidden="true" />
             </header>
 
             <section className="templateDetailHero">
@@ -128,8 +127,8 @@ export default async function TemplateDetailsPage({ params }: Props) {
                     <p className="detailLead">{template.description}</p>
 
                     <div className="detailBadges">
-                        <span className={template.badge === "Premium" ? "premiumBadge" : "freeBadge"}>
-                            {template.badge}
+                        <span className={detailBadge.className}>
+                            {detailBadge.label}
                         </span>
                         <span>Animated</span>
                         <span>Mobile First</span>
@@ -189,6 +188,19 @@ export default async function TemplateDetailsPage({ params }: Props) {
             <TemplateSupport className="templateDetailSupport templateDetailSupport--desktop" />
         </main>
     );
+}
+
+function getTemplateDetailBadge(template: { id: string; popularity: string; badge: string }) {
+    if (template.id === "pastel-floral-wedding") {
+        return {
+            label: "Featured",
+            className: "featuredBadge",
+        };
+    }
+
+    return template.badge === "Premium"
+        ? { label: "Premium", className: "premiumBadge" }
+        : { label: template.popularity, className: "featuredBadge" };
 }
 
 function TemplateSupport({ className }: { className: string }) {

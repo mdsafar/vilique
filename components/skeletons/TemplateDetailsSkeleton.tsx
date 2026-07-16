@@ -16,7 +16,7 @@ export default function TemplateDetailsSkeleton() {
                     <h1>Template details</h1>
                     <p>Loading template</p>
                 </div>
-                <span className="templateDetailSelect analyticsHeaderPill">Template</span>
+                <div className="analyticsHeaderSpacer" aria-hidden="true" />
             </header>
 
             <section className="templateDetailHero">

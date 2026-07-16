@@ -40,7 +40,7 @@ export function generateEventFingerprint({
     const normPrimary = normalizeText(primaryName);
     const normSecondary = normalizeText(secondaryName || "");
 
-    // Sort names to make fingerprint order-independent (e.g. Maya & Arjun vs Arjun & Maya)
+    // Sort names to make fingerprint order-independent (e.g. Name 1 & Name 2 vs Name 2 & Name 1)
     const names = [normPrimary, normSecondary].filter(Boolean).sort();
 
     const parts = [

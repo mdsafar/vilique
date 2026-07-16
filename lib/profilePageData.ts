@@ -4,12 +4,12 @@ import { InvitationData } from "@/types/invitation";
 export const fallbackInvitations: InvitationData[] = [
     {
         id: "sample-wedding",
-        slug: "maya-arjun",
+        slug: "name-1-name-2",
         category: "wedding",
         templateId: "pastel-floral-wedding",
         title: "Wedding Invitation",
-        primaryName: "Maya",
-        secondaryName: "Arjun",
+        primaryName: "Name 1",
+        secondaryName: "Name 2",
         eventDate: "2027-02-14",
         eventTime: "05:30 PM",
         venueName: "",

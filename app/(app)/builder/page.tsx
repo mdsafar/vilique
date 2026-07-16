@@ -23,11 +23,13 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import PublishModal from "@/components/PublishModal";
 import { useToast } from "@/components/Toast";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { normalizeInvitationDateValue, parseInvitationDateParts } from "@/lib/invitationDate";
 import { getPublicInvitationUrl } from "@/lib/config/site";
+import { createDemoCountdownTargetDate } from "@/lib/demoCountdown";
 import { templates } from "@/data/templates";
 import TemplateRenderer from "@/components/TemplateRenderer";
 import type { InvitationData } from "@/types/invitation";
@@ -154,8 +156,19 @@ function dispatchSoundPreviewState(isPlaying: boolean) {
 export default function BuilderPage() {
     return (
         <Suspense fallback={<main className="builderShell" />}>
-            <BuilderContent />
+            <BuilderProtectedContent />
         </Suspense>
+    );
+}
+
+function BuilderProtectedContent() {
+    const searchParams = useSearchParams();
+    const currentBuilderPath = `/builder${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+
+    return (
+        <ProtectedRoute next={currentBuilderPath} className="builderShell">
+            <BuilderContent />
+        </ProtectedRoute>
     );
 }
 
@@ -168,6 +181,7 @@ function BuilderContent() {
     const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
     const [activeTab, setActiveTab] = useState<EditorTab>("content");
     const [previewScreen, setPreviewScreen] = useState<PreviewScreen>("invite");
+    const [demoCountdownTargetDate, setDemoCountdownTargetDate] = useState<Date | null>(createDemoCountdownTargetDate);
     const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
     const [saveState, setSaveState] = useState("Creating draft...");
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
@@ -468,6 +482,9 @@ function BuilderContent() {
     }
 
     function updateField(key: string, value: string) {
+        if (key === "eventDate" || key === "eventTime") {
+            setDemoCountdownTargetDate(null);
+        }
         setValidationErrors((prev) => {
             if (!(key in prev)) return prev;
             const nextInvitation = { ...invitation, [key]: value };
@@ -609,6 +626,7 @@ function BuilderContent() {
                 const response = await fetch(`/api/invitations/${existingId}`);
                 if (response.ok) {
                     const draft = normalizeInvitationDate(await response.json());
+                    setDemoCountdownTargetDate(null);
                     setInvitation(draft);
                     initialInvitation.current = draft;
                     lastSavedPayload.current = buildSavePayload(draft);
@@ -784,6 +802,7 @@ function BuilderContent() {
                                     <TemplateRenderer
                                         invitation={invitation}
                                         accepted={previewScreen === "thanks"}
+                                        demoCountdownTargetDate={demoCountdownTargetDate ?? undefined}
                                         onAccept={() => setPreviewScreen("thanks")}
                                         onDecline={() => setPreviewScreen("invite")}
                                         enableAudio
@@ -1651,10 +1670,6 @@ function DatePickerField({
                                     </button>
                                 );
                             })}
-                        </div>
-
-                        <div className="customPickerFooter single">
-                            <button type="button" onClick={() => onToggle(false)}>Done</button>
                         </div>
                     </div>
                 </PickerModal>

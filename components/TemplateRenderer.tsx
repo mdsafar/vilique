@@ -8,6 +8,7 @@ type TemplateRendererProps = {
     invitation: InvitationData;
     accepted?: boolean;
     rsvpStatus?: RSVPStatus | null;
+    demoCountdownTargetDate?: Date;
     onAccept?: () => void;
     onDecline?: () => void;
     onChangeRsvp?: () => void;
@@ -26,13 +27,14 @@ export default function TemplateRenderer({
     invitation,
     accepted,
     rsvpStatus,
+    demoCountdownTargetDate,
     onAccept,
     onDecline,
     onChangeRsvp,
     onEvent,
     enableAudio,
 }: TemplateRendererProps) {
-    const props = { invitation, accepted, rsvpStatus, onAccept, onDecline, onChangeRsvp, onEvent, enableAudio };
+    const props = { invitation, accepted, rsvpStatus, demoCountdownTargetDate, onAccept, onDecline, onChangeRsvp, onEvent, enableAudio };
 
     switch (invitation.templateId) {
         case "pastel-floral-wedding":

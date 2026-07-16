@@ -20,6 +20,12 @@ type Props = {
 export default function TemplateDetailPreview({ template, categoryLabel }: Props) {
     const trackRef = useRef<HTMLDivElement>(null);
     const [activePreview, setActivePreview] = useState(0);
+    const [invitation] = useState(() => ({
+        ...createDefaultInvitation(),
+        templateId: template.id,
+        title: template.name,
+        eventDate: getNextYearDateInputValue(),
+    }));
 
     if (template.id !== "pastel-floral-wedding") {
         return (
@@ -43,12 +49,6 @@ export default function TemplateDetailPreview({ template, categoryLabel }: Props
             </div>
         );
     }
-
-    const invitation = {
-        ...createDefaultInvitation(),
-        templateId: template.id,
-        title: template.name,
-    };
 
     function handleTrackScroll() {
         const track = trackRef.current;
@@ -114,6 +114,13 @@ export default function TemplateDetailPreview({ template, categoryLabel }: Props
             </div>
         </div>
     );
+}
+
+function getNextYearDateInputValue() {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() + 1);
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function TemplatePreviewState({

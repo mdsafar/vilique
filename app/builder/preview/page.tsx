@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBuilderInvitation } from "@/features/invitations/data";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import PublicInviteExperience from "@/components/PublicInviteExperience";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 
 type Props = {
     searchParams: Promise<{ id?: string; from?: string }>;
@@ -19,6 +21,22 @@ export default async function BuilderPreviewPage({ searchParams }: Props) {
 
     if (!id) {
         redirect("/templates");
+    }
+
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        return (
+            <main className="builderPreviewShell">
+                <AuthRequiredModal
+                    next={`/builder/preview?id=${id}${from ? `&from=${from}` : ""}`}
+                    forceOpen
+                />
+            </main>
+        );
     }
 
     const invitation = await getBuilderInvitation({ id });

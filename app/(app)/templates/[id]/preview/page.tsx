@@ -40,10 +40,10 @@ export default async function TemplatePreviewPage({ params }: Props) {
         <div className="invitePreviewShell templateStandalonePreview">
             <Link className="inviteBackButton" href={`/templates/${template.id}`}>
                 <ArrowLeft size={16} aria-hidden="true" />
-                Template
+                <span>Template</span>
             </Link>
 
-            <PastelFloralWedding invitation={invitation} />
+            <PastelFloralWedding invitation={invitation} useDemoCountdown />
         </div>
     );
 }

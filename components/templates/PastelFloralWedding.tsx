@@ -8,12 +8,15 @@ import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
 import { getEventPhase, isInvitationCompleted } from "@/lib/lifecycle";
 import { parseInvitationDateParts } from "@/lib/invitationDate";
+import { createDemoCountdownTargetDate } from "@/lib/demoCountdown";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 
 type Props = {
     invitation: InvitationData;
     accepted?: boolean;
     rsvpStatus?: RSVPStatus | null;
+    demoCountdownTargetDate?: Date;
+    useDemoCountdown?: boolean;
     onAccept?: () => void;
     onDecline?: () => void;
     onChangeRsvp?: () => void;
@@ -62,6 +65,8 @@ export default function PastelFloralWedding({
     invitation,
     accepted = false,
     rsvpStatus = null,
+    demoCountdownTargetDate,
+    useDemoCountdown = false,
     onAccept,
     onDecline,
     onChangeRsvp,
@@ -74,6 +79,9 @@ export default function PastelFloralWedding({
     const [particles, setParticles] = useState<CelebrationParticle[]>([]);
     const [petals, setPetals] = useState<FallingPetal[]>([]);
     const [isSongPlaying, setIsSongPlaying] = useState(false);
+    const [fallbackDemoCountdownTargetDate] = useState(() =>
+        useDemoCountdown ? createDemoCountdownTargetDate() : null
+    );
     const songRef = useRef<HTMLAudioElement>(null);
     const tickRef = useRef<HTMLAudioElement>(null);
     const songTimeoutRef = useRef<number | null>(null);
@@ -134,8 +142,12 @@ export default function PastelFloralWedding({
         [eventDate, invitation.eventTime, invitation.eventTimezone]
     );
 
-    const { countdown, isStarted, now } = useCountdown(eventDate);
+    const effectiveDemoCountdownTargetDate = demoCountdownTargetDate ?? fallbackDemoCountdownTargetDate;
+    const countdownEventDate = effectiveDemoCountdownTargetDate ?? eventDate;
+    const hasDemoCountdown = Boolean(effectiveDemoCountdownTargetDate);
+    const { countdown, isStarted, now } = useCountdown(countdownEventDate);
     const completed = useMemo(() => {
+        if (hasDemoCountdown) return false;
         return isInvitationCompleted({
             eventDate: invitation.eventDate,
             eventTime: invitation.eventTime,
@@ -146,25 +158,26 @@ export default function PastelFloralWedding({
             firstPublishedAt: invitation.firstPublishedAt,
             publishedAt: invitation.publishedAt,
         }, new Date(now));
-    }, [invitation.status, invitation.lifecycleStatus, invitation.eventStatus, invitation.firstPublishedAt, invitation.publishedAt, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
+    }, [hasDemoCountdown, invitation.status, invitation.lifecycleStatus, invitation.eventStatus, invitation.firstPublishedAt, invitation.publishedAt, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
     const eventPhase = useMemo(() => {
+        if (hasDemoCountdown) return "upcoming";
         if (completed) return "completed";
         return getEventPhase({
             eventDate: invitation.eventDate,
             eventTime: invitation.eventTime,
             eventTimezone: invitation.eventTimezone,
         }, 0, new Date(now));
-    }, [completed, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
+    }, [completed, hasDemoCountdown, invitation.eventDate, invitation.eventTime, invitation.eventTimezone, now]);
     const inProgress = eventPhase === "in_progress";
 
     const countdownTitle = useMemo(() => {
         const isWedding = invitation.category === "wedding";
         if (completed) return "EVENT COMPLETED";
-        if (inProgress || isStarted) {
+        if (!hasDemoCountdown && (inProgress || isStarted)) {
             return isWedding ? "WEDDING IN PROGRESS" : "EVENT IN PROGRESS";
         }
         return isWedding ? "COUNTDOWN TO WEDDING" : "COUNTDOWN TO EVENT";
-    }, [completed, inProgress, isStarted, invitation.category]);
+    }, [completed, hasDemoCountdown, inProgress, isStarted, invitation.category]);
 
     const songUrl = enableAudio ? normalizeAudioUrl(invitation.musicUrl || invitation.defaultMusicUrl) : null;
     const shouldPlayCountdownTick = enableAudio && !completed && !inProgress && !isStarted;

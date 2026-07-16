@@ -236,7 +236,7 @@ export default function TemplatesCatalog() {
             ) : templates.length ? (
                 <section className="templateGrid">
                     {templates.map((template) => {
-                        const details = [template.popularity, categoryLabels[template.category], template.badge];
+                        const details = [template.popularity, categoryLabels[template.category]];
                         const featureChips = template.features.slice(0, 3);
                         const ratingLabel = formatTemplateRating({
                             average: template.ratingAverage ?? null,
@@ -257,7 +257,7 @@ export default function TemplatesCatalog() {
                                         >
                                             <div className="templateReferenceCard">
                                                 <small>WEDDING INVITATION</small>
-                                                <strong>Maya & Arjun</strong>
+                                                <strong>Name 1 & Name 2</strong>
                                                 <span>{todayLabel} · 05:30 PM</span>
                                             </div>
                                             <i className="templateFlower flowerOne" />

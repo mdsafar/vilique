@@ -46,7 +46,7 @@ export default function BottomNav({ initialUser }: Props) {
         };
     }, []);
 
-    const hiddenRoutes = ["/builder", "/invite", "/templates/", "/login", "/signup", "/dashboard/payment-history"];
+    const hiddenRoutes = ["/builder", "/invite", "/templates/", "/signup", "/dashboard/payment-history"];
     const protectedNavRoutes = ["/invitations", "/profile", "/dashboard"];
     const isProtectedNavRoute = protectedNavRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
     const profileName = getProfileName(user);

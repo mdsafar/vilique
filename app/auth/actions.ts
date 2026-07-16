@@ -14,6 +14,12 @@ function getRedirectPath(formData: FormData): string {
         : "/profile";
 }
 
+function redirectToAuthModal(next: string, message: string): never {
+    const redirectUrl = new URL(next, "https://vilique.local");
+    redirectUrl.searchParams.set("authError", message);
+    redirect(`${redirectUrl.pathname}${redirectUrl.search}`);
+}
+
 async function getRequestOrigin(): Promise<string> {
     const headerStore = await headers();
 
@@ -37,11 +43,7 @@ export async function signInWithGoogle(formData: FormData) {
     const next = getRedirectPath(formData);
 
     if (process.env.GOOGLE_AUTH_ENABLED !== "true") {
-        redirect(
-            `/login?error=${encodeURIComponent(
-                "Google login is not enabled."
-            )}&next=${encodeURIComponent(next)}`
-        );
+        redirectToAuthModal(next, "Google login is not enabled.");
     }
 
     const supabase = await createClient();
@@ -58,11 +60,7 @@ export async function signInWithGoogle(formData: FormData) {
     });
 
     if (error || !data.url) {
-        redirect(
-            `/login?error=${encodeURIComponent(
-                error?.message || "Unable to start Google login."
-            )}&next=${encodeURIComponent(next)}`
-        );
+        redirectToAuthModal(next, error?.message || "Unable to start Google login.");
     }
 
     redirect(data.url);
