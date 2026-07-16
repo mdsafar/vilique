@@ -5,7 +5,7 @@ export default function ProfilePageSkeleton() {
         <>
             <section className="profileOverview profileOverview--skeleton" aria-label="Loading profile overview">
                 <article className="profileCard profileCard--skeleton">
-                    <div className="profileIdentity">
+                    <div className="profileCardMain">
                         <Skeleton style={{ width: 58, height: 58 }} rounded="full" />
                         <div className="profileDetails">
                             <TextSkeleton width={110} height={11} />
@@ -13,7 +13,27 @@ export default function ProfilePageSkeleton() {
                             <TextSkeleton width={198} height={12} />
                         </div>
                     </div>
-                    <Skeleton style={{ width: "100%", height: 112 }} rounded="xl" />
+
+                    <div className="profileHeaderButtons profileHeaderButtons--skeleton">
+                        <Skeleton className="profileHistoryButton" style={{ width: 92, height: 36 }} rounded="lg" />
+                        <Skeleton className="profileLogoutButton" style={{ width: 92, height: 36 }} rounded="lg" />
+                    </div>
+
+                    <div className="profilePlanUsage profilePlanUsage--skeleton">
+                        <div className="usageMeta">
+                            <TextSkeleton width={138} height={12} />
+                        </div>
+                        <div className="pricingRateInfo">
+                            {Array.from({ length: 2 }).map((_, index) => (
+                                <div className="rateDetails rateDetails--skeleton" key={index}>
+                                    <Skeleton style={{ width: 30, height: 3 }} rounded="full" />
+                                    <TextSkeleton width={84} height={10} />
+                                    <TextSkeleton width={42} height={20} />
+                                </div>
+                            ))}
+                        </div>
+                        <TextSkeleton width="86%" height={10} />
+                    </div>
                 </article>
 
                 <section className="profileStats" aria-label="Loading invitation metrics">

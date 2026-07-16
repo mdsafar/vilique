@@ -48,53 +48,56 @@ export function LegalPage({
     sections: Section[];
 }) {
     return (
-        <main className="legalPage">
-            <header className="legalHero">
-                <Link href="/templates" className="legalBack">
-                    <ArrowLeft size={16} aria-hidden="true" />
-                    <span>Back to Vilique</span>
-                </Link>
-                <h1>{title}</h1>
-                <p>{description}</p>
-                <dl className="legalMeta">
-                    <div>
-                        <dt>Effective</dt>
-                        <dd>{policyMeta.effectiveDate}</dd>
-                    </div>
-                    <div>
-                        <dt>Last updated</dt>
-                        <dd>{policyMeta.lastUpdated}</dd>
-                    </div>
-                </dl>
-            </header>
+        <>
+            <main className="legalPage">
+                <header className="legalHero">
+                    <Link href="/templates" className="legalBack">
+                        <ArrowLeft size={16} aria-hidden="true" />
+                        <span>Back to Vilique</span>
+                    </Link>
+                    <h1>{title}</h1>
+                    <p>{description}</p>
+                    <dl className="legalMeta">
+                        <div>
+                            <dt>Effective</dt>
+                            <dd>{policyMeta.effectiveDate}</dd>
+                        </div>
+                        <div>
+                            <dt>Last updated</dt>
+                            <dd>{policyMeta.lastUpdated}</dd>
+                        </div>
+                    </dl>
+                </header>
 
-            <div className="legalBodyShell">
-                <nav className="legalToc" aria-label={`${title} contents`}>
-                    {sections.map((section) => (
-                        <a href={`#${section.id}`} key={section.id}>{section.title}</a>
-                    ))}
-                </nav>
-
-                <div className="legalContentShell">
-                    <article className="legalContent">
-                        <p className="legalNotice">
-                            This page is drafted for Vilique production readiness and must be reviewed by qualified legal counsel before launch.
-                        </p>
-                        {sections.map((section, index) => (
-                            <section id={section.id} key={section.id}>
-                                <span className="legalSectionNumber" aria-hidden="true">
-                                    {(index + 1).toString().padStart(2, "0")}
-                                </span>
-                                <div className="legalSectionBody">
-                                    <h2>{section.title}</h2>
-                                    {section.body}
-                                </div>
-                            </section>
+                <div className="legalBodyShell">
+                    <nav className="legalToc" aria-label={`${title} contents`}>
+                        {sections.map((section) => (
+                            <a href={`#${section.id}`} key={section.id}>{section.title}</a>
                         ))}
-                    </article>
+                    </nav>
+
+                    <div className="legalContentShell">
+                        <article className="legalContent">
+                            <p className="legalNotice">
+                                This page is drafted for Vilique production readiness and must be reviewed by qualified legal counsel before launch.
+                            </p>
+                            {sections.map((section, index) => (
+                                <section id={section.id} key={section.id}>
+                                    <span className="legalSectionNumber" aria-hidden="true">
+                                        {(index + 1).toString().padStart(2, "0")}
+                                    </span>
+                                    <div className="legalSectionBody">
+                                        <h2>{section.title}</h2>
+                                        {section.body}
+                                    </div>
+                                </section>
+                            ))}
+                        </article>
+                    </div>
                 </div>
-            </div>
-        </main>
+            </main>
+            <LegalFooter />
+        </>
     );
 }
 

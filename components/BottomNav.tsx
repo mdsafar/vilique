@@ -16,7 +16,7 @@ type Props = {
 export default function BottomNav({ initialUser }: Props) {
     const pathname = usePathname();
     const [user, setUser] = useState<NavUser | null>(initialUser);
-    const [authChecked, setAuthChecked] = useState(true);
+    const [authChecked, setAuthChecked] = useState(Boolean(initialUser));
 
     useEffect(() => {
         let active = true;
@@ -47,6 +47,8 @@ export default function BottomNav({ initialUser }: Props) {
     }, []);
 
     const hiddenRoutes = ["/builder", "/invite", "/templates/", "/login", "/signup", "/dashboard/payment-history"];
+    const protectedNavRoutes = ["/invitations", "/profile", "/dashboard"];
+    const isProtectedNavRoute = protectedNavRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
     const profileName = getProfileName(user);
     const profileImage = getProfileImage(user);
     const profileInitials = getInitials(profileName || user?.email || "User");
@@ -77,6 +79,7 @@ export default function BottomNav({ initialUser }: Props) {
     }, [authChecked, pathname, profileName, user]);
 
     const shouldHide = hiddenRoutes.some((route) => pathname.startsWith(route)) ||
+        (isProtectedNavRoute && (!authChecked || !user)) ||
         /^\/invitations\/[^/]+\/analytics(?:\/)?$/.test(pathname);
 
     if (shouldHide) return null;

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { LogOut, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { HelpCircle, LogOut, AlertTriangle } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
@@ -59,6 +60,10 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
 
             {profile && (
                 <div className="profileHeaderButtons">
+                    <Link href="/contact" className="profileHistoryButton" title="Support and legal">
+                        <HelpCircle size={14} />
+                        <span>Support</span>
+                    </Link>
                     <button
                         className="profileLogoutButton"
                         onClick={() => setIsConfirmOpen(true)}

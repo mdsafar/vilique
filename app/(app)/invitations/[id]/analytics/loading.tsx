@@ -1,14 +1,19 @@
-import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 
 export default function AnalyticsLoading() {
     return (
         <main className="profilePage analyticsPage" aria-busy="true">
             <section className="analyticsPanel">
-                <header className="analyticsHeader analyticsHeader--skeleton">
-                    <ButtonSkeleton width={82} height={38} />
+                <header className="analyticsHeader">
+                    <Link href="/invitations" className="analyticsBackBtn" aria-label="Back to invitations">
+                        <ArrowLeft size={16} />
+                        <span>Back</span>
+                    </Link>
                     <div className="analyticsHeaderText">
-                        <TextSkeleton width={158} height={34} />
-                        <TextSkeleton width={190} height={15} />
+                        <h1>Analytics</h1>
+                        <p>Loading invitation analytics</p>
                     </div>
                 </header>
 

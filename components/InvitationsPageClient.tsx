@@ -1,6 +1,7 @@
 "use client";
 
 import ProfileInvitationsList from "@/components/ProfileInvitationsList";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { useScrollPreservation } from "./NavigationStateProvider";
 
 export default function InvitationsPageClient() {
@@ -8,10 +9,12 @@ export default function InvitationsPageClient() {
     useScrollPreservation("/invitations");
 
     return (
-        <main className="profilePage invitationsPage">
-            <section className="profileInvitations profileInvitationsFull">
-                <ProfileInvitationsList showAuthModalOnUnauthorized={false} />
-            </section>
-        </main>
+        <ProtectedRoute next="/invitations" className="profilePage invitationsPage">
+            <main className="profilePage invitationsPage">
+                <section className="profileInvitations profileInvitationsFull">
+                    <ProfileInvitationsList />
+                </section>
+            </main>
+        </ProtectedRoute>
     );
 }

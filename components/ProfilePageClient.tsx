@@ -4,7 +4,6 @@ import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import ProfilePageSkeleton from "@/components/skeletons/ProfilePageSkeleton";
-import { useIsClient } from "@/hooks/useIsClient";
 import {
     AlertTriangle,
     Calendar,
@@ -112,7 +111,6 @@ type Props = {
 };
 
 export default function ProfilePageClient({ initialDashboardData }: Props) {
-    const isClient = useIsClient();
     const [activeTab, setActiveTab] = useState<ProfileTab>(() => getInitialProfileTab());
     const [hasOpenedTransactions, setHasOpenedTransactions] = useState(() => getInitialProfileTab() === "transactions");
     const [hasChangedTab, setHasChangedTab] = useState(false);
@@ -121,7 +119,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         data: dashboardData,
         error: dashboardError,
         mutate: mutateDashboard,
-    } = useSWR<DashboardData>(isClient ? "/api/profile/dashboard" : null, null, {
+    } = useSWR<DashboardData>("/api/profile/dashboard", null, {
         fallbackData: initialDashboardData,
         suspense: false,
     });
@@ -133,7 +131,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         isLoading: isTemplateRatingsLoading,
         isValidating: isTemplateRatingsValidating,
     } = useSWRInfinite<PaginatedTemplateRatings>((pageIndex, previousPageData) => {
-        if (!isClient || !dashboardData?.profile) return null;
+        if (!dashboardData?.profile) return null;
         if (previousPageData && !previousPageData.hasMore) return null;
         const params = new URLSearchParams({ sort: "recently_used", limit: "9" });
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
@@ -147,7 +145,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         isLoading: isPaymentsInitialLoading,
         isValidating: isPaymentsValidating,
     } = useSWRInfinite<PaginatedPayments>((pageIndex, previousPageData) => {
-        if (!isClient || !dashboardData?.profile || !hasOpenedTransactions) return null;
+        if (!dashboardData?.profile || !hasOpenedTransactions) return null;
         if (previousPageData && !previousPageData.hasMore) return null;
         const params = new URLSearchParams({ sort: "newest", limit: "10" });
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
@@ -171,18 +169,15 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         return () => window.removeEventListener("popstate", handlePopState);
     }, []);
 
-    if (isClient && dashboardError?.status === 401) {
+    if (dashboardError?.status === 401) {
         return (
-            <>
+            <main className="profilePage">
                 <AuthRequiredModal next="/profile" forceOpen />
-                <main className="profilePage" aria-busy="true">
-                    <ProfilePageSkeleton />
-                </main>
-            </>
+            </main>
         );
     }
 
-    if (isClient && dashboardError) {
+    if (dashboardError) {
         return (
             <main className="profilePage profileStatePage">
                 <ListState
@@ -196,7 +191,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         );
     }
 
-    if (!isClient || !dashboardData) {
+    if (!dashboardData) {
         return (
             <main className="profilePage" aria-busy="true">
                 <ProfilePageSkeleton />

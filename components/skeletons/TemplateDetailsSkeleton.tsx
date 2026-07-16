@@ -1,17 +1,22 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 
 export default function TemplateDetailsSkeleton() {
     return (
         <main className="page templateDetailsPage" aria-busy="true">
-            <header className="templateDetailTopbar analyticsHeader analyticsHeader--skeleton">
-                <div className="templateDetailCrumb" aria-hidden="true">
-                    <ButtonSkeleton className="analyticsBackBtn" width={44} height={38} />
+            <header className="templateDetailTopbar analyticsHeader">
+                <div className="templateDetailCrumb">
+                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/templates">
+                        <ArrowLeft size={16} aria-hidden="true" />
+                        <span>Templates</span>
+                    </Link>
                 </div>
                 <div className="analyticsHeaderText">
-                    <TextSkeleton width={180} height={20} />
-                    <TextSkeleton width={112} height={14} />
+                    <h1>Template details</h1>
+                    <p>Loading template</p>
                 </div>
-                <ButtonSkeleton className="templateDetailSelect analyticsHeaderPill" width={168} height={34} />
+                <span className="templateDetailSelect analyticsHeaderPill">Template</span>
             </header>
 
             <section className="templateDetailHero">

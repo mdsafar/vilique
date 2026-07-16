@@ -4,7 +4,7 @@ import { siteConfig } from "@/lib/config/site";
 import { validateProductionEnv } from "@/lib/env";
 import StableDocumentTitle from "@/components/StableDocumentTitle";
 import { ToastProvider } from "@/components/Toast";
-import { LegalFooter } from "@/components/LegalPage";
+import { AppProviders } from "@/components/AppProviders";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -68,8 +68,9 @@ export default function RootLayout({
       <body>
         <StableDocumentTitle />
         <ToastProvider>
-          {children}
-          <LegalFooter />
+          <AppProviders>
+            {children}
+          </AppProviders>
         </ToastProvider>
       </body>
     </html>

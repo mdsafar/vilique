@@ -20,12 +20,6 @@ type Props = {
     disabledReason?: string;
 };
 
-type TemplateCatalogItem = {
-    id: string;
-    ratingAverage?: number | null;
-    ratingCount?: number;
-};
-
 async function fetchTemplateRating(endpoint: string): Promise<TemplateRatingState> {
     const response = await fetch(endpoint);
     if (!response.ok) {
@@ -88,17 +82,16 @@ export default function TemplateRatingControl({
             }
 
             await mutate(result, { revalidate: false });
-            mutateGlobal("/api/templates", (templates?: TemplateCatalogItem[]) => {
-                if (!templates) return templates;
-                return templates.map((template) => {
-                    if (template.id !== templateId) return template;
-                    return {
-                        ...template,
-                        ratingAverage: result.average,
-                        ratingCount: result.count,
-                    };
-                });
-            }, { revalidate: false });
+            mutateGlobal(
+                (key) => typeof key === "string" && key.includes("/api/templates"),
+                undefined,
+                { revalidate: true }
+            );
+            mutateGlobal(
+                (key) => typeof key === "string" && key.includes("/api/profile/template-ratings"),
+                undefined,
+                { revalidate: true }
+            );
             setSavedMessage("Rating saved");
             window.setTimeout(() => setSavedMessage(""), 1800);
         } catch (error) {

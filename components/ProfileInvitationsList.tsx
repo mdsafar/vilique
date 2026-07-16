@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type UIEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
@@ -87,6 +87,8 @@ export default function ProfileInvitationsList({
 
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
+    const [isMobileTitleCollapsed, setIsMobileTitleCollapsed] = useState(false);
+    const lastListScrollTopRef = useRef(0);
     const {
         data,
         error,
@@ -107,6 +109,7 @@ export default function ProfileInvitationsList({
         return `/api/invitations?${params.toString()}`;
     }, null, {
         suspense: false,
+        keepPreviousData: true,
         revalidateFirstPage: false,
         onSuccess: (invitationPages) => {
             const nextCounts = invitationPages?.[0]?.counts;
@@ -162,16 +165,11 @@ export default function ProfileInvitationsList({
         window.history.replaceState(null, "", nextUrl);
     }, [debouncedSearch, statusFilter]);
 
-    useEffect(() => {
-        void mutate();
-    }, [mutate]);
-
     if (isUnauthorized && showAuthModalOnUnauthorized) {
         return (
-            <>
+            <main className="profilePage invitationsPage">
                 <AuthRequiredModal next="/invitations" forceOpen />
-                <InvitationListSkeleton />
-            </>
+            </main>
         );
     }
 
@@ -180,11 +178,30 @@ export default function ProfileInvitationsList({
         setSearchTerm("");
         setStatusFilter("all");
     };
+    const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
+        if (!window.matchMedia("(max-width: 560px)").matches) {
+            setIsMobileTitleCollapsed(false);
+            return;
+        }
+
+        const currentScrollTop = event.currentTarget.scrollTop;
+        const scrollDelta = currentScrollTop - lastListScrollTopRef.current;
+
+        if (currentScrollTop < 16) {
+            setIsMobileTitleCollapsed(false);
+        } else if (scrollDelta > 6 && currentScrollTop > 36) {
+            setIsMobileTitleCollapsed(true);
+        } else if (scrollDelta < -6) {
+            setIsMobileTitleCollapsed(false);
+        }
+
+        lastListScrollTopRef.current = currentScrollTop;
+    };
 
     return (
         <>
-            <header className="profileControls">
-                <div>
+            <header className={`profileControls${isMobileTitleCollapsed ? " isTitleCollapsed" : ""}`}>
+                <div className="profileControlsTitle">
                     <h2>Your invitations</h2>
                     <p>Manage and track all your invitation websites</p>
                 </div>
@@ -259,7 +276,7 @@ export default function ProfileInvitationsList({
             {isLoadingFirstPage ? (
                 <InvitationListSkeleton />
             ) : invitations.length ? (
-                <div className="profileInvitationList">
+                <div className="profileInvitationList" onScroll={handleListScroll}>
                     {invitations.map((invitation) => (
                         <InvitationRow
                             invitation={invitation}
@@ -469,8 +486,16 @@ function InvitationRow({
     const moreMenuFirstItemRef = useRef<HTMLButtonElement>(null);
     const router = useRouter();
     const { showToast } = useToast();
-    const { mutate } = useSWRConfig();
-    const refreshInvitationLists = () => mutate((key) => typeof key === "string" && key.startsWith("/api/invitations"));
+    const { cache, mutate } = useSWRConfig();
+    const getCachedDashboard = () => {
+        const state = cache.get("/api/profile/dashboard") as { data?: DashboardData } | undefined;
+        return state?.data;
+    };
+    const refreshInvitationLists = () => mutate(
+        (key) => typeof key === "string" && key.startsWith("/api/invitations"),
+        undefined,
+        { revalidate: true }
+    );
 
     const isPaidPublishFailed = invitation.paymentStatus === "paid" &&
         !invitation.firstPublishedAt &&
@@ -524,7 +549,7 @@ function InvitationRow({
 
     async function handleDeleteConfirm() {
         setIsDeleting(true);
-        const originalData = await mutate("/api/profile/dashboard");
+        const originalData = getCachedDashboard();
 
         mutate("/api/profile/dashboard", (current?: DashboardData) => {
             if (!current) return current;
@@ -550,7 +575,7 @@ function InvitationRow({
             onInvitationDeleted(invitation);
             showToast(isDraft ? "Draft deleted." : "Invitation deleted.", "success");
             mutate("/api/profile/dashboard");
-            refreshInvitationLists();
+            void refreshInvitationLists();
         } catch (error) {
             showToast(error instanceof Error ? error.message : "Failed to delete invitation", "error");
             mutate("/api/profile/dashboard", originalData, { revalidate: false });
@@ -568,7 +593,7 @@ function InvitationRow({
     async function handleTakeOfflineConfirm() {
         if (isTakingOffline) return;
         setIsTakingOffline(true);
-        const originalData = await mutate("/api/profile/dashboard");
+        const originalData = getCachedDashboard();
 
         mutate("/api/profile/dashboard", (current?: DashboardData) => {
             if (!current) return current;
@@ -610,7 +635,7 @@ function InvitationRow({
             }, invitation);
             showToast("Invitation taken offline.", "success");
             mutate("/api/profile/dashboard");
-            refreshInvitationLists();
+            void refreshInvitationLists();
         } catch {
             showToast("Unable to take invitation offline.", "error");
             mutate("/api/profile/dashboard", originalData, { revalidate: false });
@@ -628,7 +653,7 @@ function InvitationRow({
     async function handleMakeOnlineConfirm() {
         if (isMakingOnline) return;
         setIsMakingOnline(true);
-        const originalData = await mutate("/api/profile/dashboard");
+        const originalData = getCachedDashboard();
 
         mutate("/api/profile/dashboard", (current?: DashboardData) => {
             if (!current) return current;
@@ -674,7 +699,7 @@ function InvitationRow({
             }, invitation);
             showToast("Invitation is online again.", "success");
             mutate("/api/profile/dashboard");
-            refreshInvitationLists();
+            void refreshInvitationLists();
         } catch {
             showToast("Unable to make invitation online.", "error");
             mutate("/api/profile/dashboard", originalData, { revalidate: false });

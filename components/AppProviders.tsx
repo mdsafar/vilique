@@ -15,16 +15,20 @@ const fetcher = async (url: string) => {
     return res.json();
 };
 
+const swrConfig = {
+    fetcher,
+    suspense: true,
+    dedupingInterval: 10_000,
+    keepPreviousData: true,
+    revalidateIfStale: false,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    shouldRetryOnError: false,
+};
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
     return (
-        <SWRConfig
-            value={{
-                fetcher,
-                suspense: true,
-                revalidateOnFocus: false, // Avoid refreshing data when switching browser tabs unless needed
-                shouldRetryOnError: false, // Handle errors gracefully
-            }}
-        >
+        <SWRConfig value={swrConfig}>
             <NavigationStateProvider>{children}</NavigationStateProvider>
         </SWRConfig>
     );

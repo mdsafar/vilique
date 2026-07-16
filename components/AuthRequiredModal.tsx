@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, PencilLine, Send, ShieldCheck, Sparkles, X } from "lucide-react";
@@ -118,10 +117,6 @@ export default function AuthRequiredModal({ next, forceOpen = false }: Props) {
                 </button>
 
                 <div className="authPanelTop">
-                    <span>
-                        <Image className="authGoogleIcon" src="/google-logo.png" alt="" width={16} height={16} aria-hidden="true" />
-                        <b>Google account</b>
-                    </span>
                     <span>
                         <ShieldCheck size={18} aria-hidden="true" />
                         <b>Secure sign in</b>

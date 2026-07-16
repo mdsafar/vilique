@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 import AppLogo from "@/components/AppLogo";
-import { ButtonSkeleton, TextSkeleton } from "@/components/ui/Skeleton";
+import { ButtonSkeleton } from "@/components/ui/Skeleton";
 import TemplateCardSkeleton from "@/components/skeletons/TemplateCardSkeleton";
 
 export default function TemplatesPageSkeleton() {
@@ -19,7 +19,10 @@ export default function TemplatesPageSkeleton() {
                             <section className="marketSearch" aria-hidden="true">
                                 <div className="searchBox">
                                     <Search size={18} aria-hidden="true" />
-                                    <TextSkeleton width={132} height={13} />
+                                    <input
+                                        disabled
+                                        placeholder="Search floral, pastel"
+                                    />
                                 </div>
                             </section>
                         </div>
