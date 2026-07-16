@@ -9088,20 +9088,25 @@ p {
 
   .mobileSheetHeader h2 {
     margin-top: 3px;
-    font-size: 25px;
+    font-size: 22px;
     line-height: 1;
     text-transform: capitalize;
   }
 
   .mobileSheetHeader button {
-    width: 44px;
-    min-height: 44px;
+    width: 40px;
+    min-height: 40px;
     border: 0;
     border-radius: 999px;
     background: #f1edf0;
     color: #171717;
     display: grid;
     place-items: center;
+  }
+
+  .mobileSheetHeader button svg {
+    width: 16px;
+    height: 16px;
   }
 
   .sheetHandle {
@@ -9119,7 +9124,7 @@ p {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 7px;
     overflow: visible;
-    padding: 5px;
+    padding: 5px 8px;
     margin: 0 12px 14px;
     z-index: 2;
     background: #f4f1f3;
@@ -9251,6 +9256,7 @@ p {
   .mobileBuilderSheet .editorTabs {
     gap: 5px;
     margin-inline: 8px;
+    padding-inline: 6px;
   }
 
   .mobileBuilderSheet .editorTabs button {
