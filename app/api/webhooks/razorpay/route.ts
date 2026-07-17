@@ -114,8 +114,20 @@ export async function POST(request: Request) {
             });
         const claimedEvents = claimedEventsData as ClaimedWebhookEvent[] | null;
 
-        if (claimError || !claimedEvents?.length) {
-            reportError(claimError || new Error("Webhook event claim returned no rows"), "webhook.claim_failed", { eventId, eventType });
+        if (claimError) {
+            reportError(new Error(claimError.message), "webhook.claim_failed", {
+                eventId,
+                eventType,
+                message: claimError.message,
+                code: claimError.code,
+                details: claimError.details,
+                hint: claimError.hint,
+            });
+            return NextResponse.json({ error: "Database error claiming event" }, { status: 500 });
+        }
+
+        if (!claimedEvents?.length) {
+            reportError(new Error("Webhook event claim returned no rows"), "webhook.claim_failed", { eventId, eventType });
             return NextResponse.json({ error: "Database error claiming event" }, { status: 500 });
         }
 
