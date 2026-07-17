@@ -13,7 +13,6 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import TemplateCardSkeleton from "@/components/skeletons/TemplateCardSkeleton";
 import { ButtonSkeleton } from "@/components/ui/Skeleton";
-import * as Sentry from "@sentry/nextjs";
 
 type TemplateItem = {
     id: string;
@@ -195,14 +194,6 @@ export default function TemplatesCatalog() {
                                         placeholder="Search floral, pastel"
                                     />
                                 </label>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        Sentry.captureException(new Error("Sentry Test Error"));
-                                    }}
-                                >
-                                    Test Sentry
-                                </button>
                             </section>
                         </div>
 
