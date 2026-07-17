@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import TemplateRenderer from "@/components/TemplateRenderer";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 import { trackInvitationEvent, AnalyticsEventType } from "@/lib/analytics";
@@ -17,6 +17,9 @@ type StoredRsvp = {
 
 const RSVP_TOKEN_PREFIX = "vilique:rsvp-token:";
 const RSVP_CHANGE_PREFIX = "vilique:rsvp-changing:";
+const PUBLIC_INVITE_BACKGROUND =
+    "radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%)";
+const PUBLIC_INVITE_BACKGROUND_COLOR = "#ecdcf7";
 
 export default function PublicInviteExperience({ invitation, isPublic = false }: Props) {
     const [accepted, setAccepted] = useState(false);
@@ -25,20 +28,34 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const guestTokenRef = useRef("");
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!isPublic) return;
 
-        const inviteBackground =
-            "radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%)";
         const previousHtmlBackground = document.documentElement.style.background;
+        const previousHtmlBackgroundColor = document.documentElement.style.backgroundColor;
+        const previousHtmlMinHeight = document.documentElement.style.minHeight;
         const previousBodyBackground = document.body.style.background;
+        const previousBodyBackgroundColor = document.body.style.backgroundColor;
+        const previousBodyMinHeight = document.body.style.minHeight;
 
-        document.documentElement.style.background = inviteBackground;
-        document.body.style.background = inviteBackground;
+        document.documentElement.classList.add("publicInviteDocumentBackground");
+        document.body.classList.add("publicInviteDocumentBackground");
+        document.documentElement.style.background = PUBLIC_INVITE_BACKGROUND;
+        document.documentElement.style.backgroundColor = PUBLIC_INVITE_BACKGROUND_COLOR;
+        document.documentElement.style.minHeight = "100%";
+        document.body.style.background = PUBLIC_INVITE_BACKGROUND;
+        document.body.style.backgroundColor = PUBLIC_INVITE_BACKGROUND_COLOR;
+        document.body.style.minHeight = "100%";
 
         return () => {
+            document.documentElement.classList.remove("publicInviteDocumentBackground");
+            document.body.classList.remove("publicInviteDocumentBackground");
             document.documentElement.style.background = previousHtmlBackground;
+            document.documentElement.style.backgroundColor = previousHtmlBackgroundColor;
+            document.documentElement.style.minHeight = previousHtmlMinHeight;
             document.body.style.background = previousBodyBackground;
+            document.body.style.backgroundColor = previousBodyBackgroundColor;
+            document.body.style.minHeight = previousBodyMinHeight;
         };
     }, [isPublic]);
 

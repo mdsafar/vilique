@@ -138,6 +138,7 @@ const editorTabs: { id: EditorTab; label: string }[] = [
 ];
 const weddingTemplateTitleOptions = ["Wedding Invitation", "Reception"] as const;
 const weddingTemplateDefaultTitle = weddingTemplateTitleOptions[0];
+const builderLocalPreviewKey = "vilique-builder-local-preview";
 
 let activeSoundPreviewAudio: HTMLAudioElement | null = null;
 let activeSoundPreviewStop: (() => void) | null = null;
@@ -151,6 +152,21 @@ function stopActiveSoundPreview() {
 
 function dispatchSoundPreviewState(isPlaying: boolean) {
     window.dispatchEvent(new Event(isPlaying ? "vilique:sound-preview-start" : "vilique:sound-preview-stop"));
+}
+
+function readLocalPreviewDraft(templateKey: string): { invitation: InvitationData } | null {
+    if (typeof window === "undefined") return null;
+
+    try {
+        const stored = sessionStorage.getItem(builderLocalPreviewKey);
+        if (!stored) return null;
+        const parsed = JSON.parse(stored) as { invitation?: InvitationData };
+        if (!parsed.invitation || parsed.invitation.templateId !== templateKey) return null;
+        return { invitation: parsed.invitation };
+    } catch {
+        sessionStorage.removeItem(builderLocalPreviewKey);
+        return null;
+    }
 }
 
 export default function BuilderPage() {
@@ -310,6 +326,7 @@ function BuilderContent() {
                 };
 
                 if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(builderLocalPreviewKey);
                     sessionStorage.setItem(`vilique-new-draft-${draft.id}`, "true");
                     sessionStorage.setItem(`vilique-builder-back-target-${draft.id}`, builderBackTarget.current);
                     sessionStorage.setItem(`vilique-builder-back-label-${draft.id}`, builderBackLabel.current);
@@ -362,6 +379,7 @@ function BuilderContent() {
             if (options.isExplicitUserSave) {
                 isNewDraft.current = false;
                 if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(builderLocalPreviewKey);
                     sessionStorage.removeItem(`vilique-new-draft-${source.id}`);
                     sessionStorage.removeItem(`vilique-builder-back-target-${source.id}`);
                     sessionStorage.removeItem(`vilique-builder-back-label-${source.id}`);
@@ -385,6 +403,7 @@ function BuilderContent() {
             if (options.isExplicitUserSave) {
                 isNewDraft.current = false;
                 if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(builderLocalPreviewKey);
                     sessionStorage.removeItem(`vilique-new-draft-${source.id}`);
                     sessionStorage.removeItem(`vilique-builder-back-target-${source.id}`);
                     sessionStorage.removeItem(`vilique-builder-back-label-${source.id}`);
@@ -443,6 +462,18 @@ function BuilderContent() {
 
     async function saveAndPreview() {
         setIsPreviewing(true);
+        if (invitation.id === "default-draft-placeholder-id") {
+            if (typeof window !== "undefined") {
+                sessionStorage.setItem(builderLocalPreviewKey, JSON.stringify({
+                    invitation,
+                    backLabel: builderBackLabel.current,
+                    backTarget: builderBackTarget.current,
+                }));
+            }
+            router.push(`/builder/preview?local=1&template=${encodeURIComponent(invitation.templateId)}`);
+            return;
+        }
+
         const savedInvitation = await saveInvitation({ createIfNeeded: true });
         if (savedInvitation) {
             router.push(`/builder/preview?id=${savedInvitation.id}`);
@@ -652,6 +683,17 @@ function BuilderContent() {
                 templateId: templateKey,
                 updatedAt: new Date().toISOString(),
             };
+            const localPreviewDraft = readLocalPreviewDraft(templateKey);
+            if (localPreviewDraft) {
+                const restoredDraft = normalizeInvitationDate(localPreviewDraft.invitation);
+                setInvitation(restoredDraft);
+                initialInvitation.current = null;
+                lastSavedPayload.current = buildSavePayload(restoredDraft);
+                setSaveState("Not saved");
+                setIsLoadingInvitation(false);
+                return;
+            }
+
             const normalizedDefaultInv = normalizeInvitationDate(defaultInv);
             setInvitation(normalizedDefaultInv);
             initialInvitation.current = null;
@@ -900,6 +942,7 @@ function BuilderContent() {
                     // Mark as explicitly saved since user completed publishing
                     isNewDraft.current = false;
                     if (typeof window !== "undefined" && invitation.id) {
+                        sessionStorage.removeItem(builderLocalPreviewKey);
                         sessionStorage.removeItem(`vilique-new-draft-${invitation.id}`);
                         sessionStorage.removeItem(`vilique-builder-back-target-${invitation.id}`);
                         sessionStorage.removeItem(`vilique-builder-back-label-${invitation.id}`);

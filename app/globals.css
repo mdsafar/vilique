@@ -11025,11 +11025,13 @@ p {
 .publicInvitationWrapper,
 .invitePreviewShell,
 .publicInvitationWrapper .invitePreviewShell {
-  min-height: 100svh;
-  background:
+  --public-invite-bg:
     radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
     radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
     linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%);
+  min-height: 100svh;
+  background: var(--public-invite-bg);
+  background-color: #ecdcf7;
 }
 
 .publicInvitationWrapper,
@@ -11042,15 +11044,15 @@ p {
 .invitePreviewShell::before {
   content: "";
   position: fixed;
-  inset: -50svh 0;
-  z-index: -1;
+  inset: -100lvh 0;
+  z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
-    radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
-    linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%);
+  background: var(--public-invite-bg);
+  background-color: #ecdcf7;
 }
 
+html.publicInviteDocumentBackground,
+body.publicInviteDocumentBackground,
 html:has(.publicInvitationWrapper),
 body:has(.publicInvitationWrapper),
 html:has(.invitePreviewShell),
@@ -11059,6 +11061,7 @@ body:has(.invitePreviewShell) {
     radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
     radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
     linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%);
+  background-color: #ecdcf7;
   background-attachment: fixed;
   background-size: cover;
 }
@@ -11068,7 +11071,10 @@ body:has(.invitePreviewShell) {
 .builderPreviewShell .pastelWeddingPage {
   background: transparent;
   background-attachment: fixed;
+  min-height: max(100svh, 100dvh);
   perspective: none;
+  position: relative;
+  z-index: 1;
 }
 
 .publicInvitationWrapper .pastelWeddingPage::before,

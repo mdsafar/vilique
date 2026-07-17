@@ -6,9 +6,10 @@ import PublicInviteExperience from "@/components/PublicInviteExperience";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import BuilderSessionPreview from "@/components/BuilderSessionPreview";
 
 type Props = {
-    searchParams: Promise<{ id?: string; from?: string }>;
+    searchParams: Promise<{ id?: string; from?: string; local?: string; template?: string }>;
 };
 
 export const metadata: Metadata = {
@@ -17,9 +18,12 @@ export const metadata: Metadata = {
 };
 
 export default async function BuilderPreviewPage({ searchParams }: Props) {
-    const { id, from } = await searchParams;
+    const { id, from, local, template } = await searchParams;
 
     if (!id) {
+        if (local === "1") {
+            return <BuilderSessionPreview templateId={template} />;
+        }
         redirect("/templates");
     }
 

@@ -440,11 +440,13 @@ function InviteCard({
     inProgress: boolean;
     countdownTitle: string;
 }) {
+    const inviteTitle = invitation.title.trim() || "Wedding Invitation";
+
     return (
         <section className={`weddingCard inviteScreen active ${isAccepting ? "accepting" : ""} ${completed ? "completed" : ""}`}>
             <CardDecor />
 
-            <p className="weddingTopText">WEDDING INVITATION</p>
+            <p className="weddingTopText">{inviteTitle.toUpperCase()}</p>
             <GoldDivider />
 
             <h1 className="weddingNames">
