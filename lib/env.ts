@@ -31,7 +31,7 @@ function isPlaceholderSecret(value: string) {
 }
 
 export function validateRazorpayWebhookSecret() {
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
     if (!secret) {
         throw new Error("RAZORPAY_WEBHOOK_SECRET is required.");
@@ -76,7 +76,7 @@ export function validateProductionEnv() {
     const isLivePayments =
         serverMode === "live" || publicMode === "live";
 
-    const requiredForDeployment = [
+    const required = [
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
@@ -93,12 +93,6 @@ export function validateProductionEnv() {
         process.env.NEXT_PUBLIC_APP_URL?.trim() ||
         process.env.NEXT_PUBLIC_SITE_URL?.trim()
     );
-
-    const requiredForLivePayments: string[] = [];
-
-    const required = isLivePayments
-        ? [...requiredForDeployment, ...requiredForLivePayments]
-        : requiredForDeployment;
 
     const missing = required.filter((key) => {
         const value = process.env[key];

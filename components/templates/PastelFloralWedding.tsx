@@ -264,14 +264,25 @@ export default function PastelFloralWedding({
         const handlePreviewAudioStop = () => {
             audioSuspendedRef.current = false;
         };
+        const handleModalAudioSuspend = () => {
+            audioSuspendedRef.current = true;
+            stopThisTemplateAudio();
+        };
+        const handleModalAudioResume = () => {
+            audioSuspendedRef.current = false;
+        };
         window.addEventListener("pagehide", handlePageHide);
         window.addEventListener("vilique:sound-preview-start", handlePreviewAudioStart);
         window.addEventListener("vilique:sound-preview-stop", handlePreviewAudioStop);
+        window.addEventListener("vilique:template-audio-suspend", handleModalAudioSuspend);
+        window.addEventListener("vilique:template-audio-resume", handleModalAudioResume);
         return () => {
             mountedRef.current = false;
             window.removeEventListener("pagehide", handlePageHide);
             window.removeEventListener("vilique:sound-preview-start", handlePreviewAudioStart);
             window.removeEventListener("vilique:sound-preview-stop", handlePreviewAudioStop);
+            window.removeEventListener("vilique:template-audio-suspend", handleModalAudioSuspend);
+            window.removeEventListener("vilique:template-audio-resume", handleModalAudioResume);
             stopThisTemplateAudio(false);
         };
     }, [pathname]);

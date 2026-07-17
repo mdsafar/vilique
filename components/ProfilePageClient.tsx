@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { CSSProperties, KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
 import ProfilePageSkeleton from "@/components/skeletons/ProfilePageSkeleton";
@@ -10,14 +10,15 @@ import {
     CheckCircle2,
     ClipboardCheck,
     Download,
-    ExternalLink,
     Eye,
     HelpCircle,
     Loader2,
+    MoreVertical,
     PencilLine,
     Receipt,
     RefreshCw,
     Star,
+    Trash2,
     UsersRound,
 } from "lucide-react";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
@@ -169,6 +170,17 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         return () => window.removeEventListener("popstate", handlePopState);
     }, []);
 
+    useEffect(() => {
+        function handleProfileDataChanged() {
+            void mutateDashboard();
+            void mutateTemplateRatings();
+            void mutatePayments();
+        }
+
+        window.addEventListener("vilique:profile-data-changed", handleProfileDataChanged);
+        return () => window.removeEventListener("vilique:profile-data-changed", handleProfileDataChanged);
+    }, [mutateDashboard, mutatePayments, mutateTemplateRatings]);
+
     if (dashboardError?.status === 401) {
         return (
             <main className="profilePage">
@@ -270,39 +282,44 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         );
     }
 
+    const profileOverview = (
+        <section className="profileOverview" aria-label="Profile overview">
+            <ProfileCard
+                profile={profile}
+                activePublishedCount={activePublishedCount}
+                totalSpent={dashboard.totalSpent || 0}
+                initials={initials}
+                greeting={greeting}
+            />
+
+            <section className="profileStats" aria-label="Invitation metrics">
+                {stats.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                        <article className={`profileStat ${item.tone}`} key={item.label}>
+                            <span>
+                                <Icon size={24} aria-hidden="true" />
+                            </span>
+                            <div>
+                                <strong>{item.value}</strong>
+                                <b>{item.label}</b>
+                                <p>{item.detail}</p>
+                            </div>
+                        </article>
+                    );
+                })}
+            </section>
+        </section>
+    );
+
     return (
         <main className="profilePage">
-            <section className="profileOverview" aria-label="Profile overview">
-                <ProfileCard
-                    profile={profile}
-                    activePublishedCount={activePublishedCount}
-                    totalSpent={dashboard.totalSpent || 0}
-                    initials={initials}
-                    greeting={greeting}
-                />
-
-                <section className="profileStats" aria-label="Invitation metrics">
-                    {stats.map((item) => {
-                        const Icon = item.icon;
-
-                        return (
-                            <article className={`profileStat ${item.tone}`} key={item.label}>
-                                <span>
-                                    <Icon size={24} aria-hidden="true" />
-                                </span>
-                                <div>
-                                    <strong>{item.value}</strong>
-                                    <b>{item.label}</b>
-                                    <p>{item.detail}</p>
-                                </div>
-                            </article>
-                        );
-                    })}
-                </section>
-            </section>
+            {profile ? null : profileOverview}
 
             {profile ? (
                 <ProfileActivityTabs
+                    header={profileOverview}
                     activeTab={activeTab}
                     onTabChange={(tab) => {
                         setActiveTab(tab);
@@ -346,6 +363,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
 }
 
 function ProfileActivityTabs({
+    header,
     activeTab,
     onTabChange,
     templateCount,
@@ -353,6 +371,7 @@ function ProfileActivityTabs({
     templatesPanel,
     transactionsPanel,
 }: {
+    header: ReactNode;
     activeTab: ProfileTab;
     onTabChange: (tab: ProfileTab) => void;
     templateCount: number | null;
@@ -361,7 +380,10 @@ function ProfileActivityTabs({
     transactionsPanel: ReactNode;
 }) {
     const sectionRef = useRef<HTMLElement | null>(null);
+    const fixedSectionRef = useRef<HTMLDivElement | null>(null);
+    const headerRef = useRef<HTMLDivElement | null>(null);
     const [isTabsPinned, setIsTabsPinned] = useState(false);
+    const [fixedSectionHeight, setFixedSectionHeight] = useState(0);
     const tabs: { id: ProfileTab; label: string; count: number | null }[] = [
         { id: "templates", label: "Used Templates", count: templateCount },
         { id: "transactions", label: "Transactions", count: transactionCount },
@@ -370,13 +392,15 @@ function ProfileActivityTabs({
     useEffect(() => {
         function updatePinnedState() {
             const section = sectionRef.current;
+            const header = headerRef.current;
             if (!section || !window.matchMedia("(max-width: 860px)").matches) {
                 setIsTabsPinned(false);
                 return;
             }
 
             const rect = section.getBoundingClientRect();
-            setIsTabsPinned(rect.top <= 0 && rect.bottom > 90);
+            const headerHeight = header?.getBoundingClientRect().height || 0;
+            setIsTabsPinned(rect.top + headerHeight <= 0 && rect.bottom > 90);
         }
 
         updatePinnedState();
@@ -386,6 +410,31 @@ function ProfileActivityTabs({
         return () => {
             window.removeEventListener("scroll", updatePinnedState);
             window.removeEventListener("resize", updatePinnedState);
+        };
+    }, []);
+
+    useEffect(() => {
+        const fixedSection = fixedSectionRef.current;
+        if (!fixedSection) return;
+        const fixedSectionElement = fixedSection;
+
+        function updateFixedSectionHeight() {
+            if (!window.matchMedia("(min-width: 861px)").matches) {
+                setFixedSectionHeight(0);
+                return;
+            }
+
+            setFixedSectionHeight(Math.ceil(fixedSectionElement.getBoundingClientRect().height));
+        }
+
+        updateFixedSectionHeight();
+        const resizeObserver = new ResizeObserver(updateFixedSectionHeight);
+        resizeObserver.observe(fixedSectionElement);
+        window.addEventListener("resize", updateFixedSectionHeight);
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener("resize", updateFixedSectionHeight);
         };
     }, []);
 
@@ -410,25 +459,31 @@ function ProfileActivityTabs({
             className={`profileActivityTabs ${isTabsPinned ? "isProfileTabsPinned" : ""}`}
             aria-label="Profile activity"
             ref={sectionRef}
+            style={{ "--profile-fixed-section-height": `${fixedSectionHeight}px` } as CSSProperties}
         >
-            <div className="profileTabList" role="tablist" aria-label="Profile sections">
-                {tabs.map((tab, index) => (
-                    <button
-                        type="button"
-                        id={`profile-tab-${tab.id}`}
-                        key={tab.id}
-                        className={activeTab === tab.id ? "active" : ""}
-                        role="tab"
-                        aria-selected={activeTab === tab.id}
-                        aria-controls={`profile-panel-${tab.id}`}
-                        tabIndex={activeTab === tab.id ? 0 : -1}
-                        onClick={() => onTabChange(tab.id)}
-                        onKeyDown={(event) => handleTabKeyDown(event, index)}
-                    >
-                        <span>{tab.label}</span>
-                        {tab.count !== null ? <b>{tab.count}</b> : null}
-                    </button>
-                ))}
+            <div className="profileFixedDesktopSection" ref={fixedSectionRef}>
+                <div className="profileActivityHeader" ref={headerRef}>
+                    {header}
+                </div>
+                <div className="profileTabList" role="tablist" aria-label="Profile sections">
+                    {tabs.map((tab, index) => (
+                        <button
+                            type="button"
+                            id={`profile-tab-${tab.id}`}
+                            key={tab.id}
+                            className={activeTab === tab.id ? "active" : ""}
+                            role="tab"
+                            aria-selected={activeTab === tab.id}
+                            aria-controls={`profile-panel-${tab.id}`}
+                            tabIndex={activeTab === tab.id ? 0 : -1}
+                            onClick={() => onTabChange(tab.id)}
+                            onKeyDown={(event) => handleTabKeyDown(event, index)}
+                        >
+                            <span>{tab.label}</span>
+                            {tab.count !== null ? <b>{tab.count}</b> : null}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div
@@ -439,7 +494,6 @@ function ProfileActivityTabs({
             >
                 {activeTab === "templates" ? templatesPanel : null}
             </div>
-
             <div
                 id="profile-panel-transactions"
                 role="tabpanel"
@@ -872,38 +926,53 @@ function PaymentSkeletonCard() {
 
 function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
     const [downloadingDocument, setDownloadingDocument] = useState<"invoice" | "refund" | null>(null);
+    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+    const actionMenuRef = useRef<HTMLDivElement | null>(null);
     const { showToast } = useToast();
     const templateName = payment.templateName || "Premium Design";
     const invitationTitle = payment.invitationTitle || "Deleted Invitation";
     const publicUrl = payment.invitationSlug ? getPublicInvitationUrl(payment.invitationSlug) : null;
-    const dateString = new Date(payment.created_at).toLocaleDateString("en-IN", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+    const dateString = formatTransactionDate(payment.created_at);
     const lifecycle = getTransactionLifecycle(payment);
     const status = getPaymentStatus(lifecycle);
     const StatusIcon = status.icon;
-    const amountLabel = lifecycle === "refunded"
-        ? `Refunded ${formatPaiseToCurrency(payment.amount_paise, payment.currency)}`
-        : formatPaiseToCurrency(payment.amount_paise, payment.currency);
-    const refundDate = payment.refund_processed_at
-        ? new Date(payment.refund_processed_at).toLocaleDateString("en-IN", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        })
-        : null;
+    const CardIcon = invitationTitle === "Deleted Invitation" ? Trash2 : StatusIcon;
+    const amountLabel = formatPaiseToCurrency(payment.amount_paise, payment.currency);
     const refundReference = payment.refund_reference || null;
-    const refundReason = payment.refund_reason || (lifecycle === "refunded" ? "Failed publication recovery refund" : null);
     const invitationAccessRevoked = lifecycle === "refunded" && !publicUrl;
     const isDownloadingInvoice = downloadingDocument === "invoice";
     const isDownloadingRefund = downloadingDocument === "refund";
+    const showPrimaryAction = lifecycle === "refund_pending";
+    const canDownloadInvoice = lifecycle !== "failed" && lifecycle !== "recovery_pending" && lifecycle !== "processing";
+    const canDownloadRefundReceipt = lifecycle === "refunded" && Boolean(refundReference);
+    const showRefundPendingReceiptMessage = lifecycle === "refund_pending";
+    const showActions = showPrimaryAction || canDownloadInvoice || canDownloadRefundReceipt || showRefundPendingReceiptMessage;
+
+    useEffect(() => {
+        if (!isActionMenuOpen) return;
+
+        function handlePointerDown(event: PointerEvent) {
+            const target = event.target;
+            if (!(target instanceof Node) || actionMenuRef.current?.contains(target)) return;
+            setIsActionMenuOpen(false);
+        }
+
+        function handleKeyDown(event: globalThis.KeyboardEvent) {
+            if (event.key === "Escape") setIsActionMenuOpen(false);
+        }
+
+        document.addEventListener("pointerdown", handlePointerDown);
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.removeEventListener("pointerdown", handlePointerDown);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [isActionMenuOpen]);
 
     async function handleDownloadDocument(kind: "invoice" | "refund") {
         if (downloadingDocument) return;
+        setIsActionMenuOpen(false);
         setDownloadingDocument(kind);
         try {
             await downloadServerDocument(payment.id, kind);
@@ -915,24 +984,25 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
     }
 
     return (
-        <article className="profileTransactionCard">
+        <article className={`profileTransactionCard ${showActions ? "profileTransactionCard--withActions" : "profileTransactionCard--noActions"}`}>
             <div className="profileTransactionTop">
-                <div className="profileTransactionIcon">
-                    <Receipt size={18} aria-hidden="true" />
+                <div className={`profileTransactionIcon profileTransactionIcon--${status.className}`}>
+                    <CardIcon size={18} aria-hidden="true" />
                 </div>
 
                 <div className="profileTransactionBody">
                     <div className="profileTransactionTitle">
                         <h3>{templateName}</h3>
-                        <span className={`paymentStatusBadge ${status.className}`}>
-                            <StatusIcon size={12} />
-                            <span>{status.label}</span>
-                        </span>
                     </div>
 
                     <p>
-                        For <strong>{invitationTitle}</strong>
+                        <strong>{invitationTitle}</strong>
                     </p>
+
+                    <span className={`paymentStatusBadge ${status.className}`}>
+                        <StatusIcon size={12} />
+                        <span>{status.label}</span>
+                    </span>
                 </div>
 
                 <div className="profileTransactionAside">
@@ -941,116 +1011,85 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
                 </div>
             </div>
 
+            {showActions ? (
+                <div className="profileTransactionMenu" ref={actionMenuRef}>
+                    <button
+                        type="button"
+                        className="profileTransactionMenuButton"
+                        aria-label="Transaction actions"
+                        aria-expanded={isActionMenuOpen}
+                        onClick={() => setIsActionMenuOpen((current) => !current)}
+                    >
+                        <MoreVertical size={16} aria-hidden="true" />
+                    </button>
+
+                    {isActionMenuOpen ? (
+                        <div className="profileTransactionMenuPanel" role="menu">
+                            {lifecycle === "refund_pending" ? (
+                                <span className="profileTransactionMenuItem profileTransactionMenuItem--muted" role="menuitem">
+                                    <Loader2 size={13} className="spinner" />
+                                    <span>Refund Pending</span>
+                                </span>
+                            ) : null}
+
+                            {canDownloadInvoice ? (
+                                <button
+                                    type="button"
+                                    className="profileTransactionMenuItem"
+                                    role="menuitem"
+                                    onClick={() => handleDownloadDocument("invoice")}
+                                    disabled={Boolean(downloadingDocument)}
+                                >
+                                    {isDownloadingInvoice ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
+                                    <span>{isDownloadingInvoice ? "Preparing..." : "Invoice"}</span>
+                                </button>
+                            ) : null}
+
+                            {canDownloadRefundReceipt ? (
+                                <button
+                                    type="button"
+                                    className="profileTransactionMenuItem"
+                                    role="menuitem"
+                                    onClick={() => handleDownloadDocument("refund")}
+                                    disabled={Boolean(downloadingDocument)}
+                                >
+                                    {isDownloadingRefund ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
+                                    <span>{isDownloadingRefund ? "Preparing..." : "Refund Receipt"}</span>
+                                </button>
+                            ) : showRefundPendingReceiptMessage ? (
+                                <span className="profileTransactionMenuItem profileTransactionMenuItem--muted" role="menuitem">
+                                    Refund receipt after completion
+                                </span>
+                            ) : null}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
             {status.message ? (
                 <div className={`profileTransactionNotice ${status.className}`}>
                     {status.message}
                 </div>
             ) : null}
 
+            {invitationAccessRevoked ? (
+                <div className="profileTransactionAccessRevoked">
+                    Invitation access revoked.
+                </div>
+            ) : null}
+
             <div className="profileTransactionMeta">
                 <span className="profileTransactionDate">
-                    <Calendar size={13} className="metaIcon" />
                     <span>{dateString}</span>
                 </span>
                 {payment.receipt ? (
                     <span className="profileTransactionRef">
-                        <span className="refLabel">Ref</span>
-                        <code>{payment.receipt}</code>
+                        Receipt #{formatTransactionReference(payment.receipt)}
                     </span>
-                ) : null}
-                {refundDate ? (
-                    <span className="profileTransactionRef">
-                        <span className="refLabel">Refund Date</span>
-                        <code>{refundDate}</code>
-                    </span>
-                ) : null}
-                {refundReference ? (
-                    <span className="profileTransactionRef">
-                        <span className="refLabel">Refund Ref</span>
-                        <code>{refundReference}</code>
-                    </span>
-                ) : null}
-                {refundReason ? (
-                    <span className="profileTransactionRef">
-                        <span className="refLabel">Reason</span>
-                        <code>{refundReason}</code>
-                    </span>
-                ) : null}
-                {invitationAccessRevoked ? (
-                    <span className="profileTransactionRef profileTransactionAccessRevoked">
-                        Invitation access revoked.
-                    </span>
-                ) : null}
-            </div>
-
-            <div className="profileTransactionAction">
-                {lifecycle === "paid" && publicUrl ? (
-                    <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="paymentLinkAction">
-                        <ExternalLink size={13} />
-                        <span>View Invitation</span>
-                    </a>
-                ) : lifecycle === "refund_pending" ? (
-                    <span className="paymentNoAction paymentProcessingAction">
-                        <Loader2 size={13} className="spinner" />
-                        <span>Refund Pending</span>
-                    </span>
-                ) : lifecycle === "refunded" ? (
-                    <button type="button" className="paymentLinkAction" onClick={() => showRefundDetails(payment)}>
-                        <HelpCircle size={13} />
-                        <span>View Refund Details</span>
-                    </button>
-                ) : lifecycle === "recovery_pending" ? (
-                    <span className="paymentNoAction paymentProcessingAction">
-                        <Loader2 size={13} className="spinner" />
-                        Processing...
-                    </span>
-                ) : lifecycle === "failed" ? (
-                    <a href={`/builder?id=${payment.invitation_id}&from=transactions`} className="paymentLinkAction">
-                        <RefreshCw size={13} />
-                        <span>Retry Payment</span>
-                    </a>
-                ) : (
-                    <span className="paymentNoAction">Processing...</span>
-                )}
-
-                {lifecycle === "failed" || lifecycle === "recovery_pending" ? null : (
-                    <button
-                        type="button"
-                        className="paymentInvoiceAction"
-                        onClick={() => handleDownloadDocument("invoice")}
-                        disabled={Boolean(downloadingDocument)}
-                    >
-                        {isDownloadingInvoice ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
-                        <span>{isDownloadingInvoice ? "Preparing invoice..." : "Download Invoice"}</span>
-                    </button>
-                )}
-
-                {lifecycle === "refunded" && refundReference ? (
-                    <button
-                        type="button"
-                        className="paymentInvoiceAction"
-                        onClick={() => handleDownloadDocument("refund")}
-                        disabled={Boolean(downloadingDocument)}
-                    >
-                        {isDownloadingRefund ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
-                        <span>{isDownloadingRefund ? "Preparing refund receipt..." : "Download Refund Receipt"}</span>
-                    </button>
-                ) : lifecycle === "refund_pending" ? (
-                    <span className="paymentNoAction">Refund receipt available after completion</span>
                 ) : null}
             </div>
         </article>
     );
-}
-
-function showRefundDetails(payment: PaymentRecord) {
-    const lines = [
-        payment.refund_reference ? `Refund reference: ${payment.refund_reference}` : null,
-        payment.refund_processed_at ? `Refund date: ${new Date(payment.refund_processed_at).toLocaleDateString("en-IN")}` : null,
-        payment.refund_reason ? `Reason: ${payment.refund_reason}` : null,
-    ].filter(Boolean);
-
-    window.alert(lines.length ? lines.join("\n") : "Refund details are being reconciled. Please contact support with this transaction reference.");
 }
 
 async function downloadServerDocument(transactionId: string, kind: "invoice" | "refund") {
@@ -1076,6 +1115,30 @@ function getDownloadFileName(contentDisposition: string | null, kind: "invoice" 
     const match = contentDisposition?.match(/filename="([^"]+)"/i);
     if (match?.[1]) return match[1];
     return `vilique-${kind === "invoice" ? "invoice" : "refund"}-${fallback}.pdf`;
+}
+
+function formatTransactionDate(value: string, options: { includeTime?: boolean } = {}) {
+    const includeTime = options.includeTime ?? true;
+    const date = new Date(value);
+    const day = new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    }).format(date);
+
+    if (!includeTime) return day;
+
+    const time = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    }).format(date);
+
+    return `${day} · ${time}`;
+}
+
+function formatTransactionReference(value: string) {
+    return value.replace(/^(rcpt_|rfnd_)/i, "").slice(0, 6).toUpperCase();
 }
 
 function formatCategoryLabel(category: string) {
@@ -1131,7 +1194,7 @@ function getPaymentStatus(status: TransactionLifecycleState) {
             message: "Your payment was successful. Publishing is being completed automatically. Please do not pay again.",
         };
     }
-    return { label: "Processing", className: "pending", icon: HelpCircle };
+    return { label: "Not Completed", className: "cancelled", icon: HelpCircle };
 }
 
 function getGreeting() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket, LockKeyhole, ShieldCheck, PartyPopper } from "lucide-react";
+import { Copy, Share2, ExternalLink, X, Check, AlertTriangle, Loader2, Rocket, LockKeyhole, ShieldCheck, PartyPopper, Link2, Music, MapPin, UsersRound, Video, Zap, RotateCcw, Clock } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { getPublicInvitationUrl } from "@/lib/config/site";
@@ -74,6 +74,20 @@ interface PaymentInfo {
     templateName: string;
 }
 
+const PREMIUM_FEATURES = [
+    { label: "Customizable URL slug", icon: Link2 },
+    { label: "RSVP & Guest Wishes", icon: UsersRound },
+    { label: "Sound Effects & Music", icon: Music },
+    { label: "Background Video", icon: Video },
+    { label: "Interactive Maps", icon: MapPin },
+    { label: "Fast Mobile Loading", icon: Zap },
+];
+
+const DEFAULT_PAYMENT_FAILURE_LINES = [
+    "Your bank declined the payment.",
+    "Please try again or use another payment method.",
+];
+
 export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess }: Props) {
     const [slug, setSlug] = useState(invitation.slug);
     const [status, setStatus] = useState<SlugStatus>("idle");
@@ -121,6 +135,16 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             document.body.style.top = prev.bodyTop;
             document.body.style.width = prev.bodyWidth;
             window.scrollTo(0, scrollY);
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        window.dispatchEvent(new Event("vilique:template-audio-suspend"));
+
+        return () => {
+            window.dispatchEvent(new Event("vilique:template-audio-resume"));
         };
     }, [isOpen]);
 
@@ -232,8 +256,11 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
     const isSlugTakenOrInvalid = slug !== invitation.slug && (status === "taken" || status === "invalid");
     
     // Can trigger publication or checkout if details are complete and state is ready
-    const isBusy = isPublishing || loadingPaymentInfo || paymentProcessingState !== "idle";
-    const canPublishOrPay = !hasValidationErrors && !isSlugTakenOrInvalid && !isBusy;
+    const isPaymentProcessing = paymentProcessingState === "creatingOrder" || paymentProcessingState === "openingCheckout" || paymentProcessingState === "verifyingPayment";
+    const isPaymentFailed = paymentProcessingState === "failed" || Boolean(paymentError);
+    const isRateLimitedPayment = isTooManyRequestsError(paymentError);
+    const isBusy = isPublishing || loadingPaymentInfo || isPaymentProcessing || paymentProcessingState === "paymentSuccess";
+    const canPublishOrPay = !hasValidationErrors && !isSlugTakenOrInvalid && !isBusy && !isRateLimitedPayment;
 
     const currentSlug = isPublished ? invitation.slug : slug;
     const publicUrl = getPublicInvitationUrl(currentSlug);
@@ -264,7 +291,9 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
 
             const orderData = await orderRes.json();
             if (!orderRes.ok) {
-                throw new Error(orderData.error || "Failed to initialize payment order");
+                setPaymentProcessingState("failed");
+                setPaymentError(orderData.error || "Failed to initialize payment order");
+                return;
             }
 
             if (orderData.status === "alreadyPaid") {
@@ -315,6 +344,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             setPaymentProcessingState("paymentSuccess");
                             setIsPublished(true);
                             setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
+                            notifyProfileDataChanged();
                             onPublishSuccess({
                                 slug: verifyData.slug,
                                 status: "published",
@@ -326,6 +356,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
                             setPaymentProcessingState("idle");
                             setPublishError(verifyData.message || "Your payment was successful, but publishing is still being completed. Please do not pay again.");
+                            notifyProfileDataChanged();
                             onPublishSuccess({
                                 slug: invitation.slug,
                                 status: invitation.status || "draft",
@@ -386,9 +417,9 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             }
             const rzp = new Razorpay(options);
             rzp.on("payment.failed", function (response: RazorpayFailureResponse) {
-                console.error("Payment failure callback:", response.error);
                 setPaymentProcessingState("failed");
                 setPaymentError(response.error.description || "Payment failed. Please try again.");
+                notifyProfileDataChanged();
             });
             rzp.open();
         } catch (err: unknown) {
@@ -419,6 +450,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             }
 
             setIsPublished(true);
+            notifyProfileDataChanged();
             onPublishSuccess(data);
         } catch {
             setPublishError("An error occurred during publishing");
@@ -502,17 +534,23 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                         transition={{ type: "spring", duration: 0.4 }}
                     >
                         {/* Header */}
-                        <div className="publishModalBanner">
+                        <div className={`publishModalBanner${isPaymentProcessing ? " publishModalBanner--processing" : ""}${isPaymentFailed ? " publishModalBanner--failed" : ""}`}>
                             <div className="publishModalBannerCopy">
                                 <span className="publishModalHeaderIcon" aria-hidden="true">
-                                    <PartyPopper size={26} />
+                                    {isPaymentFailed ? <X size={22} /> : isPaymentProcessing ? <Clock size={22} /> : <PartyPopper size={26} />}
                                 </span>
                                 <div>
                                     <h2 className="publishModalBannerTitle">
                                         {isPublished ? "Invitation is Live!" : "Publish Invitation"}
                                     </h2>
                                     <p className="publishModalBannerSub">
-                                        {isPublished ? "Share your link with guests!" : "Review your details and go live."}
+                                        {isPublished
+                                            ? "Share your link with guests!"
+                                            : isPaymentFailed
+                                                ? "We couldn't process your payment."
+                                                : isPaymentProcessing
+                                                    ? "Please wait while we process your payment."
+                                                    : "Review your details and go live."}
                                     </p>
                                 </div>
                             </div>
@@ -531,9 +569,14 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             )}
 
                             {paymentError && (
-                                <div className="publishModalError">
-                                    <AlertTriangle size={15} />
-                                    <span>{paymentError}</span>
+                                <div className="publishModalError publishModalError--payment">
+                                    <AlertTriangle size={26} />
+                                    <div>
+                                        <strong>Payment failed</strong>
+                                        {getPaymentFailureLines(paymentError).map((line) => (
+                                            <span key={line}>{line}</span>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
@@ -544,6 +587,32 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                 </div>
                             ) : !isPublished ? (
                                 <>
+                                    {isPaymentProcessing && paymentInfo && !paymentInfo.isFree && !paymentInfo.alreadyPaid ? (
+                                        <>
+                                            <div className="publishPaymentProcessingState" aria-live="polite">
+                                                <div className="publishPaymentProgressRing" aria-hidden="true">
+                                                    <LockKeyhole size={28} />
+                                                </div>
+                                                <strong>Processing your payment</strong>
+                                                <p>Do not close this window or click back.</p>
+                                            </div>
+
+                                            <div className="publishProcessingPriceCard">
+                                                <div>
+                                                    <span className="priceLabelText">Publishing Price</span>
+                                                    <span className="paymentAssurancePill">
+                                                        <ShieldCheck size={15} />
+                                                        One-time payment · No hidden charges
+                                                    </span>
+                                                </div>
+                                                <strong className="priceValText">{formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}</strong>
+                                            </div>
+                                            <p className="securePaymentText">
+                                                <LockKeyhole size={13} />
+                                                Secure payment powered by Razorpay
+                                            </p>
+                                        </>
+                                    ) : <>
                                     {hasValidationErrors && (
                                         <div className="publishModalValidation">
                                             <p>Complete required fields first:</p>
@@ -591,36 +660,17 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                         <i aria-hidden="true" />
                                                     </div>
                                                     <ul>
-                                                        <li>
-                                                            <span className="checkIconWrapper">
-                                                                <Check size={12} strokeWidth={3} />
-                                                            </span>
-                                                            <span>Customizable URL slug</span>
-                                                        </li>
-                                                        <li>
-                                                            <span className="checkIconWrapper">
-                                                                <Check size={12} strokeWidth={3} />
-                                                            </span>
-                                                            <span>Sound Effects & Background Music</span>
-                                                        </li>
-                                                        <li>
-                                                            <span className="checkIconWrapper">
-                                                                <Check size={12} strokeWidth={3} />
-                                                            </span>
-                                                            <span>Interactive Maps Navigation</span>
-                                                        </li>
-                                                        <li>
-                                                            <span className="checkIconWrapper">
-                                                                <Check size={12} strokeWidth={3} />
-                                                            </span>
-                                                            <span>RSVP Manager & Guest Wishes</span>
-                                                        </li>
-                                                        <li>
-                                                            <span className="checkIconWrapper">
-                                                                <Check size={12} strokeWidth={3} />
-                                                            </span>
-                                                            <span>Fast mobile loading speeds</span>
-                                                        </li>
+                                                        {PREMIUM_FEATURES.map((feature) => {
+                                                            const FeatureIcon = feature.icon;
+                                                            return (
+                                                                <li key={feature.label}>
+                                                                    <span className="checkIconWrapper">
+                                                                        <FeatureIcon size={13} strokeWidth={2.5} />
+                                                                    </span>
+                                                                    <span>{feature.label}</span>
+                                                                </li>
+                                                            );
+                                                        })}
                                                     </ul>
                                                 </div>
                                             )}
@@ -662,7 +712,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                             </button>
                                         ) : (
                                             <button
-                                                className="publishBtnPrimary payAndPublishBtn"
+                                                className={`publishBtnPrimary payAndPublishBtn${isPaymentFailed ? " payAndPublishBtn--failed" : ""}`}
                                                 onClick={handlePaymentAndPublish}
                                                 disabled={!canPublishOrPay}
                                             >
@@ -675,7 +725,13 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                                 {paymentProcessingState === "verifyingPayment" && (
                                                     <><Loader2 size={16} className="spinner" /> Verifying Payment…</>
                                                 )}
-                                                {paymentProcessingState === "idle" && (
+                                                {isRateLimitedPayment && (
+                                                    <><Clock size={16} /> Try again shortly</>
+                                                )}
+                                                {isPaymentFailed && !isRateLimitedPayment && (
+                                                    <><RotateCcw size={16} /> Try Payment Again</>
+                                                )}
+                                                {paymentProcessingState === "idle" && !isPaymentFailed && (
                                                     <><LockKeyhole size={16} /> {paymentInfo ? `Pay ${formatPaiseToCurrency(paymentInfo.pricePaise, paymentInfo.currency)}` : "Pay"} & Publish</>
                                                 )}
                                             </button>
@@ -687,6 +743,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                             Secure payment powered by Razorpay
                                         </p>
                                     )}
+                                    </>}
                                 </>
 							) : (
                                 <div className="publishSuccessState">
@@ -729,4 +786,26 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         </AnimatePresence>,
         document.body
     );
+}
+
+function getPaymentFailureLines(message: string) {
+    const normalized = message.toLowerCase();
+    const isBankDecline =
+        normalized.includes("declined") ||
+        normalized.includes("bank") ||
+        normalized.includes("payment didn't go through");
+
+    if (isBankDecline) {
+        return DEFAULT_PAYMENT_FAILURE_LINES;
+    }
+
+    return [message];
+}
+
+function isTooManyRequestsError(message: string) {
+    return message.toLowerCase().includes("too many requests");
+}
+
+function notifyProfileDataChanged() {
+    window.dispatchEvent(new Event("vilique:profile-data-changed"));
 }
