@@ -84,6 +84,7 @@ export default function PastelFloralWedding({
     );
     const songRef = useRef<HTMLAudioElement>(null);
     const tickRef = useRef<HTMLAudioElement>(null);
+    const pageRef = useRef<HTMLElement>(null);
     const songTimeoutRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
     const audioSuspendedRef = useRef(false);
@@ -184,6 +185,11 @@ export default function PastelFloralWedding({
     const tickUrl = shouldPlayCountdownTick ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
     const showAcceptedScreen = accepted || isAccepted;
+
+    useEffect(() => {
+        if (!showAcceptedScreen) return;
+        resetInvitationScroll(pageRef.current);
+    }, [showAcceptedScreen]);
 
     useEffect(() => {
         shouldPlayCountdownTickRef.current = shouldPlayCountdownTick;
@@ -317,6 +323,7 @@ export default function PastelFloralWedding({
     function handleAccept(event: MouseEvent<HTMLButtonElement>) {
         event.stopPropagation();
         const { x, y } = getPagePointFromEvent(event);
+        const pageElement = event.currentTarget.closest(".pastelWeddingPage");
 
         setIsAccepting(true);
         createSparkles(x, y, setParticles);
@@ -343,7 +350,7 @@ export default function PastelFloralWedding({
         window.setTimeout(() => {
             setIsAccepted(true);
             onAccept?.();
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            resetInvitationScroll(pageElement);
         }, 700);
 
         window.setTimeout(() => setIsAccepting(false), 900);
@@ -365,7 +372,7 @@ export default function PastelFloralWedding({
                     isExiting={isExiting}
                 />
             )}
-            <section className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""}`}>
+            <section ref={pageRef} className={`pastelWeddingPage ${showAcceptedScreen ? "stateAccepted" : ""}`}>
             {songUrl ? <audio ref={songRef} src={songUrl} preload="auto" /> : null}
             {tickUrl ? <audio ref={tickRef} src={tickUrl} preload="auto" loop /> : null}
 
@@ -914,6 +921,25 @@ function stopAudio(audio: HTMLAudioElement | null) {
     }
     if (activeSongAudio === audio) {
         activeSongAudio = null;
+    }
+}
+
+function resetInvitationScroll(element: Element | null) {
+    const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "instant" as ScrollBehavior };
+    const scrollingElement = document.scrollingElement || document.documentElement;
+
+    scrollingElement.scrollTo(scrollOptions);
+    window.scrollTo(scrollOptions);
+
+    let current = element?.parentElement || null;
+    while (current) {
+        const style = window.getComputedStyle(current);
+        const canScrollY = current.scrollHeight > current.clientHeight;
+        const overflowY = style.overflowY;
+        if (canScrollY && /(auto|scroll|overlay)/.test(overflowY)) {
+            current.scrollTo(scrollOptions);
+        }
+        current = current.parentElement;
     }
 }
 
