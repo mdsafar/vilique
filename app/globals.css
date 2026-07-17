@@ -11076,6 +11076,29 @@ body:has(.invitePreviewShell) {
   pointer-events: none;
 }
 
+.templatePreviewSkeletonShell {
+  display: grid;
+  place-items: start center;
+  padding: calc(70px + env(safe-area-inset-top)) 16px 32px;
+}
+
+.templatePreviewBackSkeleton {
+  pointer-events: none;
+}
+
+.templatePreviewSkeletonPage {
+  width: min(100%, 440px);
+  min-height: auto;
+  padding: 0;
+}
+
+.templatePreviewSkeletonCard {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  min-height: 680px;
+}
+
 .weddingCardWrapper {
   display: grid;
   grid-template-columns: 1fr;
