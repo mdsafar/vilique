@@ -1295,7 +1295,7 @@ function EditorForm({
     const minEventDateTime = startOfDate(minEventDate).getTime();
     const minTimeMinutes = isSameDate(selectedDate, minEventDate) ? getNextSelectableMinute(now) : null;
     const maxStartTimeMinutes = 23 * 60 + 58;
-    const endMinTimeMinutes = getMinimumEndTimeMinutes(startTime, minTimeMinutes);
+    const endMinTimeMinutes = getMinimumEndTimeMinutes(startTime);
     const usesWeddingTitleDropdown = invitation.templateId === "pastel-floral-wedding";
     const selectedWeddingTitle = weddingTemplateTitleOptions.includes(invitation.title as typeof weddingTemplateTitleOptions[number])
         ? invitation.title
@@ -1316,7 +1316,7 @@ function EditorForm({
             nextStartTime = fromMinutes(Math.min(Math.max(minTimeMinutes ?? 0, toMinutes(nextStartTime || "00:00")), maxStartTimeMinutes));
         }
 
-        const minEndMinutes = getMinimumEndTimeMinutes(nextStartTime, minTimeMinutes);
+        const minEndMinutes = getMinimumEndTimeMinutes(nextStartTime);
         if (!nextEndTime || !isSelectableTime(nextEndTime, minEndMinutes, null)) {
             nextEndTime = getPreferredEndTime(nextStartTime, minEndMinutes);
         }
@@ -1391,7 +1391,7 @@ function EditorForm({
                     <span>Start Time</span>
                     <TimePickerField
                         value={startTime}
-                        onChange={(value) => updateField("eventTime", normalizeTimeRangeForStart(value, endTime, minTimeMinutes))}
+                        onChange={(value) => updateField("eventTime", normalizeTimeRangeForStart(value, endTime))}
                         minTimeMinutes={minTimeMinutes}
                         maxTimeMinutes={maxStartTimeMinutes}
                         isOpen={activePicker === "startTime"}
@@ -1929,18 +1929,16 @@ function fromMinutes(value: number) {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function isSelectableTime(value: string, minTimeMinutes: number | null, maxTimeMinutes: number | null = null) {
+export function isSelectableTime(value: string, minTimeMinutes: number | null, maxTimeMinutes: number | null = null) {
     const minutes = toMinutes(value);
     if (minTimeMinutes !== null && minutes < minTimeMinutes) return false;
     if (maxTimeMinutes !== null && minutes > maxTimeMinutes) return false;
     return true;
 }
 
-function getMinimumEndTimeMinutes(startTime: string, minTimeMinutes: number | null) {
+export function getMinimumEndTimeMinutes(startTime: string) {
     const startEndMinimum = startTime ? Math.min(toMinutes(startTime) + 1, 23 * 60 + 59) : null;
-    if (startEndMinimum === null) return minTimeMinutes;
-    if (minTimeMinutes === null) return startEndMinimum;
-    return Math.max(startEndMinimum, minTimeMinutes);
+    return startEndMinimum;
 }
 
 function getPreferredEndTime(startTime: string, minEndTimeMinutes: number | null) {
@@ -1948,8 +1946,8 @@ function getPreferredEndTime(startTime: string, minEndTimeMinutes: number | null
     return fromMinutes(Math.max(minEndTimeMinutes ?? 0, preferredEndMinutes));
 }
 
-function normalizeTimeRangeForStart(startTime: string, endTime: string, minTimeMinutes: number | null) {
-    const minEndTimeMinutes = getMinimumEndTimeMinutes(startTime, minTimeMinutes);
+function normalizeTimeRangeForStart(startTime: string, endTime: string) {
+    const minEndTimeMinutes = getMinimumEndTimeMinutes(startTime);
     const nextEndTime = endTime && isSelectableTime(endTime, minEndTimeMinutes)
         ? endTime
         : getPreferredEndTime(startTime, minEndTimeMinutes);

@@ -39,7 +39,7 @@ export default async function TemplatePreviewPage({ params }: Props) {
         <div className="invitePreviewShell templateStandalonePreview">
             <TemplatePreviewBackButton templateId={template.id} />
 
-            <PastelFloralWedding invitation={invitation} useDemoCountdown />
+            <PastelFloralWedding invitation={invitation} useDemoCountdown enableAudio />
         </div>
     );
 }
