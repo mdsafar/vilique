@@ -1,10 +1,5 @@
-import DelayedRouteSkeleton from "@/components/DelayedRouteSkeleton";
-import TemplateDetailsSkeleton from "@/components/skeletons/TemplateDetailsSkeleton";
+import TemplateDetailsRouteLoading from "@/components/TemplateDetailsRouteLoading";
 
 export default function TemplateDetailsLoading() {
-    return (
-        <DelayedRouteSkeleton delayMs={0}>
-            <TemplateDetailsSkeleton />
-        </DelayedRouteSkeleton>
-    );
+    return <TemplateDetailsRouteLoading />;
 }

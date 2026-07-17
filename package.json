@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Create beautiful invitation websites in minutes with Vilique.",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

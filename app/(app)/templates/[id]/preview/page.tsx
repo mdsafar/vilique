@@ -1,10 +1,9 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { templates } from "@/data/templates";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import PastelFloralWedding from "@/components/templates/PastelFloralWedding";
+import TemplatePreviewBackButton from "@/components/TemplatePreviewBackButton";
 
 type Props = {
     params: Promise<{
@@ -38,10 +37,7 @@ export default async function TemplatePreviewPage({ params }: Props) {
 
     return (
         <div className="invitePreviewShell templateStandalonePreview">
-            <Link className="inviteBackButton" href={`/templates/${template.id}`}>
-                <ArrowLeft size={16} aria-hidden="true" />
-                <span>Template</span>
-            </Link>
+            <TemplatePreviewBackButton templateId={template.id} />
 
             <PastelFloralWedding invitation={invitation} useDemoCountdown />
         </div>

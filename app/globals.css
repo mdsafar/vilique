@@ -4982,6 +4982,9 @@ p {
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
   transition: all 0.18s ease;
 }
 
@@ -6570,6 +6573,10 @@ p {
 .templateDetailContent .primaryBtn svg,
 .templateDetailContent .secondaryBtn svg {
   flex: 0 0 auto;
+}
+
+.livePreviewLink > svg {
+  width: 17px;
 }
 
 .templateDetailContent .premiumBadge,

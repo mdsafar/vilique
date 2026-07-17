@@ -5,7 +5,6 @@ import {
     ArrowLeft,
     CheckCircle2,
     Clock3,
-    Eye,
     Heart,
     Palette,
     MapPin,
@@ -18,6 +17,7 @@ import {
     Wand2,
 } from "lucide-react";
 import TemplateDetailPreview from "@/components/templates/TemplateDetailPreview";
+import TemplateLivePreviewLink from "@/components/TemplateLivePreviewLink";
 import UseTemplateButton from "@/components/UseTemplateButton";
 import { getActiveTemplates } from "@/features/invitations/data";
 import { formatTemplateRating } from "@/lib/templateRatingFormat";
@@ -137,10 +137,7 @@ export default async function TemplateDetailsPage({ params }: Props) {
                     <div className="heroActions detailActions">
                         <UseTemplateButton templateId={template.id} />
 
-                        <Link className="secondaryBtn" href={`/templates/${template.id}/preview`}>
-                            <Eye size={17} aria-hidden="true" />
-                            Live Preview
-                        </Link>
+                        <TemplateLivePreviewLink templateId={template.id} />
                     </div>
 
                     <div className="detailBlock">
