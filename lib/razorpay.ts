@@ -45,14 +45,6 @@ export function verifyRazorpayWebhookSignature(
         .update(rawBody, "utf8")
         .digest("hex");
 
-    console.log("Webhook Signature Debug", {
-        secretLength: secret.length,
-        generatedLength: generated.length,
-        receivedLength: signature.length,
-        generatedPrefix: generated.slice(0, 8),
-        receivedPrefix: signature.slice(0, 8),
-    });
-
     if (
         !/^[a-f0-9]{64}$/i.test(signature) ||
         generated.length !== signature.length

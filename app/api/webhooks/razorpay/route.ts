@@ -63,22 +63,16 @@ const PROCESSABLE_EVENT_TYPES = new Set([
 
 export async function POST(request: Request) {
     try {
-        const signature = request.headers.get("x-razorpay-signature");
+        const signature =
+            request.headers.get("x-razorpay-signature")?.trim() ?? "";
+
         if (!signature) {
-            return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+            return NextResponse.json(
+                { error: "Missing signature" },
+                { status: 400 }
+            );
         }
-
         const rawBody = await request.text();
-
-
-        console.log("Webhook Request Debug", {
-            contentType: request.headers.get("content-type"),
-            signatureExists: !!signature,
-            signatureLength: signature.length,
-            rawBodyLength: rawBody.length,
-            rawBodyStart: rawBody.substring(0, 100),
-        });
-
 
         const isValid = verifyRazorpayWebhookSignature(rawBody, signature);
         if (!isValid) {
@@ -87,11 +81,27 @@ export async function POST(request: Request) {
 
         // Parse the body
         const payload = JSON.parse(rawBody) as RazorpayWebhookPayload;
-        const eventId = payload.id;
+
+        const eventId =
+            request.headers.get("x-razorpay-event-id")?.trim() ?? "";
+
         const eventType = payload.event;
 
+        console.log("Webhook Event Debug", {
+            eventId,
+            eventType,
+        });
+
         if (!eventId || !eventType) {
-            return NextResponse.json({ error: "Invalid payload layout" }, { status: 400 });
+            console.error("Webhook Error: Invalid payload layout", {
+                eventId,
+                eventType,
+            });
+
+            return NextResponse.json(
+                { error: "Invalid payload layout" },
+                { status: 400 }
+            );
         }
 
         const supabaseAdmin = createAdminClient();
