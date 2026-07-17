@@ -87,6 +87,7 @@ export default function PastelFloralWedding({
     const pageRef = useRef<HTMLElement>(null);
     const songTimeoutRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
+    const previousAcceptedScreenRef = useRef<boolean | null>(null);
     const audioSuspendedRef = useRef(false);
     const shouldPlayCountdownTickRef = useRef(false);
     const hasStartedTickRef = useRef(false);
@@ -187,8 +188,18 @@ export default function PastelFloralWedding({
     const showAcceptedScreen = accepted || isAccepted;
 
     useEffect(() => {
-        if (!showAcceptedScreen) return;
-        resetInvitationScroll(pageRef.current);
+        if (previousAcceptedScreenRef.current === null) {
+            previousAcceptedScreenRef.current = showAcceptedScreen;
+            if (showAcceptedScreen) {
+                scheduleInvitationScrollReset(pageRef.current);
+            }
+            return;
+        }
+
+        if (previousAcceptedScreenRef.current !== showAcceptedScreen) {
+            previousAcceptedScreenRef.current = showAcceptedScreen;
+            scheduleInvitationScrollReset(pageRef.current);
+        }
     }, [showAcceptedScreen]);
 
     useEffect(() => {
@@ -350,10 +361,16 @@ export default function PastelFloralWedding({
         window.setTimeout(() => {
             setIsAccepted(true);
             onAccept?.();
-            resetInvitationScroll(pageElement);
+            scheduleInvitationScrollReset(pageElement);
         }, 700);
 
         window.setTimeout(() => setIsAccepting(false), 900);
+    }
+
+    function handleChangeRsvp() {
+        setIsAccepted(false);
+        onChangeRsvp?.();
+        scheduleInvitationScrollReset(pageRef.current);
     }
 
     function handleDecline(event: MouseEvent<HTMLButtonElement>) {
@@ -405,7 +422,7 @@ export default function PastelFloralWedding({
                         eventParts={eventParts}
                         countdown={countdown}
                         onEvent={onEvent}
-                        onChangeRsvp={onChangeRsvp}
+                        onChangeRsvp={handleChangeRsvp}
                         completed={completed}
                         inProgress={inProgress}
                         countdownTitle={countdownTitle}
@@ -927,11 +944,13 @@ function stopAudio(audio: HTMLAudioElement | null) {
 }
 
 function resetInvitationScroll(element: Element | null) {
-    const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "instant" as ScrollBehavior };
+    const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
     const scrollingElement = document.scrollingElement || document.documentElement;
 
     scrollingElement.scrollTo(scrollOptions);
     window.scrollTo(scrollOptions);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
     let current = element?.parentElement || null;
     while (current) {
@@ -943,6 +962,16 @@ function resetInvitationScroll(element: Element | null) {
         }
         current = current.parentElement;
     }
+}
+
+function scheduleInvitationScrollReset(element: Element | null) {
+    resetInvitationScroll(element);
+
+    window.requestAnimationFrame(() => {
+        resetInvitationScroll(element);
+        window.requestAnimationFrame(() => resetInvitationScroll(element));
+    });
+    window.setTimeout(() => resetInvitationScroll(element), 80);
 }
 
 function playCelebrationSong(

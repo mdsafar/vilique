@@ -70,6 +70,16 @@ export async function POST(request: Request) {
 
         const rawBody = await request.text();
 
+
+        console.log("Webhook Request Debug", {
+            contentType: request.headers.get("content-type"),
+            signatureExists: !!signature,
+            signatureLength: signature.length,
+            rawBodyLength: rawBody.length,
+            rawBodyStart: rawBody.substring(0, 100),
+        });
+
+
         const isValid = verifyRazorpayWebhookSignature(rawBody, signature);
         if (!isValid) {
             return NextResponse.json({ error: "Invalid signature" }, { status: 400 });

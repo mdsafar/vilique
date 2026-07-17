@@ -42,10 +42,21 @@ export function verifyRazorpayWebhookSignature(
 
     const generated = crypto
         .createHmac("sha256", secret)
-        .update(rawBody)
+        .update(rawBody, "utf8")
         .digest("hex");
 
-    if (generated.length !== signature.length) {
+    console.log("Webhook Signature Debug", {
+        secretLength: secret.length,
+        generatedLength: generated.length,
+        receivedLength: signature.length,
+        generatedPrefix: generated.slice(0, 8),
+        receivedPrefix: signature.slice(0, 8),
+    });
+
+    if (
+        !/^[a-f0-9]{64}$/i.test(signature) ||
+        generated.length !== signature.length
+    ) {
         return false;
     }
 
