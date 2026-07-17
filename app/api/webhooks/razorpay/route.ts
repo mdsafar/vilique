@@ -11,8 +11,14 @@ type RazorpayEntity = {
     order_id?: string;
     payment_id?: string;
     amount?: number;
+    status?: string;
+    reason?: string;
+    failure_reason?: string;
     error_code?: string;
     error_description?: string;
+    error_reason?: string;
+    error_source?: string;
+    error_step?: string;
 };
 
 type RazorpayWebhookPayload = {
@@ -38,6 +44,13 @@ type ClaimedWebhookEvent = {
     claimed: boolean;
 };
 
+type RefundRequestLookup = {
+    id: string;
+    payment_id: string;
+    status?: string | null;
+    provider_refund_id?: string | null;
+};
+
 const PROCESSABLE_EVENT_TYPES = new Set([
     "order.paid",
     "payment.captured",
@@ -45,6 +58,7 @@ const PROCESSABLE_EVENT_TYPES = new Set([
     "payment.failed",
     "refund.created",
     "refund.processed",
+    "refund.failed",
 ]);
 
 export async function POST(request: Request) {
@@ -277,6 +291,147 @@ export async function POST(request: Request) {
                         }
                     }
                 }
+            } else if (eventType === "refund.failed") {
+                const refundEntity = payload.payload?.refund?.entity;
+                if (!refundEntity) throw new Error("Missing refund entity");
+
+                const providerRefundId = refundEntity.id;
+                const providerPaymentId = refundEntity.payment_id;
+                const failure = getRefundFailureDetails(refundEntity);
+                const now = new Date().toISOString();
+
+                let localPayment = null;
+                if (providerPaymentId) {
+                    const { data, error } = await supabaseAdmin
+                        .from("payments")
+                        .select("*")
+                        .eq("provider_payment_id", providerPaymentId)
+                        .maybeSingle();
+
+                    if (error) throw new Error(`Payment lookup failed for refund failure: ${error.message}`);
+                    localPayment = data;
+                }
+
+                let refundRequest: RefundRequestLookup | null = null;
+                if (providerRefundId) {
+                    const { data, error } = await looseSupabase(supabaseAdmin)
+                        .from("payment_refund_requests")
+                        .select("id,payment_id,status,provider_refund_id")
+                        .eq("provider_refund_id", providerRefundId)
+                        .maybeSingle();
+
+                    if (error) throw new Error(`Refund request lookup by provider refund id failed: ${error.message}`);
+                    refundRequest = data as RefundRequestLookup | null;
+                }
+
+                if (!refundRequest && localPayment) {
+                    const { data, error } = await looseSupabase(supabaseAdmin)
+                        .from("payment_refund_requests")
+                        .select("id,payment_id,status,provider_refund_id")
+                        .eq("payment_id", localPayment.id)
+                        .maybeSingle();
+
+                    if (error) throw new Error(`Refund request lookup by payment id failed: ${error.message}`);
+                    refundRequest = data as RefundRequestLookup | null;
+                }
+
+                if (!localPayment && refundRequest?.payment_id) {
+                    const { data, error } = await supabaseAdmin
+                        .from("payments")
+                        .select("*")
+                        .eq("id", refundRequest.payment_id)
+                        .maybeSingle();
+
+                    if (error) throw new Error(`Payment lookup by refund request failed: ${error.message}`);
+                    localPayment = data;
+                }
+
+                if (!localPayment) {
+                    logEvent("warn", "webhook.refund_failed_unknown_payment", {
+                        eventId,
+                        providerRefundId,
+                        providerPaymentId,
+                    });
+                } else if (
+                    localPayment.refund_state === "processed" ||
+                    localPayment.status === "refunded" ||
+                    refundRequest?.status === "processed"
+                ) {
+                    logEvent("warn", "webhook.refund_failed_after_processed_refund", {
+                        eventId,
+                        paymentId: localPayment.id,
+                        refundRequestId: refundRequest?.id || null,
+                        providerRefundId,
+                        providerPaymentId,
+                    });
+                } else {
+                    const paymentMetadata = ((localPayment.metadata as Record<string, Json>) || {});
+                    const { error: paymentUpdateError } = await supabaseAdmin
+                        .from("payments")
+                        .update({
+                            refund_state: "failed",
+                            provider_refund_id: providerRefundId || localPayment.provider_refund_id,
+                            next_refund_reconciliation_at: null,
+                            last_error: failure.message,
+                            updated_at: now,
+                            metadata: {
+                                ...paymentMetadata,
+                                refund_failed_details: {
+                                    provider_refund_id: providerRefundId || localPayment.provider_refund_id,
+                                    provider_payment_id: providerPaymentId || localPayment.provider_payment_id,
+                                    failure_reason: failure.reason,
+                                    error_code: failure.errorCode,
+                                    error_message: failure.message,
+                                    webhook_payload: payload,
+                                },
+                            } as Json,
+                        })
+                        .eq("id", localPayment.id)
+                        .neq("refund_state", "processed");
+
+                    if (paymentUpdateError) {
+                        throw new Error(`Failed to update payment for refund failure: ${paymentUpdateError.message}`);
+                    }
+
+                    if (refundRequest) {
+                        const { error: refundRequestUpdateError } = await looseSupabase(supabaseAdmin)
+                            .from("payment_refund_requests")
+                            .update({
+                                status: "failed",
+                                provider_refund_id: providerRefundId || refundRequest.provider_refund_id,
+                                provider_payload: {
+                                    webhook_payload: payload,
+                                    failure_reason: failure.reason,
+                                    error_code: failure.errorCode,
+                                    error_message: failure.message,
+                                } as Json,
+                                last_error: failure.message,
+                                failed_at: now,
+                            })
+                            .eq("id", refundRequest.id)
+                            .neq("status", "processed");
+
+                        if (refundRequestUpdateError) {
+                            throw new Error(`Failed to update refund request for refund failure: ${refundRequestUpdateError.message}`);
+                        }
+                    } else {
+                        logEvent("warn", "webhook.refund_failed_missing_refund_request", {
+                            eventId,
+                            paymentId: localPayment.id,
+                            providerRefundId,
+                            providerPaymentId,
+                        });
+                    }
+
+                    logEvent("info", "webhook.refund_failed_recorded", {
+                        eventId,
+                        paymentId: localPayment.id,
+                        refundRequestId: refundRequest?.id || null,
+                        providerRefundId,
+                        providerPaymentId,
+                        errorCode: failure.errorCode,
+                    });
+                }
             }
 
             await supabaseAdmin
@@ -308,4 +463,21 @@ export async function POST(request: Request) {
         reportError(err, "webhook.unhandled");
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
+}
+
+function getRefundFailureDetails(refundEntity: RazorpayEntity) {
+    const reason =
+        refundEntity.failure_reason ||
+        refundEntity.error_reason ||
+        refundEntity.reason ||
+        refundEntity.error_description ||
+        "Refund failed";
+    const errorCode = refundEntity.error_code || refundEntity.error_reason || "REFUND_FAILED";
+    const message = refundEntity.error_description || reason;
+
+    return {
+        reason,
+        errorCode,
+        message,
+    };
 }
