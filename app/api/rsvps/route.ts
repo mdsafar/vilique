@@ -3,11 +3,9 @@ import { rsvpCreateSchema, rsvpLookupSchema } from "@/features/invitations/valid
 import { createClient } from "@/lib/supabase/server";
 import {
     getVisitorKey,
-    hashValue,
     rateLimit,
     rateLimitResponse,
     readJsonWithLimit,
-    recordSubmissionGuard,
     sanitizeText,
 } from "@/lib/security/requestGuard";
 
@@ -59,25 +57,6 @@ export async function POST(request: Request) {
 
     if (!limit.ok) {
         return rateLimitResponse(limit.resetAt);
-    }
-
-    const dedupeKey = hashValue([
-        parsed.data.guestToken,
-        parsed.data.status,
-        sanitizeText(parsed.data.guestName).toLowerCase(),
-        parsed.data.guestPhone || "",
-        parsed.data.guestCount,
-        sanitizeText(parsed.data.message || "").toLowerCase(),
-    ].join("|"));
-    const guard = await recordSubmissionGuard({
-        scope: "rsvp",
-        invitationId: parsed.data.invitationId,
-        dedupeKey,
-        action: "upsert",
-    });
-
-    if (guard.duplicate) {
-        return NextResponse.json({ ok: true, deduped: true }, { status: 200 });
     }
 
     const { data, error } = await supabase.rpc("upsert_public_rsvp", {

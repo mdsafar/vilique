@@ -16,7 +16,6 @@ type StoredRsvp = {
 };
 
 const RSVP_TOKEN_PREFIX = "vilique:rsvp-token:";
-const RSVP_CHANGE_PREFIX = "vilique:rsvp-changing:";
 const PUBLIC_INVITE_BACKGROUND =
     "radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%)";
 const PUBLIC_INVITE_BACKGROUND_COLOR = "#ecdcf7";
@@ -71,7 +70,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         }
     }, [invitation.id, isPublic]);
 
-    useLayoutEffect(() => {
+    useEffect(() => {
         if (previousVisibleScreenRef.current === null) {
             previousVisibleScreenRef.current = showAccepted;
             return;
@@ -103,7 +102,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             .then((payload: { rsvp?: StoredRsvp | null } | null) => {
                 if (lookupRequestId !== rsvpRequestIdRef.current) return;
                 const nextStatus = payload?.rsvp?.status || null;
-                const isChangingStoredResponse = getIsChangingResponse(invitation.id);
+                const isChangingStoredResponse = getIsChangingResponse();
                 setRsvpStatus(nextStatus);
                 setAccepted(nextStatus === "accepted" && !isChangingStoredResponse);
                 setIsChangingResponse(isChangingStoredResponse);
@@ -126,13 +125,24 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         rsvpRequestIdRef.current = requestId;
         const shouldAccept = nextStatus === "accepted";
         if (!options.keepChangingResponse) {
-            clearIsChangingResponse(invitation.id);
+            clearIsChangingResponse();
         }
         if (acceptVisualTimeoutRef.current) {
             window.clearTimeout(acceptVisualTimeoutRef.current);
             acceptVisualTimeoutRef.current = null;
         }
         if (shouldAccept) {
+            // showAccepted = accepted || (rsvpStatus==="accepted" && !isChangingResponse).
+            // If rsvpStatus is already "accepted" (Change RSVP → Accept again), clearing
+            // isChangingResponse below would instantly flip showAccepted=true, causing the
+            // scroll reset and Thanks card to appear before the sparkle animation plays.
+            // Guard against that by resetting rsvpStatus to null — but ONLY when it is
+            // "accepted". When it is "declined" (Accept Instead path), clearing it would
+            // replace the Accept Instead button with the normal Accept+Decline pair during
+            // the entire 620ms animation, causing the visible flicker this fix resolves.
+            if (rsvpStatus === "accepted") {
+                setRsvpStatus(null);
+            }
             setIsChangingResponse(false);
             acceptVisualTimeoutRef.current = window.setTimeout(() => {
                 acceptVisualTimeoutRef.current = null;
@@ -177,7 +187,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 setRsvpStatus(persistedStatus);
                 setAccepted(persistedStatus === "accepted");
                 setIsChangingResponse(Boolean(options.keepChangingResponse && persistedStatus === "accepted"));
-                clearIsChangingResponse(invitation.id);
+                clearIsChangingResponse();
                 setIsRsvpSubmitting(false);
             })
             .catch(() => {
@@ -209,24 +219,20 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 onAccept={() => submitRsvp("accepted")}
                 onDecline={() => submitRsvp("declined")}
                 onChangeRsvp={() => {
-                    schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
-                    window.requestAnimationFrame(() => {
-                        schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
-                        if (acceptVisualTimeoutRef.current) {
-                            window.clearTimeout(acceptVisualTimeoutRef.current);
-                            acceptVisualTimeoutRef.current = null;
-                        }
-                        if (isPublic) {
-                            setIsChangingResponseFlag(invitation.id);
-                            rsvpRequestIdRef.current += 1;
-                            setIsRsvpSubmitting(false);
-                            setAccepted(false);
-                            setIsChangingResponse(true);
-                            return;
-                        }
+                    if (acceptVisualTimeoutRef.current) {
+                        window.clearTimeout(acceptVisualTimeoutRef.current);
+                        acceptVisualTimeoutRef.current = null;
+                    }
+                    if (isPublic) {
+                        setIsChangingResponseFlag();
+                        rsvpRequestIdRef.current += 1;
+                        setIsRsvpSubmitting(false);
                         setAccepted(false);
                         setIsChangingResponse(true);
-                    });
+                        return;
+                    }
+                    setAccepted(false);
+                    setIsChangingResponse(true);
                 }}
                 onEvent={handleAnalyticsEvent}
                 enableAudio={true}
@@ -249,33 +255,48 @@ function schedulePublicInviteScrollReset(shell: HTMLElement | null, anchor: HTML
 }
 
 function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement | null) {
-    const previousHtmlScrollBehavior = document.documentElement.style.scrollBehavior;
-    const previousBodyScrollBehavior = document.body.style.scrollBehavior;
+    const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
+    const scrollingElement = document.scrollingElement || document.documentElement;
+
+    // Suppress smooth-scroll on all containers before resetting.
+    // scrollingElement is document.body on Safari, document.documentElement elsewhere.
+    const prevHtmlBehavior = document.documentElement.style.scrollBehavior;
+    const prevBodyBehavior = document.body.style.scrollBehavior;
+    const scrollingIsHtml = scrollingElement === document.documentElement;
+    const scrollingIsBody = scrollingElement === document.body;
+    if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
+        (scrollingElement as HTMLElement).style.scrollBehavior = "auto";
+    }
     document.documentElement.style.scrollBehavior = "auto";
     document.body.style.scrollBehavior = "auto";
 
     try {
         anchor?.scrollIntoView({ block: "start", inline: "nearest", behavior: "auto" });
-        const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
-        const scrollingElement = document.scrollingElement || document.documentElement;
 
-        window.scrollTo(scrollOptions);
+        // Reset window and the document scrolling element unconditionally.
+        // html/body may report overflow:visible yet still be the viewport scroll container.
         window.scrollTo(0, 0);
+        window.scrollTo(scrollOptions);
         scrollingElement.scrollTo(scrollOptions);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
 
+        // Walk ancestors and reset any scrolled containers.
+        // Do NOT gate on overflow:auto/scroll — html/body would be skipped incorrectly.
         let current: HTMLElement | null = shell;
         while (current) {
-            if (current.scrollHeight > current.clientHeight) {
+            if (current.scrollTop !== 0) {
                 current.scrollTo(scrollOptions);
                 current.scrollTop = 0;
             }
             current = current.parentElement;
         }
     } finally {
-        document.documentElement.style.scrollBehavior = previousHtmlScrollBehavior;
-        document.body.style.scrollBehavior = previousBodyScrollBehavior;
+        document.documentElement.style.scrollBehavior = prevHtmlBehavior;
+        document.body.style.scrollBehavior = prevBodyBehavior;
+        if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
+            (scrollingElement as HTMLElement).style.scrollBehavior = "";
+        }
     }
 }
 
@@ -294,26 +315,15 @@ function getOrCreateGuestToken(invitationId: string) {
     }
 }
 
-function getIsChangingResponse(invitationId: string) {
-    try {
-        return sessionStorage.getItem(`${RSVP_CHANGE_PREFIX}${invitationId}`) === "true";
-    } catch {
-        return false;
-    }
+function getIsChangingResponse() {
+    return false;
 }
 
-function setIsChangingResponseFlag(invitationId: string) {
-    try {
-        sessionStorage.setItem(`${RSVP_CHANGE_PREFIX}${invitationId}`, "true");
-    } catch {
-        // Ignore storage failures; the in-memory state still handles this session.
-    }
+function setIsChangingResponseFlag() {
+    // No-op: Do not persist transient editing state to sessionStorage to ensure
+    // refreshing the page restores the Thanks screen for a saved RSVP.
 }
 
-function clearIsChangingResponse(invitationId: string) {
-    try {
-        sessionStorage.removeItem(`${RSVP_CHANGE_PREFIX}${invitationId}`);
-    } catch {
-        // Ignore storage failures; submitting the RSVP still updates the UI state.
-    }
+function clearIsChangingResponse() {
+    // No-op: Transient editing state is in-memory only.
 }

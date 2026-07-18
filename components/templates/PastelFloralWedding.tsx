@@ -91,7 +91,7 @@ export default function PastelFloralWedding({
     const songTimeoutRef = useRef<number | null>(null);
     const acceptTransitionTimeoutRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
-    const previousAcceptedScreenRef = useRef<boolean | null>(null);
+    const changingRsvpRef = useRef(false);
     const audioSuspendedRef = useRef(false);
     const shouldPlayCountdownTickRef = useRef(false);
     const hasStartedTickRef = useRef(false);
@@ -191,20 +191,10 @@ export default function PastelFloralWedding({
 
     const showAcceptedScreen = (accepted || isAccepted) && !isAcceptTransitioning;
 
-    useLayoutEffect(() => {
-        if (previousAcceptedScreenRef.current === null) {
-            previousAcceptedScreenRef.current = showAcceptedScreen;
-            if (showAcceptedScreen) {
-                scheduleInvitationScrollReset(pageRef.current);
-            }
-            return;
-        }
-
-        if (previousAcceptedScreenRef.current !== showAcceptedScreen) {
-            previousAcceptedScreenRef.current = showAcceptedScreen;
-            scheduleInvitationScrollReset(pageRef.current);
-        }
-    }, [showAcceptedScreen]);
+    // Scroll reset for the accepted screen transition is handled by the
+    // post-paint useEffect in PublicInviteExperience (showAccepted changes).
+    // A useLayoutEffect here would fire before the Thanks card is painted and
+    // race against the deferred resets, causing inconsistent results.
 
     useEffect(() => {
         shouldPlayCountdownTickRef.current = shouldPlayCountdownTick;
@@ -215,22 +205,28 @@ export default function PastelFloralWedding({
         }
     }, [shouldPlayCountdownTick]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!accepted) {
             if (acceptTransitionTimeoutRef.current) {
                 window.clearTimeout(acceptTransitionTimeoutRef.current);
                 acceptTransitionTimeoutRef.current = null;
             }
+            changingRsvpRef.current = false;
             stopThisTemplateAudio();
-            const frame = window.requestAnimationFrame(() => {
-                setIsAccepted(false);
-                setIsAccepting(false);
-                setIsAcceptTransitioning(false);
-                setDeclineOpen(false);
-                setParticles([]);
-                setPetals([]);
-            });
-            return () => window.cancelAnimationFrame(frame);
+            // useLayoutEffect fires synchronously after the DOM commit but before the
+            // browser paints. Setting these to false here means React can re-render
+            // showAcceptedScreen=false and paint the InviteCard in a single frame,
+            // eliminating the intermediate frame where accepted=false but isAccepted=true
+            // kept the Thanks card visible for one extra paint (the flicker).
+            /* eslint-disable react-hooks/set-state-in-effect -- intentional: setState inside
+               useLayoutEffect is the correct pattern to suppress a pre-paint intermediate frame. */
+            setIsAccepted(false);
+            setIsAccepting(false);
+            setIsAcceptTransitioning(false);
+            setDeclineOpen(false);
+            setParticles([]);
+            setPetals([]);
+            /* eslint-enable react-hooks/set-state-in-effect */
         }
     }, [accepted]);
 
@@ -359,7 +355,6 @@ export default function PastelFloralWedding({
         event.stopPropagation();
         if (rsvpProcessing) return;
         const { x, y } = getPagePointFromEvent(event);
-        const pageElement = event.currentTarget.closest(".pastelWeddingPage");
 
         setIsAccepting(true);
         setIsAcceptTransitioning(true);
@@ -392,7 +387,7 @@ export default function PastelFloralWedding({
             acceptTransitionTimeoutRef.current = null;
             setIsAccepted(true);
             setIsAcceptTransitioning(false);
-            scheduleInvitationScrollReset(pageElement);
+            // Scroll reset is handled by the PIE useEffect([showAccepted]) after paint.
         }, 620);
 
         window.setTimeout(() => setIsAccepting(false), 900);
@@ -400,14 +395,19 @@ export default function PastelFloralWedding({
 
     function handleChangeRsvp() {
         if (rsvpProcessing) return;
-        scheduleInvitationScrollReset(pageRef.current);
-        window.requestAnimationFrame(() => {
-            scheduleInvitationScrollReset(pageRef.current);
-            if (!accepted) {
-                setIsAccepted(false);
-            }
-            onChangeRsvp?.();
-        });
+        // Guard against duplicate clicks (e.g. fast double-tap on mobile).
+        // changingRsvpRef is cleared by the useLayoutEffect when accepted flips to false.
+        if (changingRsvpRef.current) return;
+        changingRsvpRef.current = true;
+        // Call onChangeRsvp synchronously so the parent state update (accepted → false)
+        // and the template's own isAccepted clear happen in the same commit,
+        // avoiding any extra paint frame that shows the Thanks card.
+        if (!accepted) {
+            setIsAccepted(false);
+        }
+        onChangeRsvp?.();
+        // Defer scroll reset until after the InviteCard is painted.
+        window.requestAnimationFrame(() => scheduleInvitationScrollReset(pageRef.current));
     }
 
     function handleDecline(event: MouseEvent<HTMLButtonElement>) {
@@ -989,25 +989,33 @@ function stopAudio(audio: HTMLAudioElement | null) {
 function resetInvitationScroll(element: Element | null) {
     const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
     const scrollingElement = document.scrollingElement || document.documentElement;
-    const previousHtmlScrollBehavior = document.documentElement.style.scrollBehavior;
-    const previousBodyScrollBehavior = document.body.style.scrollBehavior;
 
+    // Suppress smooth-scroll on all three possible containers before resetting.
+    // scrollingElement may be document.body on Safari, document.documentElement elsewhere.
+    const prevHtmlBehavior = document.documentElement.style.scrollBehavior;
+    const prevBodyBehavior = document.body.style.scrollBehavior;
+    const scrollingIsHtml = scrollingElement === document.documentElement;
+    const scrollingIsBody = scrollingElement === document.body;
+    if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
+        (scrollingElement as HTMLElement).style.scrollBehavior = "auto";
+    }
     document.documentElement.style.scrollBehavior = "auto";
     document.body.style.scrollBehavior = "auto";
 
     try {
-        scrollingElement.scrollTo(scrollOptions);
-        window.scrollTo(scrollOptions);
+        // Reset window and the document scrolling element unconditionally.
+        // html/body may report overflow:visible yet still be the viewport scroll container.
         window.scrollTo(0, 0);
+        window.scrollTo(scrollOptions);
+        scrollingElement.scrollTo(scrollOptions);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
 
+        // Walk ancestors of the template element and reset any custom scroll containers.
+        // Do NOT gate on overflow:auto/scroll — html/body would be skipped incorrectly.
         let current: Element | null = element;
         while (current) {
-            const style = window.getComputedStyle(current);
-            const canScrollY = current.scrollHeight > current.clientHeight;
-            const overflowY = style.overflowY;
-            if (canScrollY && /(auto|scroll|overlay)/.test(overflowY)) {
+            if (current.scrollTop !== 0) {
                 current.scrollTo(scrollOptions);
                 if (current instanceof HTMLElement) {
                     current.scrollTop = 0;
@@ -1016,19 +1024,28 @@ function resetInvitationScroll(element: Element | null) {
             current = current.parentElement;
         }
     } finally {
-        document.documentElement.style.scrollBehavior = previousHtmlScrollBehavior;
-        document.body.style.scrollBehavior = previousBodyScrollBehavior;
+        document.documentElement.style.scrollBehavior = prevHtmlBehavior;
+        document.body.style.scrollBehavior = prevBodyBehavior;
+        if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
+            (scrollingElement as HTMLElement).style.scrollBehavior = "";
+        }
     }
 }
 
 function scheduleInvitationScrollReset(element: Element | null) {
-    resetInvitationScroll(element);
-
+    // Do NOT call resetInvitationScroll() synchronously here.
+    // The caller (PIE useEffect) already runs post-paint; a synchronous call
+    // would execute before the browser has measured the new content height,
+    // causing browsers (especially Safari) to silently ignore or re-override it.
     window.requestAnimationFrame(() => {
         resetInvitationScroll(element);
-        window.requestAnimationFrame(() => resetInvitationScroll(element));
+        window.requestAnimationFrame(() => {
+            resetInvitationScroll(element);
+            // Third attempt after 80 ms covers slow-rendering devices and
+            // Safari's deferred scroll-position restoration.
+            window.setTimeout(() => resetInvitationScroll(element), 80);
+        });
     });
-    window.setTimeout(() => resetInvitationScroll(element), 80);
 }
 
 function playCelebrationSong(
