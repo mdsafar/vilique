@@ -1,6 +1,7 @@
 "use client";
 
 import PastelFloralWedding from "@/components/templates/PastelFloralWedding";
+import { ScrollDebugStage } from "@/components/ScrollDebugPanel";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 import { AnalyticsEventType } from "@/lib/analytics";
 
@@ -13,6 +14,7 @@ type TemplateRendererProps = {
     onDecline?: () => void;
     onChangeRsvp?: () => void;
     onEvent?: (type: AnalyticsEventType) => void;
+    onScrollDebugStage?: (stage: ScrollDebugStage | string, source?: string) => void;
     enableAudio?: boolean;
     rsvpProcessing?: boolean;
 };
@@ -33,10 +35,11 @@ export default function TemplateRenderer({
     onDecline,
     onChangeRsvp,
     onEvent,
+    onScrollDebugStage,
     enableAudio,
     rsvpProcessing,
 }: TemplateRendererProps) {
-    const props = { invitation, accepted, rsvpStatus, demoCountdownTargetDate, onAccept, onDecline, onChangeRsvp, onEvent, enableAudio, rsvpProcessing };
+    const props = { invitation, accepted, rsvpStatus, demoCountdownTargetDate, onAccept, onDecline, onChangeRsvp, onEvent, onScrollDebugStage, enableAudio, rsvpProcessing };
 
     switch (invitation.templateId) {
         case "pastel-floral-wedding":

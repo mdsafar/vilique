@@ -6,6 +6,7 @@ import Image from "next/image";
 import { MapPin, MapPinned, Phone, CalendarOff, Clock, Flower2, Heart, HeartCrack, Sparkle, Star } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
+import type { ScrollDebugStage } from "@/components/ScrollDebugPanel";
 import { getEventPhase, isInvitationCompleted } from "@/lib/lifecycle";
 import { parseInvitationDateParts } from "@/lib/invitationDate";
 import { createDemoCountdownTargetDate } from "@/lib/demoCountdown";
@@ -21,6 +22,7 @@ type Props = {
     onDecline?: () => void;
     onChangeRsvp?: () => void;
     onEvent?: (eventType: AnalyticsEventType) => void;
+    onScrollDebugStage?: (stage: ScrollDebugStage | string, source?: string) => void;
     enableAudio?: boolean;
     rsvpProcessing?: boolean;
 };
@@ -72,6 +74,7 @@ export default function PastelFloralWedding({
     onDecline,
     onChangeRsvp,
     onEvent,
+    onScrollDebugStage,
     enableAudio = false,
     rsvpProcessing = false,
 }: Props) {
@@ -190,6 +193,14 @@ export default function PastelFloralWedding({
     const tickUrl = shouldPlayCountdownTick ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
     const showAcceptedScreen = (accepted || isAccepted) && !isAcceptTransitioning;
+
+    useEffect(() => {
+        onScrollDebugStage?.(`Template accepted prop effect: accepted=${accepted}`, "PastelFloralWedding");
+    }, [accepted, onScrollDebugStage]);
+
+    useEffect(() => {
+        onScrollDebugStage?.(`Template showAcceptedScreen=${showAcceptedScreen}`, "PastelFloralWedding");
+    }, [onScrollDebugStage, showAcceptedScreen]);
 
     // Scroll reset for the accepted screen transition is handled by the
     // post-paint useEffect in PublicInviteExperience (showAccepted changes).
@@ -358,6 +369,7 @@ export default function PastelFloralWedding({
 
         setIsAccepting(true);
         setIsAcceptTransitioning(true);
+        onScrollDebugStage?.("Immediately when Accept is tapped", "PastelFloralWedding handleAccept");
         onAccept?.();
         createSparkles(x, y, setParticles);
         createPetals(setPetals);
@@ -385,9 +397,12 @@ export default function PastelFloralWedding({
         }
         acceptTransitionTimeoutRef.current = window.setTimeout(() => {
             acceptTransitionTimeoutRef.current = null;
+            onScrollDebugStage?.("When the sparkle animation completes", "PastelFloralWedding accept timeout");
             if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                onScrollDebugStage?.("activeElement.blur call", "PastelFloralWedding accept timeout");
                 document.activeElement.blur();
             }
+            onScrollDebugStage?.("Before Thanks content mounts", "PastelFloralWedding accept timeout");
             setIsAccepted(true);
             setIsAcceptTransitioning(false);
             // Scroll reset is handled by the PIE useEffect([showAccepted]) after paint.
@@ -450,6 +465,7 @@ export default function PastelFloralWedding({
                         eventParts={eventParts}
                         countdown={countdown}
                         isAccepting={isAccepting}
+                        onBeforeAcceptTap={() => onScrollDebugStage?.("Before tapping Accept", "PastelFloralWedding accept button pointerdown")}
                         onAccept={handleAccept}
                         onDecline={handleDecline}
                         rsvpStatus={rsvpStatus}
@@ -482,6 +498,7 @@ function InviteCard({
     eventParts,
     countdown,
     isAccepting,
+    onBeforeAcceptTap,
     onAccept,
     onDecline,
     rsvpStatus,
@@ -494,6 +511,7 @@ function InviteCard({
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
     isAccepting: boolean;
+    onBeforeAcceptTap?: () => void;
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
     onDecline: (event: MouseEvent<HTMLButtonElement>) => void;
     rsvpStatus?: RSVPStatus | null;
@@ -554,7 +572,14 @@ function InviteCard({
                         </div>
                     ) : null}
                     <div className={`rsvpButtons ${rsvpStatus === "declined" ? "rsvpButtons--single" : ""}`}>
-                        <button className="rsvpAcceptBtn" onClick={onAccept} disabled={rsvpProcessing} aria-busy={rsvpProcessing}>
+                        <button
+                            className="rsvpAcceptBtn"
+                            onPointerDown={onBeforeAcceptTap}
+                            onTouchStart={onBeforeAcceptTap}
+                            onClick={onAccept}
+                            disabled={rsvpProcessing}
+                            aria-busy={rsvpProcessing}
+                        >
                             <span>{rsvpStatus === "declined" ? "Accept Instead" : "Accept"}</span>
                             <Heart size={23} strokeWidth={1.8} aria-hidden="true" />
                         </button>

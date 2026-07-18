@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import TemplateRenderer from "@/components/TemplateRenderer";
+import ScrollDebugPanel, { ScrollDebugStage } from "@/components/ScrollDebugPanel";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 import { trackInvitationEvent, AnalyticsEventType } from "@/lib/analytics";
 
@@ -31,6 +32,12 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const guestTokenRef = useRef("");
     const rsvpRequestIdRef = useRef(0);
     const acceptVisualTimeoutRef = useRef<number | null>(null);
+    const scrollDebugEnabled = useSyncExternalStore(
+        subscribeToScrollDebugParam,
+        getScrollDebugParamSnapshot,
+        getScrollDebugParamServerSnapshot
+    );
+    const [currentRsvpView, setCurrentRsvpView] = useState<"invitation" | "transition" | "thanks">("invitation");
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
 
     useLayoutEffect(() => {
@@ -78,7 +85,11 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
 
         if (previousVisibleScreenRef.current !== showAccepted) {
             previousVisibleScreenRef.current = showAccepted;
+            recordScrollDebug("Before Thanks content mounts", "PublicInviteExperience useEffect(showAccepted)");
             schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
+            window.requestAnimationFrame(() => {
+                recordScrollDebug("Immediately after Thanks content mounts", "PublicInviteExperience useEffect(showAccepted)");
+            });
         }
     }, [showAccepted]);
 
@@ -104,6 +115,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 const nextStatus = payload?.rsvp?.status || null;
                 const isChangingStoredResponse = getIsChangingResponse();
                 setRsvpStatus(nextStatus);
+                setCurrentRsvpView(nextStatus === "accepted" && !isChangingStoredResponse ? "thanks" : "invitation");
                 setAccepted(nextStatus === "accepted" && !isChangingStoredResponse);
                 setIsChangingResponse(isChangingStoredResponse);
             })
@@ -132,6 +144,9 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             acceptVisualTimeoutRef.current = null;
         }
         if (shouldAccept) {
+            setCurrentRsvpView("transition");
+            window.__viliqueScrollDebug?.setView("transition", "PublicInviteExperience submitRsvp");
+            recordScrollDebug("Immediately when Accept is tapped", "PublicInviteExperience submitRsvp");
             const winObj = window as unknown as { _logState?: (label: string) => void };
             if (winObj._logState) winObj._logState("Before Accept");
             // showAccepted = accepted || (rsvpStatus==="accepted" && !isChangingResponse).
@@ -148,13 +163,19 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             setIsChangingResponse(false);
             acceptVisualTimeoutRef.current = window.setTimeout(() => {
                 acceptVisualTimeoutRef.current = null;
+                recordScrollDebug("When the sparkle animation completes", "PublicInviteExperience accept timeout");
                 if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                    recordScrollDebug("activeElement.blur call", "PublicInviteExperience accept timeout");
                     document.activeElement.blur();
                 }
+                setCurrentRsvpView("thanks");
+                window.__viliqueScrollDebug?.setView("thanks", "PublicInviteExperience accept timeout");
                 setAccepted(true);
                 setRsvpStatus("accepted");
             }, 620);
         } else {
+            setCurrentRsvpView("invitation");
+            window.__viliqueScrollDebug?.setView("invitation", "PublicInviteExperience submitRsvp");
             setAccepted(false);
             setRsvpStatus(nextStatus);
         }
@@ -190,6 +211,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                     return;
                 }
                 setRsvpStatus(persistedStatus);
+                setCurrentRsvpView(persistedStatus === "accepted" ? "thanks" : "invitation");
                 setAccepted(persistedStatus === "accepted");
                 setIsChangingResponse(Boolean(options.keepChangingResponse && persistedStatus === "accepted"));
                 clearIsChangingResponse();
@@ -201,6 +223,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                     window.clearTimeout(acceptVisualTimeoutRef.current);
                     acceptVisualTimeoutRef.current = null;
                 }
+                setCurrentRsvpView("invitation");
                 setAccepted(false);
                 setRsvpStatus(options.keepChangingResponse ? nextStatus : null);
                 setIsChangingResponse(Boolean(options.keepChangingResponse));
@@ -223,6 +246,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 rsvpStatus={isPublic ? rsvpStatus : null}
                 onAccept={() => submitRsvp("accepted")}
                 onDecline={() => submitRsvp("declined")}
+                onScrollDebugStage={recordScrollDebug}
                 onChangeRsvp={() => {
                     if (acceptVisualTimeoutRef.current) {
                         window.clearTimeout(acceptVisualTimeoutRef.current);
@@ -232,16 +256,25 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                         setIsChangingResponseFlag();
                         rsvpRequestIdRef.current += 1;
                         setIsRsvpSubmitting(false);
+                        setCurrentRsvpView("invitation");
+                        window.__viliqueScrollDebug?.setView("invitation", "PublicInviteExperience onChangeRsvp");
                         setAccepted(false);
                         setIsChangingResponse(true);
                         return;
                     }
+                    setCurrentRsvpView("invitation");
+                    window.__viliqueScrollDebug?.setView("invitation", "PublicInviteExperience onChangeRsvp");
                     setAccepted(false);
                     setIsChangingResponse(true);
                 }}
                 onEvent={handleAnalyticsEvent}
                 enableAudio={true}
                 rsvpProcessing={isRsvpSubmitting}
+            />
+            <ScrollDebugPanel
+                enabled={scrollDebugEnabled}
+                invitationRootRef={shellRef}
+                currentView={currentRsvpView}
             />
         </div>
     );
@@ -250,9 +283,12 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
 function schedulePublicInviteScrollReset(shell: HTMLElement | null, anchor: HTMLElement | null) {
     const run = () => resetPublicInviteScroll(shell, anchor);
     run();
+    recordScrollDebug("After the first scroll-reset call", "schedulePublicInviteScrollReset");
     window.requestAnimationFrame(() => {
+        recordScrollDebug("One animation frame later", "schedulePublicInviteScrollReset");
         run();
         window.requestAnimationFrame(() => {
+            recordScrollDebug("Two animation frames later", "schedulePublicInviteScrollReset");
             run();
             const winObj = window as unknown as { _logState?: (label: string) => void };
             if (winObj._logState) winObj._logState("PIE 2-frames post-reset");
@@ -261,10 +297,16 @@ function schedulePublicInviteScrollReset(shell: HTMLElement | null, anchor: HTML
     window.setTimeout(run, 80);
     window.setTimeout(run, 220);
     window.setTimeout(() => {
+        recordScrollDebug("250ms later", "schedulePublicInviteScrollReset");
+    }, 250);
+    window.setTimeout(() => {
         run();
         const winObj = window as unknown as { _logState?: (label: string) => void };
         if (winObj._logState) winObj._logState("PIE 500ms post-reset");
     }, 500);
+    window.setTimeout(() => {
+        recordScrollDebug("1000ms later", "schedulePublicInviteScrollReset");
+    }, 1000);
 }
 
 function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement | null) {
@@ -295,18 +337,26 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
 
         // Reset window and the document scrolling element unconditionally.
         // html/body may report overflow:visible yet still be the viewport scroll container.
+        recordScrollDebug("window.scrollTo(0, 0) before", "resetPublicInviteScroll");
         window.scrollTo(0, 0);
+        recordScrollDebug("window.scrollTo(0, 0) after", "resetPublicInviteScroll");
         window.scrollTo(scrollOptions);
         scrollingElement.scrollTo(scrollOptions);
+        recordScrollDebug("documentElement.scrollTop assignment before", "resetPublicInviteScroll");
         document.documentElement.scrollTop = 0;
+        recordScrollDebug("documentElement.scrollTop assignment after", "resetPublicInviteScroll");
+        recordScrollDebug("body.scrollTop assignment before", "resetPublicInviteScroll");
         document.body.scrollTop = 0;
+        recordScrollDebug("body.scrollTop assignment after", "resetPublicInviteScroll");
 
         // Walk ancestors and reset any scrolled containers.
         // Do NOT gate on overflow:auto/scroll — html/body would be skipped incorrectly.
         let current: HTMLElement | null = shell;
         while (current) {
             current.scrollTo(scrollOptions);
+            recordScrollDebug(`${current.className || current.tagName}.scrollTop assignment before`, "resetPublicInviteScroll");
             current.scrollTop = 0;
+            recordScrollDebug(`${current.className || current.tagName}.scrollTop assignment after`, "resetPublicInviteScroll");
             current = current.parentElement;
         }
     } finally {
@@ -322,6 +372,24 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
             }
         });
     }
+}
+
+function recordScrollDebug(stage: ScrollDebugStage | string, source = "PublicInviteExperience") {
+    if (typeof window === "undefined") return;
+    window.__viliqueScrollDebug?.record(stage, source);
+}
+
+function subscribeToScrollDebugParam(onStoreChange: () => void) {
+    window.addEventListener("popstate", onStoreChange);
+    return () => window.removeEventListener("popstate", onStoreChange);
+}
+
+function getScrollDebugParamSnapshot() {
+    return new URLSearchParams(window.location.search).get("scrollDebug") === "1";
+}
+
+function getScrollDebugParamServerSnapshot() {
+    return false;
 }
 
 function getOrCreateGuestToken(invitationId: string) {
