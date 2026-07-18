@@ -100,7 +100,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             previousVisibleScreenRef.current = showAccepted;
             schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
             if (isPublic && invitation.templateId === "pastel-floral-wedding") {
-                scheduleIosWebKitVisualViewportNudge(shellRef.current);
+                scheduleIosWebKitVisualViewportNudge();
             }
         }
     }, [invitation.templateId, isInitialRsvpResolved, isPublic, showAccepted]);
@@ -379,7 +379,7 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
     }
 }
 
-function scheduleIosWebKitVisualViewportNudge(shell: HTMLElement | null) {
+function scheduleIosWebKitVisualViewportNudge() {
     if (!isIosWebKit() || !window.visualViewport) return;
 
     let didNudge = false;
@@ -395,26 +395,9 @@ function scheduleIosWebKitVisualViewportNudge(shell: HTMLElement | null) {
     const runNudge = () => {
         if (didNudge) return;
         didNudge = true;
+        window.scrollTo(0, 1);
         window.requestAnimationFrame(() => {
-            const previousTransform = shell?.style.transform || "";
-            const previousTransition = shell?.style.transition || "";
-            const previousWillChange = shell?.style.willChange || "";
-            if (shell) {
-                shell.style.transition = "none";
-                shell.style.willChange = "transform";
-                shell.style.transform = previousTransform && previousTransform !== "none"
-                    ? `${previousTransform} translateY(1px)`
-                    : "translateY(1px)";
-            }
-            window.scrollTo(0, 1);
-            window.requestAnimationFrame(() => {
-                window.scrollTo(0, 0);
-                if (shell) {
-                    shell.style.transform = previousTransform;
-                    shell.style.transition = previousTransition;
-                    shell.style.willChange = previousWillChange;
-                }
-            });
+            window.scrollTo(0, 0);
         });
     };
 
