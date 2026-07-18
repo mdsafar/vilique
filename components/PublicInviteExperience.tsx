@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import TemplateRenderer from "@/components/TemplateRenderer";
-import ScrollDebugPanel from "@/components/ScrollDebugPanel";
 import { InvitationData, RSVPStatus } from "@/types/invitation";
 import { trackInvitationEvent, AnalyticsEventType } from "@/lib/analytics";
 
@@ -32,11 +31,6 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const guestTokenRef = useRef("");
     const rsvpRequestIdRef = useRef(0);
     const acceptVisualTimeoutRef = useRef<number | null>(null);
-    const scrollDebugEnabled = useSyncExternalStore(
-        subscribeToScrollDebugParam,
-        getScrollDebugParamSnapshot,
-        getScrollDebugParamServerSnapshot
-    );
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
 
     useLayoutEffect(() => {
@@ -247,11 +241,6 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 enableAudio={true}
                 rsvpProcessing={isRsvpSubmitting}
             />
-            <ScrollDebugPanel
-                enabled={scrollDebugEnabled}
-                invitationRootRef={shellRef}
-                currentView={showAccepted ? "thanks" : "invitation"}
-            />
         </div>
     );
 }
@@ -325,19 +314,6 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
             }
         });
     }
-}
-
-function subscribeToScrollDebugParam(onStoreChange: () => void) {
-    window.addEventListener("popstate", onStoreChange);
-    return () => window.removeEventListener("popstate", onStoreChange);
-}
-
-function getScrollDebugParamSnapshot() {
-    return new URLSearchParams(window.location.search).get("scrollDebug") === "1";
-}
-
-function getScrollDebugParamServerSnapshot() {
-    return false;
 }
 
 function getOrCreateGuestToken(invitationId: string) {

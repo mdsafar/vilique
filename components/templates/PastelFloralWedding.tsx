@@ -603,24 +603,11 @@ function ThanksCard({
     const containerRef = useRef<HTMLElement>(null);
 
     useLayoutEffect(() => {
-        window.__viliqueScrollDebug?.setThanksRoot(containerRef.current, "Immediately when Thanks mounts");
         resetInvitationScroll(containerRef.current);
     }, []);
 
     useEffect(() => {
-        window.requestAnimationFrame(() => {
-            window.__viliqueScrollDebug?.record("Thanks layout one animation frame later");
-        });
-        window.setTimeout(() => {
-            window.__viliqueScrollDebug?.record("Thanks layout 500ms later");
-        }, 500);
-        window.setTimeout(() => {
-            window.__viliqueScrollDebug?.record("Thanks layout 1000ms later");
-        }, 1000);
         scheduleInvitationScrollReset(containerRef.current);
-        return () => {
-            window.__viliqueScrollDebug?.setThanksRoot(null, "Thanks root unmounted");
-        };
     }, []);
 
     return (
