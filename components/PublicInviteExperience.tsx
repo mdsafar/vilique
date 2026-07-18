@@ -285,10 +285,8 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
         // Do NOT gate on overflow:auto/scroll — html/body would be skipped incorrectly.
         let current: HTMLElement | null = shell;
         while (current) {
-            if (current.scrollTop !== 0) {
-                current.scrollTo(scrollOptions);
-                current.scrollTop = 0;
-            }
+            current.scrollTo(scrollOptions);
+            current.scrollTop = 0;
             current = current.parentElement;
         }
     } finally {

@@ -592,8 +592,14 @@ function ThanksCard({
     inProgress: boolean;
     countdownTitle: string;
 }) {
+    const containerRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        scheduleInvitationScrollReset(containerRef.current);
+    }, []);
+
     return (
-        <section className={`weddingCard thanksCard active ${completed ? "completed" : ""}`}>
+        <section ref={containerRef} className={`weddingCard thanksCard active ${completed ? "completed" : ""}`}>
             <CardDecor />
 
             <h1 className="thanksTitle">We Can&apos;t Wait!</h1>
@@ -1015,11 +1021,9 @@ function resetInvitationScroll(element: Element | null) {
         // Do NOT gate on overflow:auto/scroll — html/body would be skipped incorrectly.
         let current: Element | null = element;
         while (current) {
-            if (current.scrollTop !== 0) {
-                current.scrollTo(scrollOptions);
-                if (current instanceof HTMLElement) {
-                    current.scrollTop = 0;
-                }
+            current.scrollTo(scrollOptions);
+            if (current instanceof HTMLElement) {
+                current.scrollTop = 0;
             }
             current = current.parentElement;
         }
