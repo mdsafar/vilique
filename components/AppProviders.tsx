@@ -4,6 +4,8 @@ import React from "react";
 import { SWRConfig } from "swr";
 import { NavigationStateProvider } from "./NavigationStateProvider";
 
+const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
+
 const fetcher = async (url: string) => {
     const res = await fetch(url);
     if (!res.ok) {
@@ -17,10 +19,11 @@ const fetcher = async (url: string) => {
 
 const swrConfig = {
     fetcher,
-    suspense: true,
-    dedupingInterval: 10_000,
+    suspense: false,
+    dedupingInterval: CLIENT_CACHE_TTL_MS,
+    focusThrottleInterval: CLIENT_CACHE_TTL_MS,
     keepPreviousData: true,
-    revalidateIfStale: false,
+    revalidateIfStale: true,
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     shouldRetryOnError: false,

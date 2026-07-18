@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/observability";
 import { createPublicServerClient } from "@/lib/supabase/public-server";
 import type { TemplateRatingSummary } from "@/lib/templateRatingFormat";
 
@@ -84,6 +85,7 @@ export async function canUserRateTemplate(templateId: string, userId: string) {
 
     if (error) {
         console.error("Failed to check template rating eligibility:", error);
+        reportError(error, "template_ratings.eligibility_check_failed", { templateId, userId });
         return false;
     }
 

@@ -50,7 +50,11 @@ export async function POST(request: Request) {
             .eq("provider_order_id", orderId)
             .maybeSingle();
 
-        if (paymentError || !localPayment) {
+        if (paymentError) {
+            reportError(paymentError, "payment.verify_db_lookup_failed", { orderId, invitationId });
+            return NextResponse.json({ error: "Order payment record not found" }, { status: 404 });
+        }
+        if (!localPayment) {
             return NextResponse.json({ error: "Order payment record not found" }, { status: 404 });
         }
 

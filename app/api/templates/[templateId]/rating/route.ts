@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { canUserRateTemplate, getTemplateRatingState, resolveTemplate } from "@/lib/templateRatings";
+import { reportError } from "@/lib/observability";
 
 type Context = {
     params: Promise<{ templateId: string }>;
@@ -61,6 +62,7 @@ export async function DELETE(_request: Request, { params }: Context) {
 
     if (error) {
         console.error("Template rating delete failed:", error);
+        reportError(error, "template_ratings.delete_failed", { templateId, userId: user.id });
         return ratingError("RATING_SAVE_FAILED", "Unable to remove rating.", 400);
     }
 
@@ -105,6 +107,7 @@ async function saveRating(request: Request, { params }: Context) {
 
     if (lookupError) {
         console.error("Template rating lookup failed:", lookupError);
+        reportError(lookupError, "template_ratings.lookup_failed", { templateId, userId: user.id });
         return ratingError("RATING_SAVE_FAILED", getRatingSaveMessage(lookupError), 400);
     }
 
@@ -133,6 +136,9 @@ async function saveRating(request: Request, { params }: Context) {
 
     if (error) {
         console.error("Template rating save failed:", error);
+        if (error.code !== "23505") {
+            reportError(error, "template_ratings.save_failed", { templateId, userId: user.id });
+        }
         return ratingError("RATING_SAVE_FAILED", getRatingSaveMessage(error), 400);
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Search, Star } from "lucide-react";
 import useSWRInfinite from "swr/infinite";
@@ -66,6 +66,9 @@ export default function TemplatesCatalog() {
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const [isMobileHeaderCollapsed, setIsMobileHeaderCollapsed] = useState(false);
     const savedSize = listSizes["templates"] ?? 1;
+
+    const prevCategoryRef = useRef(activeCategory);
+    const prevDebouncedSearchRef = useRef(debouncedSearch);
 
     const getFirstPageKey = (category: string, search: string) => {
         const params = new URLSearchParams({
@@ -147,13 +150,15 @@ export default function TemplatesCatalog() {
     });
 
     useEffect(() => {
-        if (size !== 1) {
+        const hasFilterChanged = prevCategoryRef.current !== activeCategory || prevDebouncedSearchRef.current !== debouncedSearch;
+        
+        if (hasFilterChanged) {
+            prevCategoryRef.current = activeCategory;
+            prevDebouncedSearchRef.current = debouncedSearch;
             setSize(1);
-        }
-        if (listSizes["templates"] !== 1) {
             setListSize("templates", 1);
         }
-    }, [activeCategory, debouncedSearch, size, listSizes, setSize, setListSize]);
+    }, [activeCategory, debouncedSearch, setSize, setListSize]);
 
     useEffect(() => {
         if (window.location.pathname !== "/") return;
@@ -294,6 +299,7 @@ export default function TemplatesCatalog() {
                                     href={`/templates/${template.id}`}
                                     className="templateCardLink"
                                     aria-label={`View ${template.name}`}
+                                    prefetch={false}
                                 >
                                     <div className="templatePreviewContainer">
                                         <div

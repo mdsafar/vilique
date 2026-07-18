@@ -46,6 +46,7 @@ export async function POST(request: Request) {
 
     if (error) {
         console.error("Payment reconciliation candidate query failed:", error);
+        reportError(error, "payment.reconciliation_candidate_query_failed");
         return NextResponse.json({ error: "Could not load reconciliation candidates" }, { status: 500 });
     }
 

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { getActiveTemplates } from "@/features/invitations/data";
+import { reportError } from "@/lib/observability";
 
 const TEMPLATE_LIMIT_DEFAULT = 10;
 const TEMPLATE_LIMIT_MAX = 36;
+const TEMPLATE_CACHE_TTL_SECONDS = 300;
+const TEMPLATE_CACHE_CONTROL = `public, max-age=${TEMPLATE_CACHE_TTL_SECONDS}, s-maxage=${TEMPLATE_CACHE_TTL_SECONDS}, stale-while-revalidate=60`;
 const templateSorts = ["popular", "highest_rated", "newest", "price_low", "price_high"] as const;
 type TemplateSort = typeof templateSorts[number];
 
@@ -46,9 +49,14 @@ export async function GET(request: Request) {
             hasMore,
             totalCount: sorted.length,
             counts: getCategoryCounts(templates, search),
+        }, {
+            headers: {
+                "Cache-Control": TEMPLATE_CACHE_CONTROL,
+            },
         });
     } catch (error) {
         console.error("Failed to fetch active templates:", error);
+        reportError(error, "templates.fetch_failed");
         return NextResponse.json({ error: "Failed to fetch active templates" }, { status: 500 });
     }
 }

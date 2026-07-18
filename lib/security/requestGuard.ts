@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { looseSupabase } from "@/lib/supabase/loose";
+import { reportError } from "@/lib/observability";
 
 type RateLimitOptions = {
     key: string;
@@ -155,5 +156,6 @@ export async function recordSubmissionGuard(input: {
     }
 
     console.error("Failed to record public submission guard:", error);
+    reportError(error, "security.submission_guard_failed", { scope: input.scope, invitationId: input.invitationId });
     return { duplicate: false };
 }

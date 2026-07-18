@@ -72,18 +72,22 @@ export function NavigationStateProvider({ children }: { children: React.ReactNod
 
     const setTemplatesSearch = useCallback((value: string) => {
         setTemplatesSearchState({ value, touched: true, source: templatesSearchFromUrl });
+        setListSizes((prev) => ({ ...prev, templates: 1 }));
     }, [templatesSearchFromUrl]);
 
     const setTemplatesFilter = useCallback((value: string) => {
         setTemplatesFilterState({ value, touched: true, source: templatesFilterFromUrl });
+        setListSizes((prev) => ({ ...prev, templates: 1 }));
     }, [templatesFilterFromUrl]);
 
     const setInvitationsSearch = useCallback((value: string) => {
         setInvitationsSearchState({ value, touched: true, source: activeInvitationsSearchFromUrl });
+        setListSizes((prev) => ({ ...prev, invitations: 1 }));
     }, [activeInvitationsSearchFromUrl]);
 
     const setInvitationsFilter = useCallback((value: string) => {
         setInvitationsFilterState({ value, touched: true, source: activeInvitationsFilterFromUrl });
+        setListSizes((prev) => ({ ...prev, invitations: 1 }));
     }, [activeInvitationsFilterFromUrl]);
 
     const setScrollPosition = useCallback((path: string, y: number) => {
@@ -154,7 +158,8 @@ export function useScrollPreservation(pageKey: string) {
             }, 80);
             return () => clearTimeout(timeout);
         }
-    }, [pageKey, scrollPositions]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pageKey]);
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;

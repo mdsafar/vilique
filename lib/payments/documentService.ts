@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { looseSupabase } from "@/lib/supabase/loose";
 import { renderInvoicePdf, renderRefundReceiptPdf, PaymentDocumentData } from "@/lib/payments/documentPdf";
 import { rateLimit, rateLimitResponse } from "@/lib/security/requestGuard";
+import { reportError } from "@/lib/observability";
 
 type DocumentKind = "invoice" | "refund";
 
@@ -81,6 +82,7 @@ export async function buildPaymentDocumentResponse(transactionId: string, kind: 
 
         if (paymentError) {
             console.error("Payment document lookup failed:", paymentError);
+            reportError(paymentError, "payment.document_lookup_failed", { paymentId: transactionId, kind });
             return documentError("PDF_GENERATION_FAILED", "Unable to prepare this document.", 500);
         }
 
@@ -127,6 +129,7 @@ export async function buildPaymentDocumentResponse(transactionId: string, kind: 
         });
     } catch (error) {
         console.error("Payment document generation failed:", error);
+        reportError(error, "payment.document_generation_failed", { transactionId, kind });
         return documentError("PDF_GENERATION_FAILED", "Unable to generate this document.", 500);
     }
 }

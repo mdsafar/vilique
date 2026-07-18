@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mediaUploadSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
 import { isInvitationCompleted } from "@/lib/lifecycle";
+import { reportError } from "@/lib/observability";
 
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const musicTypes = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg"]);
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+        reportError(error, "media.upload_failed", { invitationId: parsed.data.invitationId, kind: parsed.data.kind });
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -129,6 +131,7 @@ export async function POST(request: Request) {
 
     const { data: signed, error: signedError } = await supabase.storage.from(bucket).createSignedUrl(path, 15 * 60);
     if (signedError) {
+        reportError(signedError, "media.signed_url_failed", { invitationId: parsed.data.invitationId, path, bucket });
         return NextResponse.json({ error: signedError.message }, { status: 400 });
     }
 
@@ -168,6 +171,7 @@ export async function DELETE(request: Request) {
 
     const { error } = await supabase.storage.from(body.bucket).remove([body.path]);
     if (error) {
+        reportError(error, "media.delete_failed", { invitationId: body.invitationId, bucket: body.bucket, path: body.path });
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
 

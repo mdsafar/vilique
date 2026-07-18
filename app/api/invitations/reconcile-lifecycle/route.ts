@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isEventCompleted } from "@/lib/lifecycle";
+import { reportError } from "@/lib/observability";
 
 export async function POST(request: Request) {
     // 1. Secure scheduled cron route in production
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
 
     if (error) {
         console.error("Error fetching invitations for reconciliation:", error);
+        reportError(error, "cron.reconcile_fetch_failed");
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -53,6 +55,7 @@ export async function POST(request: Request) {
 
         if (updateError) {
             console.error("Failed to update status for reconciled items:", updateError);
+            reportError(updateError, "cron.reconcile_update_failed", { completedCount: completedIds.length, completedIds });
             return NextResponse.json({ error: updateError.message }, { status: 500 });
         }
     }

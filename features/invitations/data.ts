@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDefaultRatingSummary } from "@/lib/templateRatingFormat";
 import { getTemplateRatingSummaryMap } from "@/lib/templateRatings";
 import { mapInvitationRow, mapTemplateRow } from "@/features/invitations/mappers";
+import { reportError } from "@/lib/observability";
 
 const getCachedActiveTemplates = unstable_cache(
     async () => {
@@ -43,7 +44,8 @@ const getCachedActiveTemplates = unstable_cache(
 export async function getActiveTemplates() {
     try {
         return await getCachedActiveTemplates();
-    } catch {
+    } catch (error) {
+        reportError(error, "templates.get_cached_failed");
         return templates;
     }
 }

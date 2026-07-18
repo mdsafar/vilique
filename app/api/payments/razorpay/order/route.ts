@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/observability";
 import { razorpay } from "@/lib/razorpay";
 import { Json } from "@/types/database";
 import { isInvitationCompleted } from "@/lib/lifecycle";
@@ -16,6 +17,7 @@ const orderInputSchema = z.object({
 });
 
 export async function POST(request: Request) {
+    let body: unknown = null;
     try {
         if (process.env.PAYMENTS_ENABLED === "false") {
             return NextResponse.json({
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
         }
 
         // 2. Validate input
-        const body = await request.json().catch(() => ({}));
+        body = await request.json().catch(() => ({}));
         const validation = orderInputSchema.safeParse(body);
         if (!validation.success) {
             return NextResponse.json({ error: "Invalid invitation ID" }, { status: 400 });
@@ -159,6 +161,7 @@ export async function POST(request: Request) {
             });
         } catch (razorpayError) {
             console.error("Razorpay order creation error:", razorpayError);
+            reportError(razorpayError, "payment.razorpay_order_failed", { invitationId });
             return NextResponse.json({ error: "Failed to create payment order with Razorpay" }, { status: 502 });
         }
 
@@ -186,6 +189,7 @@ export async function POST(request: Request) {
 
         if (insertError) {
             console.error("Failed to insert payment record in DB:", insertError);
+            reportError(insertError, "payment.insert_failed", { invitationId, orderId: order.id });
             return NextResponse.json({ error: "Database registration failure" }, { status: 500 });
         }
 
@@ -206,6 +210,7 @@ export async function POST(request: Request) {
 
             if (policyError) {
                 console.error("Failed to record payment policy acceptance:", policyError);
+                reportError(policyError, "payment.policy_record_failed", { invitationId, paymentId });
                 return NextResponse.json({ error: "Could not record policy acceptance" }, { status: 500 });
             }
         }
@@ -222,6 +227,8 @@ export async function POST(request: Request) {
         });
     } catch (err: unknown) {
         console.error("Unhandled error creating Razorpay order:", err);
+        const invitationId = body && typeof body === "object" && "invitationId" in body ? String(body.invitationId) : undefined;
+        reportError(err, "payment.order_unhandled", { invitationId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

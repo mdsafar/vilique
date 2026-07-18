@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isInvitationCompleted } from "@/lib/lifecycle";
 import { Json } from "@/types/database";
+import { reportError } from "@/lib/observability";
 
 type Context = {
     params: Promise<{ id: string }>;
@@ -72,6 +73,16 @@ export async function PATCH(request: Request, { params }: Context) {
             return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
         }
         console.error("Failed to update invitation with identity check:", error);
+        
+        const combined = `${error.code || ""} ${error.message || ""}`.toLowerCase();
+        const isExpected = (error.code === "23505" && combined.includes("slug")) ||
+            (error.code === "P0001" && (combined.includes("protected event identity") || combined.includes("server validation"))) ||
+            (error.code === "P0001" && combined.includes("completed invitations cannot be edited"));
+            
+        if (!isExpected) {
+            reportError(error, "invitation.update_db_failed", { invitationId: id, userId: user.id });
+        }
+        
         return getSafeUpdateErrorResponse(error);
     }
 

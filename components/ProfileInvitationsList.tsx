@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type UIEvent } from "react";
+import { useEffect, useRef, useState, useCallback, type UIEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
@@ -88,11 +88,21 @@ export default function ProfileInvitationsList({
         setListSize,
     } = useNavigationState();
 
+    const { mutate: globalMutate } = useSWRConfig();
+    const refreshInvitationLists = useCallback(() => globalMutate(
+        (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
+        undefined,
+        { revalidate: true }
+    ), [globalMutate]);
+
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const [isMobileTitleCollapsed, setIsMobileTitleCollapsed] = useState(false);
     const lastListScrollTopRef = useRef(0);
     const savedSize = listSizes["invitations"] ?? 1;
+
+    const prevStatusFilterRef = useRef(statusFilter);
+    const prevDebouncedSearchRef = useRef(debouncedSearch);
 
     const getFirstPageKey = (status: string, search: string) => {
         const params = new URLSearchParams({
@@ -184,13 +194,26 @@ export default function ProfileInvitationsList({
     const isUnauthorized = error?.status === 401;
 
     useEffect(() => {
-        if (size !== 1) {
+        const hasFilterChanged = prevStatusFilterRef.current !== statusFilter || prevDebouncedSearchRef.current !== debouncedSearch;
+        
+        if (hasFilterChanged) {
+            prevStatusFilterRef.current = statusFilter;
+            prevDebouncedSearchRef.current = debouncedSearch;
             setSize(1);
-        }
-        if (listSizes["invitations"] !== 1) {
             setListSize("invitations", 1);
         }
-    }, [statusFilter, debouncedSearch, size, listSizes, setSize, setListSize]);
+    }, [statusFilter, debouncedSearch, setSize, setListSize]);
+
+    useEffect(() => {
+        function handleProfileDataChanged() {
+            setListSize("invitations", 1);
+            void setSize(1);
+            void refreshInvitationLists();
+        }
+
+        window.addEventListener("vilique:profile-data-changed", handleProfileDataChanged);
+        return () => window.removeEventListener("vilique:profile-data-changed", handleProfileDataChanged);
+    }, [setSize, setListSize, refreshInvitationLists]);
 
     useEffect(() => {
         if (window.location.pathname !== "/invitations") return;
@@ -552,7 +575,7 @@ function InvitationRow({
         return state?.data;
     };
     const refreshInvitationLists = () => mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/invitations"),
+        (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
         undefined,
         { revalidate: true }
     );

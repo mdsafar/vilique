@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { publishInvitationAfterPayment } from "@/features/invitations/publish";
+import { reportError } from "@/lib/observability";
 
 type Context = {
     params: Promise<{ id: string }>;
 };
 
 export async function POST(request: Request, { params }: Context) {
+    const { id } = await params;
     try {
-        const { id } = await params;
         const supabase = await createClient();
         const {
             data: { user },
@@ -43,6 +44,37 @@ export async function POST(request: Request, { params }: Context) {
                 error: "This invitation is completed and can no longer be published.",
             }, { status: 409 });
         }
+        
+        const isExpected = err instanceof Error && (
+            err.message === "SLUG_GENERATION_FAILED" ||
+            [
+                "Invitation not found",
+                "Unauthorized: You do not own this invitation",
+                "Cannot publish an archived invitation",
+                "Title is required to publish",
+                "Host/Couple name is required to publish",
+                "Event date is required to publish",
+                "Event time is required to publish",
+                "Venue name is required to publish",
+                "Primary phone is required to publish",
+                "Primary phone must be 10 digits",
+                "Secondary phone is required to publish",
+                "Secondary phone must be 10 digits",
+                "Invitation message is required to publish",
+                "Template entitlement could not be verified",
+                "Payment required: Please complete payment before publishing",
+                "Payment entitlement mismatch. Please complete payment for this invitation.",
+                "Invalid slug format",
+                "The customized link is already taken",
+                "This looks like a different event. Your purchase covers one published event. Create a new invitation for this event.",
+                "Invitation is completed and locked.",
+            ].includes(err.message)
+        );
+        
+        if (!isExpected) {
+            reportError(err, "invitation.publish_failed", { invitationId: id });
+        }
+        
         return NextResponse.json(getSafePublishError(err), { status: 400 });
     }
 }

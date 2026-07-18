@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { looseSupabase } from "@/lib/supabase/loose";
+import { reportError } from "@/lib/observability";
 
 export async function GET(request: Request) {
     try {
@@ -60,6 +61,8 @@ export async function GET(request: Request) {
         });
     } catch (err: unknown) {
         console.error("Error fetching payment status:", err);
+        const invitationId = new URL(request.url).searchParams.get("invitationId") || undefined;
+        reportError(err, "payment.status_check_failed", { invitationId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

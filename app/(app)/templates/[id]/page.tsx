@@ -29,6 +29,15 @@ type Props = {
     }>;
 };
 
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+    const templates = await getActiveTemplates();
+    return templates.map((template) => ({
+        id: template.id,
+    }));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { id } = await params;
     const templates = await getActiveTemplates();
@@ -73,7 +82,7 @@ export default async function TemplateDetailsPage({ params }: Props) {
         <main className="page templateDetailsPage">
             <header className="templateDetailTopbar analyticsHeader">
                 <div className="templateDetailCrumb">
-                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/">
+                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/" prefetch={false}>
                         <ArrowLeft size={16} aria-hidden="true" />
                         <span>Templates</span>
                     </Link>

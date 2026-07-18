@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { looseSupabase } from "@/lib/supabase/loose";
+import { reportError } from "@/lib/observability";
 
 type PaymentRecord = {
     id: string;
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
         return NextResponse.json(transactions);
     } catch (error) {
         console.error("Failed to fetch profile transactions:", error);
+        reportError(error, "profile.transactions_fetch_failed");
         return NextResponse.json({ error: "Failed to fetch transaction logs" }, { status: 500 });
     }
 }

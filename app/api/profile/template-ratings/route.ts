@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { reportError } from "@/lib/observability";
 
 type TemplateRatingItem = {
     templateId: string;
@@ -110,6 +111,7 @@ export async function GET(request: Request) {
 
         if (invitationsResult.error || paymentsResult.error) {
             console.error("Failed to load used template sources:", invitationsResult.error || paymentsResult.error);
+            reportError(invitationsResult.error || paymentsResult.error, "profile.template_ratings_sources_failed", { userId: user.id });
             return NextResponse.json({ error: "Failed to load template ratings." }, { status: 500 });
         }
 
@@ -166,6 +168,7 @@ export async function GET(request: Request) {
 
         if (userRatingsResult.error || communityRatingsResult.error) {
             console.error("Failed to load template rating rows:", userRatingsResult.error || communityRatingsResult.error);
+            reportError(userRatingsResult.error || communityRatingsResult.error, "profile.template_ratings_rows_failed", { userId: user.id });
             return NextResponse.json({ error: "Failed to load template ratings." }, { status: 500 });
         }
 
@@ -194,6 +197,7 @@ export async function GET(request: Request) {
         return NextResponse.json(toRatingsResponse(Array.from(grouped.values()), { search, ratingFilter, sort, offset, limit }));
     } catch (error) {
         console.error("Failed to load profile template ratings:", error);
+        reportError(error, "profile.template_ratings_failed");
         return NextResponse.json({ error: "Failed to load template ratings." }, { status: 500 });
     }
 }

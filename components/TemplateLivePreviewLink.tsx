@@ -14,7 +14,7 @@ export default function TemplateLivePreviewLink({ templateId }: TemplateLivePrev
         <Link
             className="secondaryBtn livePreviewLink"
             href={`/templates/${templateId}/preview`}
-            prefetch={true}
+            prefetch={false}
             onClick={() => {
                 window.sessionStorage.setItem(getTemplatePreviewReturnKey(templateId), `/templates/${templateId}`);
             }}

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/observability";
 
 export async function deleteInvitation(formData: FormData) {
     const id = String(formData.get("id") || "");
@@ -57,6 +58,7 @@ export async function deleteInvitation(formData: FormData) {
             };
         }
         console.error("Unable to delete invitation:", error);
+        reportError(error, "invitation.delete_db_failed", { invitationId: id, userId: user.id });
         return { ok: false, error: "Unable to delete invitation." };
     }
 

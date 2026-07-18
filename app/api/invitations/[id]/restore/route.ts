@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { restorePublishedInvitationFromOffline } from "@/features/invitations/publish";
+import { reportError } from "@/lib/observability";
 
 type Context = {
     params: Promise<{ id: string }>;
 };
 
 export async function POST(_request: Request, { params }: Context) {
+    const { id } = await params;
     try {
-        const { id } = await params;
         const supabase = await createClient();
         const {
             data: { user },
@@ -42,6 +43,20 @@ export async function POST(_request: Request, { params }: Context) {
                 error: "This invitation is completed and can no longer be restored.",
             }, { status: 409 });
         }
+        
+        const isExpected = err instanceof Error && [
+            "Invitation not found",
+            "Unauthorized: You do not own this invitation",
+            "Cannot restore an archived invitation",
+            "Payment required: Please complete payment before publishing",
+            "Payment entitlement could not be verified",
+            "Invitation is completed and locked.",
+        ].includes(err.message);
+        
+        if (!isExpected) {
+            reportError(err, "invitation.restore_failed", { invitationId: id });
+        }
+        
         return NextResponse.json(getSafeRestoreError(err), { status: 400 });
     }
 }
