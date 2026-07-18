@@ -11,6 +11,7 @@ import {
     Clock3,
     Copy,
     Eye,
+    ExternalLink,
     Loader2,
     Pause,
     PencilLine,
@@ -218,7 +219,7 @@ function BuilderContent() {
     const initialInvitation = useRef<InvitationData | null>(null);
     const openedFromExistingInvitation = useRef(false);
     const builderBackLabel = useRef("Templates");
-    const builderBackTarget = useRef("/templates");
+    const builderBackTarget = useRef("/");
     const currentBuilderPath = `/builder${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
     const isPersistedDraft = invitation.id !== "default-draft-placeholder-id";
     const isEditingPublished = openedFromExistingInvitation.current && invitation.status === "published";
@@ -439,7 +440,7 @@ function BuilderContent() {
         setIsSavingDraft(true);
         const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
         if (saved) {
-            router.push("/invitations");
+            router.push("/invitations?reset=1");
         } else {
             setIsSavingDraft(false);
         }
@@ -643,13 +644,13 @@ function BuilderContent() {
             builderBackTarget.current = "/invitations";
         } else if (existingId && typeof window !== "undefined") {
             builderBackLabel.current = sessionStorage.getItem(`vilique-builder-back-label-${existingId}`) || "Templates";
-            builderBackTarget.current = sessionStorage.getItem(`vilique-builder-back-target-${existingId}`) || "/templates";
+            builderBackTarget.current = sessionStorage.getItem(`vilique-builder-back-target-${existingId}`) || "/";
         } else if (openedFromTemplateDetails) {
             builderBackLabel.current = "Templates";
             builderBackTarget.current = `/templates/${templateKey}`;
         } else {
             builderBackLabel.current = "Templates";
-            builderBackTarget.current = "/templates";
+            builderBackTarget.current = "/";
         }
 
         async function loadDraft() {
@@ -673,7 +674,7 @@ function BuilderContent() {
                 }
                 if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
                     showToast(result.error || "This invitation is completed and can no longer be edited.", "error");
-                    router.replace("/invitations");
+                    router.replace("/invitations?reset=1");
                     return;
                 }
             }
@@ -968,7 +969,7 @@ function BuilderContent() {
             <PublishSuccessModal
                 details={publishSuccessDetails}
                 title={invitation.title}
-                onViewProfile={() => router.push("/invitations")}
+                onViewProfile={() => router.push("/invitations?reset=1")}
             />
         </main>
     );
@@ -1018,26 +1019,43 @@ function PublishSuccessModal({
                     exit={{ opacity: 0, scale: 0.96, y: 18 }}
                     transition={{ type: "spring", duration: 0.42 }}
                 >
-                    <div className="publishSuccessIcon">
-                        <Check size={24} strokeWidth={3} />
+                    <div className="publishSuccessTop">
+                        <div className="publishSuccessIcon">
+                            <Check size={24} strokeWidth={3} />
+                        </div>
+                        <div className="publishSuccessCopy">
+                            <p>Payment successful</p>
+                            <h2>Your invitation is live</h2>
+                            <span>Guests can now open, view, and RSVP from your public invitation site.</span>
+                        </div>
                     </div>
-                    <div className="publishSuccessCopy">
-                        <p>Payment successful</p>
-                        <h2>Your invitation is live</h2>
-                        <span>{title} was published {publishedDate}.</span>
+
+                    <div className="publishSuccessReceipt">
+                        <span>Published invitation</span>
+                        <strong>{title}</strong>
+                        <small>{publishedDate}</small>
                     </div>
 
                     <div className="publishSuccessLinkBox">
-                        <span>{publicUrl}</span>
+                        <div>
+                            <small>Public link</small>
+                            <span>{publicUrl}</span>
+                        </div>
                         <button type="button" onClick={copyLink}>
                             {copied ? <Check size={16} /> : <Copy size={16} />}
                             {copied ? "Copied" : "Copy link"}
                         </button>
                     </div>
 
-                    <button className="publishSuccessProfileBtn" type="button" onClick={onViewProfile}>
-                        View in Invitations
-                    </button>
+                    <div className="publishSuccessActions publishSuccessDialogActions">
+                        <a className="publishSuccessOpenBtn" href={publicUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink size={16} />
+                            Open site
+                        </a>
+                        <button className="publishSuccessProfileBtn" type="button" onClick={onViewProfile}>
+                            View in Invitations
+                        </button>
+                    </div>
                 </motion.div>
             </div>
         </AnimatePresence>,

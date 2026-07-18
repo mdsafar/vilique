@@ -6,7 +6,7 @@ import { invitationCreateSchema } from "@/features/invitations/validation";
 import { buildInvitationSlug } from "@/features/invitations/slug";
 import { getInvitationLifecycle } from "@/lib/lifecycle";
 
-const INVITATION_LIMIT_DEFAULT = 12;
+const INVITATION_LIMIT_DEFAULT = 10;
 const INVITATION_LIMIT_MAX = 30;
 const invitationSorts = {
     updated_desc: { field: "updated_at", ascending: false },
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     const pageItemsWithRows = cursorFilteredItemsWithRows.slice(0, limit);
     const items = pageItemsWithRows.map(({ item }) => item);
     const lastRow = pageItemsWithRows[pageItemsWithRows.length - 1]?.row as Record<string, unknown> | undefined;
-    const hasMore = cursorFilteredItemsWithRows.length > limit;
+    const hasMore = items.length === limit && cursorFilteredItemsWithRows.length > limit;
     const [counts, stats] = await Promise.all([
         getInvitationCounts(user.id, search, paidInvitationIdsForUser),
         getInvitationStats(pageItemsWithRows.map(({ row }) => row.id)),
@@ -253,7 +253,7 @@ async function getPaidInvitationIdsForUser(userId: string) {
         .from("payments")
         .select("invitation_id")
         .eq("user_id", userId)
-        .eq("status", "paid")
+        .in("status", ["paid", "published"])
         .not("invitation_id", "is", null);
 
     return Array.from(new Set((data || []).map((row) => row.invitation_id).filter(Boolean)));

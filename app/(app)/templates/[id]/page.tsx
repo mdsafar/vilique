@@ -73,7 +73,7 @@ export default async function TemplateDetailsPage({ params }: Props) {
         <main className="page templateDetailsPage">
             <header className="templateDetailTopbar analyticsHeader">
                 <div className="templateDetailCrumb">
-                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/templates">
+                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/">
                         <ArrowLeft size={16} aria-hidden="true" />
                         <span>Templates</span>
                     </Link>

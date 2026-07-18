@@ -24,7 +24,7 @@ export default async function BuilderPreviewPage({ searchParams }: Props) {
         if (local === "1") {
             return <BuilderSessionPreview templateId={template} />;
         }
-        redirect("/templates");
+        redirect("/");
     }
 
     const supabase = await createClient();

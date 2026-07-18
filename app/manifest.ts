@@ -41,7 +41,7 @@ export default function manifest(): MetadataRoute.Manifest {
                 name: "Vilique Templates",
                 short_name: "Templates",
                 description: "Browse invitation website templates.",
-                url: "/templates",
+                url: "/",
             },
             {
                 name: "Vilique Dashboard",

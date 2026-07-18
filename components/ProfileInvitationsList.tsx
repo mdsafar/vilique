@@ -42,6 +42,7 @@ import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
 
 interface DashboardData {
     profile: {
@@ -83,12 +84,26 @@ export default function ProfileInvitationsList({
         setInvitationsSearch: setSearchTerm,
         invitationsFilter: statusFilter,
         setInvitationsFilter: setStatusFilter,
+        listSizes,
+        setListSize,
     } = useNavigationState();
 
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const [isMobileTitleCollapsed, setIsMobileTitleCollapsed] = useState(false);
     const lastListScrollTopRef = useRef(0);
+    const savedSize = listSizes["invitations"] ?? 1;
+
+    const getFirstPageKey = (status: string, search: string) => {
+        const params = new URLSearchParams({
+            status,
+            sort: "updated_desc",
+            limit: "10",
+        });
+        if (search) params.set("search", search);
+        return `/api/invitations?${params.toString()}`;
+    };
+
     const {
         data,
         error,
@@ -98,27 +113,32 @@ export default function ProfileInvitationsList({
         isValidating,
         mutate,
     } = useSWRInfinite<InvitationsPageResponse>((pageIndex, previousPageData) => {
-        if (previousPageData && !previousPageData.hasMore) return null;
+        if (shouldStopRequesting(previousPageData)) return null;
         const params = new URLSearchParams({
             status: statusFilter,
             sort: "updated_desc",
-            limit: "12",
+            limit: "10",
         });
         if (debouncedSearch) params.set("search", debouncedSearch);
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
         return `/api/invitations?${params.toString()}`;
     }, null, {
         suspense: false,
-        keepPreviousData: true,
+        keepPreviousData: false,
         revalidateFirstPage: false,
-        onSuccess: (invitationPages) => {
-            const nextCounts = invitationPages?.[0]?.counts;
-            if (nextCounts) setCachedCounts(nextCounts);
+        initialSize: savedSize,
+        onSuccess: (invitationPages, key) => {
+            const currentActiveKey = getFirstPageKey(statusFilter, debouncedSearch);
+            if (key && key.includes(currentActiveKey)) {
+                const nextCounts = invitationPages?.[0]?.counts;
+                if (nextCounts) setCachedCounts(nextCounts);
+            }
         },
     });
 
     const pages = data || [];
-    const invitations = pages.flatMap((page) => page.items);
+    const rawInvitations = pages.flatMap((page) => page.items);
+    const invitations = deduplicateItems(rawInvitations, "id");
     const firstPage = pages[0];
     const fallbackCounts = {
         all: initialInvitations.length,
@@ -148,21 +168,45 @@ export default function ProfileInvitationsList({
         statusFilter !== "all" ? `Tab: ${statusLabels[statusFilter] || statusFilter}` : null,
         searchTerm ? `Search: ${searchTerm}` : null,
     ].filter(Boolean) as string[];
+
+    const handleLoadMore = () => {
+        setSize((current) => {
+            const next = current + 1;
+            setListSize("invitations", next);
+            return next;
+        });
+    };
+
     const sentinelRef = useInfiniteScroll<HTMLDivElement>({
-        disabled: !hasMore || isLoadingNextPage,
-        onLoadMore: () => setSize((current) => current + 1),
+        disabled: shouldDisableSentinel({ hasMore, isLoading: isLoadingNextPage, size, pageCount: pages.length }),
+        onLoadMore: handleLoadMore,
     });
     const isUnauthorized = error?.status === 401;
 
     useEffect(() => {
+        if (size !== 1) {
+            setSize(1);
+        }
+        if (listSizes["invitations"] !== 1) {
+            setListSize("invitations", 1);
+        }
+    }, [statusFilter, debouncedSearch, size, listSizes, setSize, setListSize]);
+
+    useEffect(() => {
         if (window.location.pathname !== "/invitations") return;
         const params = new URLSearchParams(window.location.search);
-        if (statusFilter === "all") params.delete("status");
-        else params.set("status", statusFilter);
-        if (debouncedSearch) params.set("search", debouncedSearch);
-        else params.delete("search");
-        const nextUrl = params.toString() ? `/invitations?${params.toString()}` : "/invitations";
-        window.history.replaceState(null, "", nextUrl);
+        
+        const nextParams = new URLSearchParams();
+        if (statusFilter !== "all") nextParams.set("status", statusFilter);
+        if (debouncedSearch) nextParams.set("search", debouncedSearch);
+        
+        params.sort();
+        nextParams.sort();
+        
+        if (params.toString() !== nextParams.toString()) {
+            const nextUrl = nextParams.toString() ? `/invitations?${nextParams.toString()}` : "/invitations";
+            window.history.replaceState(null, "", nextUrl);
+        }
     }, [debouncedSearch, statusFilter]);
 
     if (isUnauthorized && showAuthModalOnUnauthorized) {
@@ -315,8 +359,8 @@ export default function ProfileInvitationsList({
                             : "Pick a template to publish your first invite."
                     }
                     details={hasActiveFilters ? emptyStateDetails : undefined}
-                    href={hasActiveFilters ? undefined : "/templates"}
-                    onAction={error ? () => mutate() : hasActiveFilters ? handleResetAll : undefined}
+                    href={hasActiveFilters ? undefined : "/"}
+                    onAction={error ? () => { setSize(1); setListSize("invitations", 1); mutate(); } : hasActiveFilters ? handleResetAll : undefined}
                     title={error ? "Could not load invitations" : hasActiveFilters ? "No matching invitations" : "Choose a template to begin"}
                     variant={error ? "error" : hasActiveFilters ? "filtered" : "empty"}
                 />
@@ -437,27 +481,43 @@ function InvitationAppendSkeleton() {
 
 function InvitationSkeletonCard() {
     return (
-        <article className="profileInviteRow profileInviteRow--bg profileInviteRow--wedding">
+        <article className="profileInviteRow profileInviteRow--bg profileInviteRow--wedding profileInviteRow--skeleton">
             <div className="profileInviteInfo">
                 <div className="profileInviteDetails">
                     <div className="profileInviteHeader">
-                        <TextSkeleton width={150} height={14} />
-                        <ButtonSkeleton width={92} height={26} />
+                        <TextSkeleton className="profileInviteTitleSkeleton" width="52%" height={14} />
+                        <ButtonSkeleton className="profileInviteStatusSkeleton" width={96} height={25} />
                     </div>
-                    <TextSkeleton width={220} height={24} />
-                    <TextSkeleton width="82%" height={15} />
+                    <TextSkeleton className="profileInviteNamesSkeleton" width="76%" height={21} />
+                    <TextSkeleton className="profileInviteMessageSkeleton" width="88%" height={16} />
                     <div className="profileInviteMeta">
-                        <TextSkeleton width={112} height={15} />
-                        <TextSkeleton width={150} height={15} />
-                        <TextSkeleton width={140} height={15} />
+                        <span className="profileInviteMetaPairSkeleton">
+                            <Skeleton className="profileInviteMetaIconSkeleton" rounded="sm" />
+                            <TextSkeleton className="profileInviteMetaTextSkeleton" width="100%" height={15} />
+                        </span>
+                        <span className="profileInviteMetaPairSkeleton">
+                            <Skeleton className="profileInviteMetaIconSkeleton" rounded="full" />
+                            <TextSkeleton className="profileInviteMetaTextSkeleton" width="100%" height={15} />
+                        </span>
+                        <span className="profileInviteMetaSecondary">
+                            <Skeleton className="profileInviteMetaIconSkeleton" rounded="sm" />
+                            <TextSkeleton width={138} height={14} />
+                        </span>
                     </div>
                 </div>
             </div>
-            <Skeleton className="profilePublicLinkWrap" style={{ width: "100%", height: 40 }} rounded="lg" />
-            <div className="profileInviteActions">
-                <ButtonSkeleton width="100%" height={34} />
-                <ButtonSkeleton width="100%" height={34} />
-                <ButtonSkeleton width="100%" height={34} />
+            <div className="profilePublicLinkWrap profilePublicLinkWrap--skeleton">
+                <div className="profilePublicLink">
+                    <Skeleton className="profileInviteMetaIconSkeleton" rounded="sm" />
+                    <TextSkeleton width="72%" height={17} />
+                </div>
+                <ButtonSkeleton className="profileCopyLinkSkeleton" width={30} height={28} />
+            </div>
+            <div className="profileInviteActions profileInviteActions--published profileInviteActions--skeleton">
+                <ButtonSkeleton className="profileActionSkeleton" width="100%" height={36} />
+                <ButtonSkeleton className="profileActionSkeleton" width="100%" height={36} />
+                <ButtonSkeleton className="profileActionSkeleton" width="100%" height={36} />
+                <ButtonSkeleton className="profileMoreActionSkeleton" width={40} height={36} />
             </div>
         </article>
     );
@@ -509,14 +569,15 @@ function InvitationRow({
     const isPublic = isUpcoming || isLiveToday || isCompleted;
     const hasAnalyticsAccess = Boolean(invitation.firstPublishedAt || invitation.publishedAt);
     const isSample = invitation.id.startsWith("sample-");
-    const editHref = isSample ? "/templates" : `/builder?id=${invitation.id}&from=invitations`;
+    const editHref = isSample ? "/" : `/builder?id=${invitation.id}&from=invitations`;
     const analyticsHref = `/invitations/${invitation.id}/analytics`;
     const previewHref = isSample
-        ? "/templates"
+        ? "/"
         : isPublic
             ? `/i/${invitation.slug}`
             : `/builder/preview?id=${invitation.id}&from=invitations`;
     const publicUrl = getPublicInvitationUrl(invitation.slug);
+    const showUpdatedDate = hasMeaningfulUpdate(invitation.createdAt, invitation.updatedAt);
 
     useEffect(() => {
         if (!isMoreOpen) return;
@@ -601,7 +662,7 @@ function InvitationRow({
                 if (item.id === invitation.id) {
                     return {
                         ...item,
-                        status: "draft" as const,
+                        status: "published" as const,
                         lifecycleStatus: "unpublished" as const,
                         eventStatus: "unpublished" as const,
                     };
@@ -611,8 +672,8 @@ function InvitationRow({
             return {
                 ...current,
                 invitations: updatedInvitations,
-                published: current.published - 1,
-                drafts: current.drafts + 1,
+                published: current.published,
+                drafts: current.drafts,
             };
         }, { revalidate: false });
 
@@ -628,7 +689,7 @@ function InvitationRow({
             }
             onInvitationUpdated({
                 ...invitation,
-                status: "draft",
+                status: "published",
                 lifecycleStatus: "unpublished",
                 eventStatus: "unpublished",
                 updatedAt: new Date().toISOString(),
@@ -671,13 +732,13 @@ function InvitationRow({
             return {
                 ...current,
                 invitations: updatedInvitations,
-                published: current.published + 1,
-                drafts: current.drafts - 1,
+                published: current.published,
+                drafts: current.drafts,
             };
         }, { revalidate: false });
 
         try {
-            const response = await fetch(`/api/invitations/${invitation.id}/publish`, {
+            const response = await fetch(`/api/invitations/${invitation.id}/restore`, {
                 method: "POST",
             });
             const result = await response.json().catch(() => ({}));
@@ -690,9 +751,9 @@ function InvitationRow({
                 ...invitation,
                 slug: result.slug || invitation.slug,
                 status: "published",
-                lifecycleStatus: "published",
-                eventStatus: "published",
-                paymentStatus: "paid",
+                lifecycleStatus: result.lifecycle_status || "published",
+                eventStatus: result.event_status || "published",
+                paymentStatus: result.payment_status || "paid",
                 publishedAt: result.published_at || invitation.publishedAt || new Date().toISOString(),
                 firstPublishedAt: invitation.firstPublishedAt || result.published_at || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
@@ -750,9 +811,15 @@ function InvitationRow({
                                 {formatEventTimeRange(invitation.eventTime)}
                             </span>
                         ) : null}
-                        <span>
-                            <RefreshCw size={14} aria-hidden="true" />
-                            Updated {formatDate(invitation.updatedAt)}
+                        <span className="profileInviteMetaSecondary">
+                            {showUpdatedDate ? (
+                                <RefreshCw size={14} aria-hidden="true" />
+                            ) : (
+                                <CalendarDays size={14} aria-hidden="true" />
+                            )}
+                            {showUpdatedDate
+                                ? `Updated ${formatDate(invitation.updatedAt)}`
+                                : `Created ${formatDate(invitation.createdAt)}`}
                         </span>
                     </div>
 
@@ -787,7 +854,7 @@ function InvitationRow({
                 </div>
             ) : null}
 
-            <div className={`profileInviteActions ${isCompleted ? "profileInviteActions--two" : isOffline && hasAnalyticsAccess ? "profileInviteActions--published" : isUpcoming || isLiveToday ? "profileInviteActions--published" : ""}`}>
+            <div className={`profileInviteActions ${isCompleted || isLiveToday ? "profileInviteActions--two" : isOffline && hasAnalyticsAccess ? "profileInviteActions--published" : isUpcoming ? "profileInviteActions--published" : ""}`}>
                 {isDraft ? (
                     <>
                         <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
@@ -915,7 +982,7 @@ function InvitationRow({
                         )}
                         */}
                     </>
-                ) : isUpcoming || isLiveToday ? (
+                ) : isUpcoming ? (
                     <>
                         <a href={previewHref} target="_blank" rel="noreferrer" className="profileActionBtn profileActionBtn--primary">
                             <ExternalLink size={14} aria-hidden="true" />
@@ -1141,6 +1208,13 @@ function formatDate(value: string) {
     } catch {
         return value;
     }
+}
+
+function hasMeaningfulUpdate(createdAt: string, updatedAt: string) {
+    const createdTime = new Date(createdAt).getTime();
+    const updatedTime = new Date(updatedAt).getTime();
+    if (!Number.isFinite(createdTime) || !Number.isFinite(updatedTime)) return false;
+    return updatedTime - createdTime > 60_000;
 }
 
 function formatEventTimeRange(value: string) {

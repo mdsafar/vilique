@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getActiveTemplates } from "@/features/invitations/data";
 
-const TEMPLATE_LIMIT_DEFAULT = 12;
+const TEMPLATE_LIMIT_DEFAULT = 10;
 const TEMPLATE_LIMIT_MAX = 36;
 const templateSorts = ["popular", "highest_rated", "newest", "price_low", "price_high"] as const;
 type TemplateSort = typeof templateSorts[number];
@@ -38,11 +38,12 @@ export async function GET(request: Request) {
         const sorted = sortTemplates(searched, sort);
         const items = sorted.slice(offset, offset + limit);
         const nextOffset = offset + items.length;
+        const hasMore = items.length === limit && nextOffset < sorted.length;
 
         return NextResponse.json({
             items,
-            nextCursor: nextOffset < sorted.length ? String(nextOffset) : null,
-            hasMore: nextOffset < sorted.length,
+            nextCursor: hasMore ? String(nextOffset) : null,
+            hasMore,
             totalCount: sorted.length,
             counts: getCategoryCounts(templates, search),
         });

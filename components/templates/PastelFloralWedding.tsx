@@ -510,9 +510,8 @@ function InviteCard({
             </p>
             {!completed && !inProgress ? <CountdownGrid countdown={countdown} /> : null}
 
-            {inProgress ? (
-                <EventInProgressMessage category={invitation.category} />
-            ) : !completed ? (
+            {inProgress ? <EventInProgressMessage category={invitation.category} /> : null}
+            {!completed ? (
                 <>
                     <p className="rsvpTitle">WILL YOU ATTEND?</p>
                     {rsvpStatus === "declined" ? (
@@ -610,7 +609,7 @@ function ThanksCard({
             </p>
             {!completed && !inProgress ? <CountdownGrid countdown={countdown} /> : null}
             {completed ? <EventClosedMessage /> : inProgress ? <EventInProgressMessage category={invitation.category} /> : null}
-            {!completed && !inProgress && onChangeRsvp ? (
+            {!completed && onChangeRsvp ? (
                 <button className="rsvpChangeBtn" type="button" onClick={onChangeRsvp}>
                     Change RSVP
                 </button>

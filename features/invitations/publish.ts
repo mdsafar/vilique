@@ -17,6 +17,50 @@ type PublishedInvitationRow = {
     published_at: string | null;
 };
 
+type RestoreInvitationRow = {
+    id: string;
+    user_id: string;
+    slug: string;
+    status: string;
+    lifecycle_status: string | null;
+    event_status: string | null;
+    event_date: string | null;
+    event_time: string | null;
+    event_timezone: string | null;
+    first_published_at: string | null;
+    published_at: string | null;
+    first_payment_id: string | null;
+    payment_status: string | null;
+    template_id: string | null;
+    invitation_templates?: { is_free?: boolean | null } | null;
+};
+
+export type PublishEntitlementPayment = {
+    id: string;
+    user_id: string;
+    invitation_id: string | null;
+    template_id: string | null;
+    status: string | null;
+    payment_state?: string | null;
+    publish_state?: string | null;
+    recovery_state?: string | null;
+    refund_state?: string | null;
+    paid_at?: string | null;
+    provider_payment_id?: string | null;
+};
+
+export type OfflineRestoreInvitationState = Pick<
+    RestoreInvitationRow,
+    "event_date" |
+    "event_time" |
+    "event_timezone" |
+    "status" |
+    "lifecycle_status" |
+    "event_status" |
+    "first_published_at" |
+    "published_at"
+>;
+
 type FinalizePaidInvitationPublishInput = {
     payment: {
         id: string;
@@ -213,7 +257,7 @@ export async function publishInvitationAfterPayment({
             .eq("invitation_id", invitationId)
             .eq("user_id", userId)
             .eq("template_id", templateId)
-            .eq("status", "paid")
+            .in("status", ["paid", "published"])
             .maybeSingle();
 
         if (paymentError || !payment) {
@@ -360,6 +404,184 @@ export async function publishInvitationAfterPayment({
         publishedAt: updatedInvite.published_at,
         publicUrl: getPublicInvitationUrl(updatedInvite.slug),
     };
+}
+
+export async function restorePublishedInvitationFromOffline({
+    userId,
+    invitationId,
+}: {
+    userId: string;
+    invitationId: string;
+}) {
+    const supabase = createAdminClient();
+
+    const { data: invite, error: inviteError } = await supabase
+        .from("invitations")
+        .select("id, user_id, slug, status, lifecycle_status, event_status, event_date, event_time, event_timezone, first_published_at, published_at, first_payment_id, payment_status, template_id, invitation_templates(is_free)")
+        .eq("id", invitationId)
+        .eq("user_id", userId)
+        .single();
+
+    if (inviteError || !invite) {
+        throw new Error("Invitation not found");
+    }
+
+    const invitation = invite as RestoreInvitationRow;
+    if (invitation.user_id !== userId) {
+        throw new Error("Unauthorized: You do not own this invitation");
+    }
+
+    if (invitation.status === "archived" || invitation.lifecycle_status === "archived") {
+        throw new Error("Cannot restore an archived invitation");
+    }
+
+    const isFreeTemplate = Boolean(invitation.invitation_templates?.is_free);
+    const entitlement = isFreeTemplate
+        ? null
+        : await getSuccessfulPublishEntitlement({
+            supabase,
+            userId,
+            invitationId,
+            templateId: invitation.template_id,
+            firstPaymentId: invitation.first_payment_id,
+        });
+    const restoreBlocker = getOfflineRestoreBlocker(invitation, { isFreeTemplate, entitlement });
+    if (restoreBlocker) throw new Error(restoreBlocker);
+
+    if (
+        invitation.status === "published" &&
+        invitation.lifecycle_status === "published" &&
+        invitation.event_status === "published"
+    ) {
+        return {
+            id: invitation.id,
+            slug: invitation.slug,
+            status: invitation.status,
+            lifecycleStatus: invitation.lifecycle_status,
+            eventStatus: invitation.event_status,
+            paymentStatus: invitation.payment_status,
+            publishedAt: invitation.published_at,
+            publicUrl: getPublicInvitationUrl(invitation.slug),
+            restored: false,
+        };
+    }
+
+    const restoredPaymentStatus: "unpaid" | "paid" | "refunded" = isFreeTemplate
+        ? invitation.payment_status === "paid" || invitation.payment_status === "refunded"
+            ? invitation.payment_status
+            : "unpaid"
+        : "paid";
+    const restorePatch = {
+        status: "published" as const,
+        lifecycle_status: "published" as const,
+        event_status: "published" as const,
+        payment_status: restoredPaymentStatus,
+        updated_at: new Date().toISOString(),
+    };
+
+    const { data: updatedInvite, error: updateError } = await supabase
+        .from("invitations")
+        .update(restorePatch)
+        .eq("id", invitationId)
+        .eq("user_id", userId)
+        .select("id, slug, status, lifecycle_status, event_status, payment_status, published_at")
+        .single();
+
+    if (updateError || !updatedInvite) {
+        throw new Error(updateError?.message || "Failed to restore invitation");
+    }
+
+    return {
+        id: updatedInvite.id,
+        slug: updatedInvite.slug,
+        status: updatedInvite.status,
+        lifecycleStatus: updatedInvite.lifecycle_status,
+        eventStatus: updatedInvite.event_status,
+        paymentStatus: updatedInvite.payment_status,
+        publishedAt: updatedInvite.published_at,
+        publicUrl: getPublicInvitationUrl(updatedInvite.slug),
+        restored: true,
+    };
+}
+
+export function isSuccessfulPublishEntitlement(payment: PublishEntitlementPayment | null | undefined) {
+    if (!payment) return false;
+    if (payment.refund_state === "pending" || payment.refund_state === "processed") return false;
+    if (payment.status === "refund_pending" || payment.status === "refunded" || payment.status === "partially_refunded") return false;
+
+    return payment.status === "paid" ||
+        payment.status === "published" ||
+        (payment.payment_state === "captured" && payment.publish_state === "published");
+}
+
+export function getOfflineRestoreBlocker(
+    invitation: OfflineRestoreInvitationState,
+    options: {
+        isFreeTemplate: boolean;
+        entitlement?: PublishEntitlementPayment | null;
+        now?: Date;
+    }
+) {
+    if (isInvitationCompleted({
+        eventDate: invitation.event_date,
+        eventTime: invitation.event_time,
+        eventTimezone: invitation.event_timezone,
+        status: invitation.status,
+        lifecycleStatus: invitation.lifecycle_status,
+        eventStatus: invitation.event_status,
+        first_published_at: invitation.first_published_at,
+        published_at: invitation.published_at,
+    }, options.now)) {
+        return "Invitation is completed and locked.";
+    }
+
+    if (!hasFinalizedPublishState(invitation)) {
+        return "Payment required: Please complete payment before publishing";
+    }
+
+    if (!options.isFreeTemplate && !isSuccessfulPublishEntitlement(options.entitlement)) {
+        return "Payment required: Please complete payment before publishing";
+    }
+
+    return null;
+}
+
+function hasFinalizedPublishState(invitation: Pick<RestoreInvitationRow, "first_published_at" | "published_at">) {
+    return Boolean(invitation.first_published_at || invitation.published_at);
+}
+
+async function getSuccessfulPublishEntitlement({
+    supabase,
+    userId,
+    invitationId,
+    templateId,
+    firstPaymentId,
+}: {
+    supabase: ReturnType<typeof createAdminClient>;
+    userId: string;
+    invitationId: string;
+    templateId: string | null;
+    firstPaymentId: string | null;
+}) {
+    let paymentQuery = supabase
+        .from("payments")
+        .select("id, user_id, invitation_id, template_id, status, payment_state, publish_state, recovery_state, refund_state, paid_at, provider_payment_id")
+        .eq("invitation_id", invitationId)
+        .eq("user_id", userId);
+
+    if (templateId) {
+        paymentQuery = paymentQuery.eq("template_id", templateId);
+    }
+
+    const { data: payments, error } = await paymentQuery;
+    if (error) {
+        throw new Error(error.message || "Payment entitlement could not be verified");
+    }
+
+    const candidates = ((payments || []) as PublishEntitlementPayment[])
+        .filter((payment) => !firstPaymentId || payment.id === firstPaymentId || payment.invitation_id === invitationId);
+
+    return candidates.find(isSuccessfulPublishEntitlement) || null;
 }
 
 async function buildPublishPatch({

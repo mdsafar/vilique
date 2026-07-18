@@ -7,7 +7,7 @@ export default function TemplateDetailsSkeleton() {
         <main className="page templateDetailsPage" aria-busy="true">
             <header className="templateDetailTopbar analyticsHeader">
                 <div className="templateDetailCrumb">
-                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/templates">
+                    <Link aria-label="Back to templates" className="analyticsBackBtn" href="/">
                         <ArrowLeft size={16} aria-hidden="true" />
                         <span>Templates</span>
                     </Link>

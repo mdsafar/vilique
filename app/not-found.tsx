@@ -24,7 +24,7 @@ export default function NotFound() {
                 </div>
 
                 <div className="notFoundActions" aria-label="Helpful places to continue">
-                    <Link className="notFoundPrimaryAction" href="/templates">
+                    <Link className="notFoundPrimaryAction" href="/">
                         <Grid3X3 size={17} aria-hidden="true" />
                         Browse templates
                     </Link>

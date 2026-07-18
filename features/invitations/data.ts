@@ -55,6 +55,8 @@ export async function getPublishedInvitationBySlug(slug: string) {
         .select("*, invitation_templates(template_key)")
         .eq("slug", slug)
         .eq("status", "published")
+        .neq("lifecycle_status", "unpublished")
+        .neq("event_status", "unpublished")
         .single();
 
     if (error || !data) return null;
@@ -163,7 +165,7 @@ export async function getDashboardData() {
         invitationIds.length
             ? supabase.from("invitation_events").select("invitation_id").in("invitation_id", invitationIds).eq("event_type", "view")
             : Promise.resolve({ data: [] as { invitation_id: string }[] }),
-        supabase.from("payments").select("amount_paise").eq("user_id", user.id).eq("status", "paid"),
+        supabase.from("payments").select("amount_paise").eq("user_id", user.id).in("status", ["paid", "published"]),
     ]);
 
     const invitationStats = Object.fromEntries(

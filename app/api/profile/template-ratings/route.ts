@@ -44,7 +44,7 @@ type PaidPaymentRow = {
     invitation_templates?: InvitationTemplateJoin | InvitationTemplateJoin[] | null;
 };
 
-const USED_TEMPLATE_LIMIT_DEFAULT = 9;
+const USED_TEMPLATE_LIMIT_DEFAULT = 10;
 const USED_TEMPLATE_LIMIT_MAX = 24;
 const usedTemplateSorts = ["recently_used", "most_used", "highest_rated", "unrated_first"] as const;
 type UsedTemplateSort = typeof usedTemplateSorts[number];
@@ -243,12 +243,13 @@ function toRatingsResponse(
     const sorted = sortUsedTemplates(filtered, options.sort);
     const items = sorted.slice(options.offset, options.offset + options.limit);
     const nextOffset = options.offset + items.length;
+    const hasMore = items.length === options.limit && nextOffset < sorted.length;
 
     return {
         ratings: items,
         items,
-        nextCursor: nextOffset < sorted.length ? String(nextOffset) : null,
-        hasMore: nextOffset < sorted.length,
+        nextCursor: hasMore ? String(nextOffset) : null,
+        hasMore,
         totalCount: sorted.length,
         counts: {
             all: filtered.length,

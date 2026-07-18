@@ -6,11 +6,13 @@ export default function ProfilePageSkeleton() {
             <section className="profileOverview profileOverview--skeleton" aria-label="Loading profile overview">
                 <article className="profileCard profileCard--skeleton">
                     <div className="profileCardMain">
-                        <Skeleton style={{ width: 58, height: 58 }} rounded="full" />
+                        <div className="profileAvatar" style={{ background: "rgba(229, 231, 235, 0.5)", border: "3px solid #ffffff", boxShadow: "none" }}>
+                            <Skeleton style={{ width: "100%", height: "100%" }} rounded="full" />
+                        </div>
                         <div className="profileDetails">
-                            <TextSkeleton width={110} height={11} />
-                            <TextSkeleton width={150} height={22} />
-                            <TextSkeleton width={198} height={12} />
+                            <TextSkeleton className="profileGreeting" width={110} height={9.5} />
+                            <Skeleton style={{ width: 150, height: 20, marginTop: 2, marginBottom: 6 }} rounded="sm" />
+                            <TextSkeleton width={198} height={11} />
                         </div>
                     </div>
 
@@ -26,9 +28,8 @@ export default function ProfilePageSkeleton() {
                         <div className="pricingRateInfo">
                             {Array.from({ length: 2 }).map((_, index) => (
                                 <div className="rateDetails rateDetails--skeleton" key={index}>
-                                    <Skeleton style={{ width: 30, height: 3 }} rounded="full" />
-                                    <TextSkeleton width={84} height={10} />
-                                    <TextSkeleton width={42} height={20} />
+                                    <TextSkeleton className="rateLabel" width={index === 0 ? 84 : 70} height={9.5} />
+                                    <TextSkeleton className="rateValue" width={32} height={18} />
                                 </div>
                             ))}
                         </div>
@@ -39,11 +40,13 @@ export default function ProfilePageSkeleton() {
                 <section className="profileStats" aria-label="Loading invitation metrics">
                     {Array.from({ length: 4 }).map((_, index) => (
                         <article className="profileStat" key={index}>
-                            <Skeleton style={{ width: 30, height: 30 }} rounded="md" />
+                            <span style={{ background: "rgba(229, 231, 235, 0.5)", width: 34, height: 34, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0 }}>
+                                <Skeleton style={{ width: "100%", height: "100%" }} rounded="md" />
+                            </span>
                             <div>
-                                <TextSkeleton width={24} height={21} />
-                                <TextSkeleton width={78} height={12} />
-                                <TextSkeleton width={104} height={10} />
+                                <Skeleton style={{ width: 24, height: 18 }} rounded="sm" />
+                                <Skeleton style={{ width: 78, height: 10.5, marginTop: 4 }} rounded="sm" />
+                                <Skeleton style={{ width: 104, height: 9, marginTop: 2 }} rounded="sm" />
                             </div>
                         </article>
                     ))}

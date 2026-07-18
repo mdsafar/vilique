@@ -102,7 +102,7 @@ a {
 .loadingButton {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 8px;
   vertical-align: middle;
@@ -1667,9 +1667,7 @@ p {
   gap: 12px;
 }
 
-.profileOverview--skeleton .profileStat {
-  min-height: 128px;
-}
+
 
 .profileActivityTabs--shellLoading {
   gap: 8px;
@@ -2444,6 +2442,61 @@ p {
   transform: none;
 }
 
+.profileTransactionCard--skeleton {
+  pointer-events: none;
+}
+
+.profileTransactionCard--skeleton .profileTransactionTop {
+  grid-template-columns: 44px minmax(0, 1fr) max-content;
+}
+
+.profileTransactionTitleSkeleton {
+  max-width: min(100%, 132px);
+}
+
+.profileTransactionSubtitleSkeleton {
+  max-width: min(100%, 160px);
+}
+
+.profileTransactionStatusSkeleton {
+  width: 86px;
+  height: 22px;
+  flex: 0 0 86px;
+}
+
+.profileTransactionMenuSkeleton {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.profileTransactionAside--skeleton {
+  min-width: 62px;
+}
+
+.profileTransactionAside--skeleton .profileTransactionAmountSkeleton {
+  max-width: 52px;
+}
+
+.profileTransactionMetaSkeleton {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 7px;
+}
+
+.profileTransactionMetaIconSkeleton {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
+.profileTransactionMetaTextSkeleton {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .profileTransactionTop {
   min-width: 0;
   display: grid;
@@ -2511,7 +2564,7 @@ p {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -2539,11 +2592,11 @@ p {
 }
 
 .profileTransactions .paymentStatusBadge {
-  margin-top: 5px;
-  padding: 3px 8px;
+  margin-top: 0;
+  padding: 3px 7px;
   gap: 5px;
   border-radius: 7px;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
   line-height: 1;
 }
@@ -2552,6 +2605,24 @@ p {
   color: #5f6472;
   background: #eef0f4;
   border-color: #e2e5eb;
+}
+
+.profileTransactionHeaderBadge {
+  margin-top: 0;
+}
+
+.profileTransactionHeaderActions {
+  justify-self: end;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-right: 2px;
+}
+
+.profileTransactionCard--withActions .profileTransactionHeaderActions {
+  margin-right: -4px;
 }
 
 .profileTransactionNotice {
@@ -2570,10 +2641,12 @@ p {
 
 .profileTransactionMeta {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px;
   min-width: 0;
+  padding-right: 104px;
   padding-top: 11px;
   border-top: 1px solid rgba(219, 215, 226, 0.8);
   color: #777188;
@@ -2586,7 +2659,14 @@ p {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  gap: 4px;
+  gap: 7px;
+}
+
+.profileTransactionMeta svg {
+  width: 13px;
+  height: 13px;
+  color: #777188;
+  flex: 0 0 auto;
 }
 
 .profileTransactionDate {
@@ -2632,92 +2712,117 @@ p {
 }
 
 .profileTransactionAside {
-  position: relative;
-  justify-self: end;
-  min-width: 58px;
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
+  min-width: 62px;
   display: grid;
-  justify-items: end;
-  align-content: start;
-  gap: 3px;
+  justify-items: center;
+  align-content: center;
+  gap: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(238, 224, 255, 0.92), rgba(248, 243, 255, 0.94));
   color: #1b1730;
-  text-align: right;
+  text-align: center;
 }
 
 .profileTransactionCard--withActions .profileTransactionAside {
-  min-width: 76px;
-  padding-right: 34px;
+  min-width: 62px;
 }
 
 .profileTransactionMenu {
-  position: absolute;
-  top: 16px;
-  right: 18px;
+  position: relative;
   z-index: 10;
   display: grid;
   justify-items: end;
 }
 
 .profileTransactionMenuButton {
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: #777188;
   display: grid;
   place-items: center;
   cursor: pointer;
   box-shadow: none;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .profileTransactionMenuButton:hover,
 .profileTransactionMenuButton[aria-expanded="true"] {
   color: #6f43e8;
-  background: rgba(140, 76, 243, 0.07);
+  background: transparent;
+  box-shadow: none;
+  transform: translateY(-1px);
 }
 
 .profileTransactionMenuPanel {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   right: 0;
   z-index: 20;
-  width: 178px;
+  width: 168px;
   display: grid;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid rgba(226, 218, 235, 0.88);
-  border-radius: 12px;
-  background: #ffffff;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid rgba(224, 216, 235, 0.92);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.98);
   box-shadow:
-    0 18px 38px rgba(31, 18, 53, 0.12),
-    0 2px 8px rgba(31, 18, 53, 0.04),
+    0 22px 46px rgba(31, 18, 53, 0.13),
+    0 3px 10px rgba(31, 18, 53, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform-origin: top right;
+  animation: profileMenuFloatIn 140ms ease both;
+  backdrop-filter: blur(18px);
 }
 
 .profileTransactionMenuItem {
   width: 100%;
-  min-height: 36px;
+  min-height: 38px;
   border: 0;
-  border-radius: 9px;
-  padding: 0 10px;
+  border-radius: 11px;
+  padding: 0 11px 0 8px;
   background: transparent;
-  color: #5f4a25;
+  color: #3f344d;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  font-weight: 760;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 780;
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
 .profileTransactionMenuItem svg {
+  width: 25px;
+  height: 25px;
+  padding: 5px;
+  border-radius: 8px;
+  color: #9a6a16;
+  background: rgba(199, 164, 92, 0.12);
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.profileTransactionMenuItem svg.spinner,
+.profileInviteActions .profileActionMenuItem svg.spinner {
   width: 14px;
   height: 14px;
-  color: #a06f16;
-  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .profileTransactionMenuItem span {
@@ -2727,7 +2832,7 @@ p {
 }
 
 .profileTransactionMenuItem:hover {
-  background: rgba(199, 164, 92, 0.085);
+  background: rgba(250, 246, 236, 0.96);
   color: #4b3511;
 }
 
@@ -2741,23 +2846,24 @@ p {
   cursor: default;
 }
 
+.profileTransactionMenuItem--muted svg {
+  color: #8f879d;
+  background: rgba(143, 135, 157, 0.11);
+}
+
 .profileTransactionMenuItem--muted:hover {
   background: transparent;
 }
 
 .profileTransactionAside strong {
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 760;
   line-height: 1;
   white-space: nowrap;
 }
 
 .profileTransactionAside span {
-  font-size: 8.5px;
-  color: #8f879d;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .profileTransactions .paymentLinkAction,
@@ -2910,6 +3016,11 @@ p {
 @media (min-width: 861px) {
   .profileActivityTabs {
     padding-top: calc(var(--profile-fixed-section-height, 0px) + 8px);
+    width: 100%;
+    margin: 0 auto;
+    padding-left: 24px;
+    padding-right: 24px;
+    box-sizing: border-box;
   }
 
   .profileFixedDesktopSection {
@@ -2919,25 +3030,32 @@ p {
     right: 0;
     width: auto;
     z-index: 80;
-    margin-inline: 0;
-    padding: 10px 24px 10px;
+    padding: 0;
     box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    justify-content: center;
-    gap: 8px;
     background:
       linear-gradient(180deg, rgba(250, 247, 242, 0.98) 0%, rgba(250, 247, 242, 0.96) 88%, rgba(250, 247, 242, 0) 100%);
     backdrop-filter: blur(16px);
   }
 
-  .profileFixedDesktopSection .profileOverview {
+  .profileFixedDesktopInner {
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .profileFixedDesktopInner .profileOverview {
     width: 100%;
     margin-bottom: 0;
   }
 
-  .profileFixedDesktopSection .profileTabList {
-    justify-self: start;
+  .profileFixedDesktopInner .profileTabList {
+    margin-left: 12px;
+    margin-bottom: 10px;
   }
 }
 
@@ -3781,8 +3899,22 @@ p {
   color: #9ca3af;
 }
 
-.profileInviteMeta span:last-child {
+.profileInviteMeta .profileInviteMetaSecondary {
   color: #9ca3af;
+  font-size: 9.75px;
+  font-weight: 650;
+  flex: 1 1 100%;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  white-space: nowrap;
+}
+
+.profileInviteMeta .profileInviteMetaSecondary svg {
+  color: #a9b1bf;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
 }
 
 .profilePublicLink {
@@ -3995,53 +4127,76 @@ p {
 }
 
 .profileInviteActions .profileActionBtn--more {
-  width: 40px;
+  width: 34px;
   padding: 0;
-  color: #64748b;
+  border-color: rgba(226, 218, 235, 0.9);
+  background: rgba(248, 245, 253, 0.92);
+  color: #7b6b91;
+  box-shadow: 0 8px 18px rgba(31, 18, 53, 0.06);
 }
 
 .profileInviteActions .profileActionBtn--more:hover:not(:disabled),
 .profileInviteActions .profileActionBtn--more[aria-expanded="true"] {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: rgba(243, 238, 255, 0.98);
+  border-color: rgba(140, 76, 243, 0.24);
+  color: #6f43e8;
+  box-shadow: 0 10px 24px rgba(111, 67, 232, 0.12);
   transform: translateY(-1px);
 }
 
 .profileActionMenu {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   z-index: 20;
-  min-width: 158px;
-  padding: 6px;
-  border-radius: 12px;
-  border: 1px solid rgba(226, 232, 240, 0.95);
+  min-width: 166px;
+  padding: 7px;
+  border-radius: 15px;
+  border: 1px solid rgba(224, 216, 235, 0.92);
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16), 0 1px 0 rgba(255, 255, 255, 0.95) inset;
-  backdrop-filter: blur(16px);
+  box-shadow:
+    0 22px 46px rgba(31, 18, 53, 0.13),
+    0 3px 10px rgba(31, 18, 53, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.95) inset;
+  transform-origin: bottom right;
+  animation: profileMenuFloatIn 140ms ease both;
+  backdrop-filter: blur(18px);
 }
 
 .profileInviteActions .profileActionMenuItem {
   width: 100%;
-  height: 34px;
-  min-height: 34px;
+  height: 38px;
+  min-height: 38px;
   justify-content: flex-start;
-  padding: 0 10px;
-  border-radius: 8px;
+  padding: 0 11px 0 8px;
+  border-radius: 11px;
   background: transparent;
   border: 0;
   box-shadow: none;
-  color: #475569;
+  color: #3f344d;
   font-size: 12px;
-  font-weight: 720;
-  gap: 8px;
+  font-weight: 780;
+  gap: 9px;
   transform: none;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.profileInviteActions .profileActionMenuItem svg {
+  width: 25px;
+  height: 25px;
+  padding: 5px;
+  border-radius: 8px;
+  color: #c2410c;
+  background: rgba(251, 146, 60, 0.12);
+  flex: 0 0 auto;
+  box-sizing: border-box;
 }
 
 .profileInviteActions .profileActionMenuItem:hover:not(:disabled),
 .profileInviteActions .profileActionMenuItem:focus-visible {
-  background: #f8fafc;
+  background: #fff7ed;
   color: #c2410c;
   outline: none;
   transform: none;
@@ -4049,6 +4204,11 @@ p {
 
 .profileInviteActions .profileActionMenuItem--online {
   color: #047857;
+}
+
+.profileInviteActions .profileActionMenuItem--online svg {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.13);
 }
 
 .profileInviteActions .profileActionMenuItem--online:hover:not(:disabled),
@@ -4066,6 +4226,18 @@ p {
   cursor: not-allowed;
   opacity: 0.68;
   transform: none;
+}
+
+@keyframes profileMenuFloatIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .profileInviteActions form {
@@ -4231,7 +4403,7 @@ p {
 }
 
 .profileInviteRow.profileInviteRow--bg .profileInviteDetails {
-  max-width: min(100%, 300px);
+  max-width: min(100%, 600px);
   gap: 7px;
   height: 100%;
   display: flex;
@@ -4272,11 +4444,14 @@ p {
 
 .profileInviteRow.profileInviteRow--bg .profileInviteMeta {
   width: 100%;
-  padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.22);
-  gap: 8px 14px;
+  padding-top: 3px;
+  gap: 10px 14px;
   font-size: 11px;
   margin-top: auto;
+}
+
+.profileInviteRow.profileInviteRow--bg .profileInviteMeta .profileInviteMetaSecondary {
+  font-size: 10.5px;
 }
 
 .profileInviteRow.profileInviteRow--bg .profilePublicLinkWrap {
@@ -4289,6 +4464,122 @@ p {
 .profileInviteRow.profileInviteRow--bg .profileInviteActions {
   grid-row: 3;
   margin-top: 0;
+}
+
+.profileInviteRow--skeleton {
+  pointer-events: none;
+}
+
+.profileInviteRow--skeleton .profileInviteDetails {
+  max-width: min(100%, 600px);
+}
+
+.profileInviteTitleSkeleton {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.profileInviteStatusSkeleton {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border-radius: 9px;
+}
+
+.profileInviteNamesSkeleton {
+  max-width: 230px;
+}
+
+.profileInviteMessageSkeleton {
+  max-width: 264px;
+}
+
+.profileInviteRow--skeleton .profileInviteMeta span {
+  overflow: visible;
+}
+
+.profileInviteRow--skeleton .profileInviteMeta > span {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-width: 0;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.profileInviteRow--skeleton .profileInviteMeta > .profileInviteMetaPairSkeleton {
+  flex: 1 1 calc(50% - 7px);
+  max-width: calc(50% - 7px);
+}
+
+.profileInviteRow--skeleton .profileInviteMeta > .profileInviteMetaSecondary {
+  width: 100%;
+  flex-basis: 100%;
+}
+
+.profileInviteRow--skeleton .profileInviteMeta .skeletonBase {
+  margin-top: 0;
+  max-width: 100%;
+}
+
+.profileInviteMetaIconSkeleton {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.profileInviteRow--skeleton .profileInviteMeta .profileInviteMetaIconSkeleton {
+  width: 14px;
+  min-width: 14px;
+  max-width: 14px;
+}
+
+.profileInviteMetaTextSkeleton {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.profilePublicLinkWrap--skeleton {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 0;
+}
+
+.profilePublicLinkWrap--skeleton .profilePublicLink {
+  flex: 1 1 auto;
+  min-width: 0;
+  pointer-events: none;
+  background: transparent;
+  padding: 0 10px;
+}
+
+.profileInviteActions--skeleton {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 40px;
+  gap: 7px;
+}
+
+.profileInviteActions--skeleton .skeletonBase {
+  display: block;
+  min-width: 0;
+}
+
+.profileInviteActions--skeleton > :last-child {
+  grid-column: auto;
+}
+
+.profileCopyLinkSkeleton {
+  flex: 0 0 30px;
+  border-radius: 7px;
+}
+
+.profileActionSkeleton {
+  border-radius: 9px;
+}
+
+.profileMoreActionSkeleton {
+  flex: 0 0 40px;
+  border-radius: 9px;
 }
 
 /* Empty states */
@@ -12704,7 +12995,7 @@ body:has(.invitePreviewShell) {
 
   .rateDetails {
     min-height: 54px;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     align-content: center;
   }
@@ -12715,7 +13006,8 @@ body:has(.invitePreviewShell) {
   }
 
   .rateValue {
-    font-size: 18px;
+    justify-self: end;
+    font-size: 16px;
   }
 
   .profileControls {
@@ -12867,9 +13159,7 @@ body:has(.invitePreviewShell) {
     padding-bottom: 0;
   }
 
-  .profileOverview--skeleton .profileStat {
-    min-height: 104px;
-  }
+
 
   .profileTemplateRatingGrid--skeleton {
     grid-template-columns: 1fr;
@@ -12941,8 +13231,12 @@ body:has(.invitePreviewShell) {
   }
 
   .rateDetails {
-    min-height: 68px;
-    padding: 12px;
+    min-height: 58px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    align-content: center;
   }
 
   .rateLabel {
@@ -12950,7 +13244,8 @@ body:has(.invitePreviewShell) {
   }
 
   .rateValue {
-    font-size: 23px;
+    justify-self: end;
+    font-size: 19px;
   }
 
   .usageDisclaimer {
@@ -13242,6 +13537,10 @@ body:has(.invitePreviewShell) {
     width: 100%;
   }
 
+  .profileInviteMeta .profileInviteMetaSecondary {
+    font-size: 10.75px;
+  }
+
   .profileInviteMeta span:not(:last-child) {
     white-space: nowrap;
   }
@@ -13306,7 +13605,7 @@ body:has(.invitePreviewShell) {
 
   .profileInviteRow.profileInviteRow--bg .profileInviteDetails {
     gap: 7px;
-    max-width: min(100%, 360px);
+    max-width: min(100%, 600px);
   }
 
   .profileInviteRow.profileInviteRow--bg .profileInviteHeader {
@@ -13341,10 +13640,6 @@ body:has(.invitePreviewShell) {
     white-space: nowrap;
   }
 
-  .profileInviteRow.profileInviteRow--bg .profileInviteMeta span:last-child {
-    flex-basis: 100%;
-    margin-top: 0;
-  }
 }
 
 @media (max-width: 430px) {
@@ -13384,6 +13679,10 @@ body:has(.invitePreviewShell) {
   .profileInviteMeta {
     gap: 6px;
     font-size: 10.5px;
+  }
+
+  .profileInviteMeta .profileInviteMetaSecondary {
+    font-size: 11px;
   }
 
   .filterTabBtn {
@@ -14033,33 +14332,57 @@ body:has(.invitePreviewShell) {
 .publishSuccessLockedBackdrop {
   position: absolute;
   inset: 0;
-  background: rgba(20, 16, 28, 0.48);
-  backdrop-filter: blur(18px);
+  background:
+    radial-gradient(circle at 50% 80%, rgba(140, 76, 243, 0.18), transparent 34%),
+    rgba(20, 16, 28, 0.52);
+  backdrop-filter: blur(16px);
 }
 
 .publishSuccessPanel {
   position: relative;
   z-index: 1;
-  width: min(100%, 440px);
-  border-radius: 24px;
-  background: #ffffff;
-  border: 1px solid rgba(140, 76, 243, 0.16);
-  box-shadow: 0 28px 70px rgba(45, 27, 76, 0.26);
-  padding: 24px;
+  width: min(100%, 470px);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), #ffffff 54%),
+    #ffffff;
+  border: 1px solid rgba(218, 208, 230, 0.9);
+  box-shadow:
+    0 30px 80px rgba(31, 18, 53, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.publishSuccessPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: linear-gradient(90deg, #16a34a, #8c4cf3);
+}
+
+.publishSuccessTop {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
 }
 
 .publishSuccessIcon {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  width: 58px;
+  height: 58px;
+  border-radius: 17px;
   display: grid;
   place-items: center;
   color: #ffffff;
   background: linear-gradient(135deg, #16a34a 0%, #5bbd85 100%);
-  box-shadow: 0 14px 26px rgba(22, 163, 74, 0.22);
+  box-shadow:
+    0 16px 30px rgba(22, 163, 74, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .publishSuccessCopy {
@@ -14071,25 +14394,55 @@ body:has(.invitePreviewShell) {
 .publishSuccessCopy p {
   margin: 0;
   color: #16a34a;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .publishSuccessCopy h2 {
   margin: 0;
   color: #1f1235;
-  font-size: 25px;
+  font-size: 26px;
   line-height: 1.08;
   font-weight: 900;
 }
 
 .publishSuccessCopy span {
   color: #7c6f8a;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.45;
   font-weight: 600;
+}
+
+.publishSuccessReceipt {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.92), rgba(248, 244, 255, 0.78));
+  border: 1px solid rgba(199, 231, 214, 0.85);
+}
+
+.publishSuccessReceipt span,
+.publishSuccessLinkBox small {
+  color: #6d647b;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.publishSuccessReceipt strong {
+  color: #1f1235;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.publishSuccessReceipt small {
+  color: #746b84;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .publishSuccessLinkBox {
@@ -14097,10 +14450,16 @@ body:has(.invitePreviewShell) {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  border-radius: 16px;
-  background: #f7f5fa;
-  border: 1.5px solid #e2ddf0;
-  padding: 12px;
+  border-radius: 15px;
+  background: #faf8fd;
+  border: 1px solid #e2ddf0;
+  padding: 11px;
+}
+
+.publishSuccessLinkBox div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .publishSuccessLinkBox span {
@@ -14114,7 +14473,8 @@ body:has(.invitePreviewShell) {
 }
 
 .publishSuccessLinkBox button,
-.publishSuccessProfileBtn {
+.publishSuccessProfileBtn,
+.publishSuccessOpenBtn {
   border: 0;
   cursor: pointer;
   display: inline-flex;
@@ -14125,22 +14485,13 @@ body:has(.invitePreviewShell) {
 }
 
 .publishSuccessLinkBox button {
-  min-height: 38px;
-  border-radius: 12px;
-  padding: 0 13px;
-  color: #5c5070;
+  min-height: 40px;
+  border-radius: 11px;
+  padding: 0 14px;
+  color: #5d4c71;
   background: #ffffff;
-  border: 1.5px solid #d8cde8;
+  border: 1px solid #d8cde8;
   white-space: nowrap;
-}
-
-.publishSuccessProfileBtn {
-  min-height: 48px;
-  border-radius: 15px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #8c4cf3 0%, #7030d9 100%);
-  box-shadow: 0 12px 22px rgba(140, 76, 243, 0.24);
-  font-size: 15px;
 }
 
 .publishSuccessActions {
@@ -14148,6 +14499,80 @@ body:has(.invitePreviewShell) {
   grid-template-columns: 1fr auto auto;
   gap: 8px;
   width: 100%;
+}
+
+.publishSuccessDialogActions {
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.publishSuccessOpenBtn,
+.publishSuccessProfileBtn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.publishSuccessOpenBtn {
+  color: #5d4c71;
+  background: #ffffff;
+  border: 1px solid #ded6ea;
+}
+
+.publishSuccessProfileBtn {
+  color: #ffffff;
+  background: linear-gradient(135deg, #8c4cf3 0%, #7030d9 100%);
+  box-shadow: 0 12px 22px rgba(140, 76, 243, 0.24);
+}
+
+@media (max-width: 560px) {
+  .publishSuccessOverlay {
+    padding: 14px;
+  }
+
+  .publishSuccessPanel {
+    width: 100%;
+    border-radius: 20px;
+    padding: 18px;
+    gap: 12px;
+  }
+
+  .publishSuccessTop {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .publishSuccessIcon {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+  }
+
+  .publishSuccessCopy h2 {
+    font-size: 22px;
+  }
+
+  .publishSuccessCopy span {
+    font-size: 12.5px;
+  }
+
+  .publishSuccessReceipt {
+    padding: 12px;
+  }
+
+  .publishSuccessLinkBox {
+    grid-template-columns: 1fr;
+  }
+
+  .publishSuccessLinkBox button {
+    width: 100%;
+  }
+
+  .publishSuccessDialogActions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .publishBtnShare {
@@ -14434,17 +14859,32 @@ body:has(.invitePreviewShell) {
   }
 
   .profileTransactions {
-    margin-inline: 14px;
-    padding-bottom: calc(var(--bottom-nav-clearance) + 10px);
+    margin-inline: 0;
+    padding-bottom: calc(var(--bottom-nav-clearance) - 18px);
   }
 
   .profileActivityTabs {
-    margin-inline: 14px;
-    padding-bottom: calc(var(--bottom-nav-clearance) + 10px);
+    margin-inline: 0;
+    padding-bottom: calc(var(--bottom-nav-clearance) - 18px);
+  }
+
+  .profileActivityHeader {
+    margin-inline: 0;
+    width: 100%;
   }
 
   .profileTabList {
-    width: 100%;
+    width: calc(100% - 28px);
+    margin-inline: 14px;
+  }
+
+  .profileActivityTabs.isProfileTabsPinned .profileTabList {
+    left: 14px;
+    right: 14px;
+    width: auto;
+    max-width: none;
+    margin-inline: 0;
+    transform: none;
   }
 
   .profileTabList button {
@@ -14473,6 +14913,7 @@ body:has(.invitePreviewShell) {
   .profileTransactions .paymentsList {
     grid-template-columns: 1fr;
     gap: 8px;
+    padding-inline: 14px;
   }
 
   .profileTemplateRatingGrid {
@@ -14567,50 +15008,77 @@ body:has(.invitePreviewShell) {
   }
 
   .profileTransactionCard {
-    gap: 7px;
-    padding: 12px;
-    border-radius: 14px;
-    min-height: 0;
+    gap: 10px;
+    padding: 16px 14px;
+    border-radius: 16px;
+    min-height: 142px;
   }
 
   .profileTransactionTop {
-    grid-template-columns: 38px minmax(0, 1fr) 82px;
-    gap: 10px;
+    grid-template-columns: 46px minmax(0, 1fr) max-content;
+    gap: 12px;
+  }
+
+  .profileTransactionCard--skeleton .profileTransactionTop {
+    grid-template-columns: 46px minmax(0, 1fr) max-content;
   }
 
   .profileTransactionIcon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
   }
 
   .profileTransactionIcon svg {
-    width: 18px;
-    height: 18px;
+    width: 21px;
+    height: 21px;
   }
 
   .profileTransactionTitle {
-    gap: 5px;
+    gap: 7px;
   }
 
   .profileTransactionTitle h3 {
-    font-size: 13.25px;
+    font-size: 16px;
   }
 
   .profileTransactionBody p {
-    font-size: 10.75px;
+    font-size: 12.5px;
   }
 
   .profileTransactionAside {
+    position: absolute;
+    right: 14px;
+    bottom: 15px;
+    min-width: 68px;
     display: grid;
-    justify-items: end;
-    gap: 1px;
-    min-width: 82px;
+    justify-items: center;
+    align-content: center;
+    gap: 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(238, 224, 255, 0.92), rgba(248, 243, 255, 0.94));
+    text-align: center;
   }
 
   .profileTransactionCard--withActions .profileTransactionAside {
-    min-width: 82px;
-    padding-right: 24px;
+    min-width: 68px;
+  }
+
+  .profileTransactionAside--skeleton {
+    min-width: 68px;
+  }
+
+  .profileTransactionStatusSkeleton {
+    width: 94px;
+    height: 24px;
+    flex-basis: 94px;
+  }
+
+  .profileTransactionMenuSkeleton {
+    width: 26px;
+    height: 26px;
+    flex-basis: 26px;
   }
 
   .profileTransactionAside strong {
@@ -14618,18 +15086,13 @@ body:has(.invitePreviewShell) {
   }
 
   .profileTransactionAside span {
-    font-size: 8px;
-  }
-
-  .profileTransactionMenu {
-    top: 13px;
-    right: 12px;
+    display: none;
   }
 
   .profileTransactionMenuButton {
-    width: 22px;
-    height: 22px;
-    min-height: 22px;
+    width: 26px;
+    height: 26px;
+    min-height: 26px;
   }
 
   .profileTransactionAction {
@@ -14638,30 +15101,33 @@ body:has(.invitePreviewShell) {
   }
 
   .profileTransactionMeta {
-    gap: 8px;
-    font-size: 10.75px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    padding-right: 84px;
   }
 
   .profileTransactionMeta > span {
-    font-size: 10.75px;
+    font-size: 12px;
   }
 
   .profileTransactionRefundDetails {
-    font-size: 10.75px;
+    font-size: 12px;
   }
 
   .profileTransactions .paymentLinkAction,
   .profileTransactions .paymentInvoiceAction,
   .profileTransactions .paymentNoAction {
-    flex: 1 1 132px;
-    min-height: 32px;
-    font-size: 10.5px;
+    flex: 1 1 142px;
+    min-height: 36px;
+    font-size: 12px;
   }
 
   .profileHeaderButtons {
     width: 100%;
     align-items: stretch;
-    margin-top: -6px;
+    margin-top: 8px;
   }
 
   .profileHistoryButton,
@@ -14975,12 +15441,7 @@ body:has(.invitePreviewShell) {
   animation: skeletonPulseAnimation 1.6s ease-in-out infinite;
 }
 
-/* Profile size lift without changing layout */
-@media (min-width: 1181px) {
-  .profilePage {
-    zoom: 1.06;
-  }
-}
+
 
 @media (max-width: 767px) {
   .templateGrid {
@@ -16387,8 +16848,34 @@ body:has(.invitePreviewShell) {
 }
 
 .eventStateMessage.eventInProgressMessage {
+  width: min(100%, 360px);
+  margin: 16px auto 6px;
+  gap: 8px;
+  padding: 16px 16px 14px;
+  border-radius: 16px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(240, 250, 246, 0.45) 100%);
   border: 1px solid rgba(106, 171, 148, 0.35);
+}
+
+.eventInProgressMessage .eventStateIcon {
+  width: 38px;
+  height: 38px;
+}
+
+.eventInProgressMessage .eventStateIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.eventStateMessage.eventInProgressMessage .rsvpTitle {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+}
+
+.eventInProgressMessage .eventStateCopy {
+  max-width: 300px;
+  font-size: 0.74rem;
+  line-height: 1.4;
 }
 
 .eventStateIcon {
@@ -17069,6 +17556,16 @@ body:has(.invitationsPage) {
   backdrop-filter: blur(18px);
 }
 
+.profileControlsTitle {
+  display: grid;
+  gap: 4px;
+}
+
+.profileControlsTitle h2,
+.profileControlsTitle p {
+  margin: 0;
+}
+
 .profileSearchSkeleton {
   justify-self: end;
   width: 460px;
@@ -17433,12 +17930,12 @@ body:has(.invitationsPage) {
 }
 
 .profileInviteActions.profileInviteActions--published {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) 40px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 34px;
 }
 
 .profileInviteActions.profileInviteActions--published .profileActionOverflow,
 .profileInviteActions.profileInviteActions--published .profileActionBtn--more {
-  width: 40px;
+  width: 34px;
 }
 
 .profileInviteActions.profileInviteActions--published .profileActionBtn--more {
@@ -17447,12 +17944,12 @@ body:has(.invitationsPage) {
 
 .profileInviteActions .profileActionMenu .profileActionMenuItem {
   width: 100%;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 11px 0 8px;
+  border-radius: 11px;
   font-size: 12px;
-  gap: 8px;
+  gap: 9px;
 }
 
 @media (min-width: 901px) {

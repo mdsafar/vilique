@@ -28,10 +28,11 @@ import { Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { formatPaiseToCurrency } from "@/lib/currency";
 import { getTransactionLifecycle, TransactionLifecycleState } from "@/lib/payments/transactionLifecycle";
-import { useScrollPreservation } from "./NavigationStateProvider";
+import { useScrollPreservation, useNavigationState } from "./NavigationStateProvider";
 import { InvitationData } from "@/types/invitation";
 import { useToast } from "./Toast";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
 
 type PaymentRecord = {
     id: string;
@@ -115,6 +116,10 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
     const [activeTab, setActiveTab] = useState<ProfileTab>(() => getInitialProfileTab());
     const [hasOpenedTransactions, setHasOpenedTransactions] = useState(() => getInitialProfileTab() === "transactions");
     const [hasChangedTab, setHasChangedTab] = useState(false);
+    const { listSizes, setListSize } = useNavigationState();
+
+    const savedTemplateRatingsSize = listSizes["templateRatings"] ?? 1;
+    const savedPaymentsSize = listSizes["payments"] ?? 1;
 
     const {
         data: dashboardData,
@@ -129,29 +134,31 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         error: templateRatingsError,
         mutate: mutateTemplateRatings,
         setSize: setTemplateRatingsSize,
+        size: templateRatingsSize,
         isLoading: isTemplateRatingsLoading,
         isValidating: isTemplateRatingsValidating,
     } = useSWRInfinite<PaginatedTemplateRatings>((pageIndex, previousPageData) => {
         if (!dashboardData?.profile) return null;
-        if (previousPageData && !previousPageData.hasMore) return null;
-        const params = new URLSearchParams({ sort: "recently_used", limit: "9" });
+        if (shouldStopRequesting(previousPageData)) return null;
+        const params = new URLSearchParams({ sort: "recently_used", limit: "10" });
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
         return `/api/profile/template-ratings?${params.toString()}`;
-    }, null, { suspense: false, keepPreviousData: true, revalidateFirstPage: false });
+    }, null, { suspense: false, keepPreviousData: false, revalidateFirstPage: false, initialSize: savedTemplateRatingsSize });
     const {
         data: paymentsPages,
         error: paymentsFetchError,
         mutate: mutatePayments,
         setSize: setPaymentsSize,
+        size: paymentsSize,
         isLoading: isPaymentsInitialLoading,
         isValidating: isPaymentsValidating,
     } = useSWRInfinite<PaginatedPayments>((pageIndex, previousPageData) => {
         if (!dashboardData?.profile || !hasOpenedTransactions) return null;
-        if (previousPageData && !previousPageData.hasMore) return null;
+        if (shouldStopRequesting(previousPageData)) return null;
         const params = new URLSearchParams({ sort: "newest", limit: "10" });
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
         return `/api/profile/payments?${params.toString()}`;
-    }, null, { suspense: false, keepPreviousData: true, revalidateFirstPage: false });
+    }, null, { suspense: false, keepPreviousData: false, revalidateFirstPage: false, initialSize: savedPaymentsSize });
 
     // Register scroll preservation on this page path
     useScrollPreservation("/profile");
@@ -172,6 +179,10 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
 
     useEffect(() => {
         function handleProfileDataChanged() {
+            setListSize("templateRatings", 1);
+            setListSize("payments", 1);
+            void setTemplateRatingsSize(1);
+            void setPaymentsSize(1);
             void mutateDashboard();
             void mutateTemplateRatings();
             void mutatePayments();
@@ -179,7 +190,7 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
 
         window.addEventListener("vilique:profile-data-changed", handleProfileDataChanged);
         return () => window.removeEventListener("vilique:profile-data-changed", handleProfileDataChanged);
-    }, [mutateDashboard, mutatePayments, mutateTemplateRatings]);
+    }, [mutateDashboard, mutatePayments, mutateTemplateRatings, setTemplateRatingsSize, setPaymentsSize, setListSize]);
 
     if (dashboardError?.status === 401) {
         return (
@@ -221,9 +232,11 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
         totalSpent: 0,
     };
 
-    const templateRatings = (templateRatingsPages || []).flatMap((page) => page.ratings || page.items || []);
+    const rawTemplateRatings = (templateRatingsPages || []).flatMap((page) => page.ratings || page.items || []);
+    const templateRatings = deduplicateItems(rawTemplateRatings, "templateId");
     const templateRatingsHasMore = Boolean(templateRatingsPages?.[templateRatingsPages.length - 1]?.hasMore);
-    const payments = (paymentsPages || []).flatMap((page) => page.payments || page.items || []);
+    const rawPayments = (paymentsPages || []).flatMap((page) => page.payments || page.items || []);
+    const payments = deduplicateItems(rawPayments, "id");
     const paymentsLastPage = paymentsPages?.[paymentsPages.length - 1];
     const isTemplateRatingsInitialLoading = Boolean(profile)
         && isTemplateRatingsLoading
@@ -339,9 +352,20 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
                             isLoadingMore={isTemplateRatingsValidating && Boolean(templateRatingsPages?.length)}
                             hasMore={templateRatingsHasMore}
                             pageCount={templateRatingsPages?.length || 0}
-                            onLoadMore={() => setTemplateRatingsSize((current) => current + 1)}
+                            size={templateRatingsSize}
+                            onLoadMore={() => {
+                                setTemplateRatingsSize((current) => {
+                                    const next = current + 1;
+                                    setListSize("templateRatings", next);
+                                    return next;
+                                });
+                            }}
                             onRatingSaved={() => mutateTemplateRatings()}
-                            onRetry={() => mutateTemplateRatings()}
+                            onRetry={() => {
+                                setTemplateRatingsSize(1);
+                                setListSize("templateRatings", 1);
+                                mutateTemplateRatings();
+                            }}
                         />
                     }
                     transactionsPanel={
@@ -352,8 +376,19 @@ export default function ProfilePageClient({ initialDashboardData }: Props) {
                             isLoadingMore={isPaymentsValidating && Boolean(paymentsPages?.length)}
                             hasMore={Boolean(paymentsLastPage?.hasMore)}
                             pageCount={paymentsPages?.length || 0}
-                            onLoadMore={() => setPaymentsSize((current) => current + 1)}
-                            onRetry={() => mutatePayments()}
+                            size={paymentsSize}
+                            onLoadMore={() => {
+                                setPaymentsSize((current) => {
+                                    const next = current + 1;
+                                    setListSize("payments", next);
+                                    return next;
+                                });
+                            }}
+                            onRetry={() => {
+                                setPaymentsSize(1);
+                                setListSize("payments", 1);
+                                mutatePayments();
+                            }}
                         />
                     }
                 />
@@ -462,27 +497,29 @@ function ProfileActivityTabs({
             style={{ "--profile-fixed-section-height": `${fixedSectionHeight}px` } as CSSProperties}
         >
             <div className="profileFixedDesktopSection" ref={fixedSectionRef}>
-                <div className="profileActivityHeader" ref={headerRef}>
-                    {header}
-                </div>
-                <div className="profileTabList" role="tablist" aria-label="Profile sections">
-                    {tabs.map((tab, index) => (
-                        <button
-                            type="button"
-                            id={`profile-tab-${tab.id}`}
-                            key={tab.id}
-                            className={activeTab === tab.id ? "active" : ""}
-                            role="tab"
-                            aria-selected={activeTab === tab.id}
-                            aria-controls={`profile-panel-${tab.id}`}
-                            tabIndex={activeTab === tab.id ? 0 : -1}
-                            onClick={() => onTabChange(tab.id)}
-                            onKeyDown={(event) => handleTabKeyDown(event, index)}
-                        >
-                            <span>{tab.label}</span>
-                            {tab.count !== null ? <b>{tab.count}</b> : null}
-                        </button>
-                    ))}
+                <div className="profileFixedDesktopInner">
+                    <div className="profileActivityHeader" ref={headerRef}>
+                        {header}
+                    </div>
+                    <div className="profileTabList" role="tablist" aria-label="Profile sections">
+                        {tabs.map((tab, index) => (
+                            <button
+                                type="button"
+                                id={`profile-tab-${tab.id}`}
+                                key={tab.id}
+                                className={activeTab === tab.id ? "active" : ""}
+                                role="tab"
+                                aria-selected={activeTab === tab.id}
+                                aria-controls={`profile-panel-${tab.id}`}
+                                tabIndex={activeTab === tab.id ? 0 : -1}
+                                onClick={() => onTabChange(tab.id)}
+                                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                            >
+                                <span>{tab.label}</span>
+                                {tab.count !== null ? <b>{tab.count}</b> : null}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -513,6 +550,7 @@ function ProfileUsedTemplates({
     isLoadingMore,
     hasMore,
     pageCount,
+    size,
     onLoadMore,
     onRatingSaved,
     onRetry,
@@ -523,12 +561,13 @@ function ProfileUsedTemplates({
     isLoadingMore: boolean;
     hasMore: boolean;
     pageCount: number;
+    size: number;
     onLoadMore: () => void;
     onRatingSaved: () => void;
     onRetry: () => void;
 }) {
     const sentinelRef = useInfiniteScroll<HTMLDivElement>({
-        disabled: !hasMore || isLoadingMore,
+        disabled: shouldDisableSentinel({ hasMore, isLoading: isLoadingMore, size, pageCount }),
         onLoadMore,
     });
 
@@ -811,6 +850,7 @@ function ProfileTransactions({
     isLoadingMore,
     hasMore,
     pageCount,
+    size,
     onLoadMore,
     onRetry,
 }: {
@@ -820,11 +860,12 @@ function ProfileTransactions({
     isLoadingMore: boolean;
     hasMore: boolean;
     pageCount: number;
+    size: number;
     onLoadMore: () => void;
     onRetry: () => void;
 }) {
     const sentinelRef = useInfiniteScroll<HTMLDivElement>({
-        disabled: !hasMore || isLoadingMore,
+        disabled: shouldDisableSentinel({ hasMore, isLoading: isLoadingMore, size, pageCount }),
         onLoadMore,
     });
 
@@ -903,22 +944,27 @@ function PaymentSkeletonCard() {
                 <Skeleton className="profileTransactionIcon" rounded="lg" />
                 <div className="profileTransactionBody">
                     <div className="profileTransactionTitle">
-                        <TextSkeleton width={132} height={16} />
-                        <Skeleton style={{ width: 62, height: 20 }} rounded="full" />
+                        <TextSkeleton className="profileTransactionTitleSkeleton" width={132} height={16} />
                     </div>
-                    <TextSkeleton width={160} height={12} />
+                    <TextSkeleton className="profileTransactionSubtitleSkeleton" width={160} height={12} />
                 </div>
-                <div className="profileTransactionAside">
-                    <TextSkeleton width={52} height={20} />
-                    <TextSkeleton width={26} height={10} />
+                <div className="profileTransactionHeaderActions">
+                    <Skeleton className="profileTransactionStatusSkeleton" rounded="full" />
+                    <Skeleton className="profileTransactionMenuSkeleton" rounded="md" />
+                </div>
+                <div className="profileTransactionAside profileTransactionAside--skeleton">
+                    <TextSkeleton className="profileTransactionAmountSkeleton" width={52} height={20} />
                 </div>
             </div>
             <div className="profileTransactionMeta">
-                <TextSkeleton width={160} height={12} />
-                <TextSkeleton width={140} height={18} />
-            </div>
-            <div className="profileTransactionAction">
-                <Skeleton style={{ width: 134, height: 30 }} rounded="lg" />
+                <span className="profileTransactionMetaSkeleton">
+                    <Skeleton className="profileTransactionMetaIconSkeleton" rounded="sm" />
+                    <TextSkeleton className="profileTransactionMetaTextSkeleton" width={132} height={12} />
+                </span>
+                <span className="profileTransactionMetaSkeleton profileTransactionMetaSkeleton--receipt">
+                    <Skeleton className="profileTransactionMetaIconSkeleton" rounded="sm" />
+                    <TextSkeleton className="profileTransactionMetaTextSkeleton" width={150} height={12} />
+                </span>
             </div>
         </article>
     );
@@ -998,11 +1044,68 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
                     <p>
                         <strong>{invitationTitle}</strong>
                     </p>
+                </div>
 
-                    <span className={`paymentStatusBadge ${status.className}`}>
+                <div className="profileTransactionHeaderActions">
+                    <span className={`paymentStatusBadge profileTransactionHeaderBadge ${status.className}`}>
                         <StatusIcon size={12} />
                         <span>{status.label}</span>
                     </span>
+
+                    {showActions ? (
+                        <div className="profileTransactionMenu" ref={actionMenuRef}>
+                            <button
+                                type="button"
+                                className="profileTransactionMenuButton"
+                                aria-label="Transaction actions"
+                                aria-expanded={isActionMenuOpen}
+                                onClick={() => setIsActionMenuOpen((current) => !current)}
+                            >
+                                <MoreVertical size={16} aria-hidden="true" />
+                            </button>
+
+                            {isActionMenuOpen ? (
+                                <div className="profileTransactionMenuPanel" role="menu">
+                                    {lifecycle === "refund_pending" ? (
+                                        <span className="profileTransactionMenuItem profileTransactionMenuItem--muted" role="menuitem">
+                                            <Loader2 size={13} className="spinner" />
+                                            <span>Refund Pending</span>
+                                        </span>
+                                    ) : null}
+
+                                    {canDownloadInvoice ? (
+                                        <button
+                                            type="button"
+                                            className="profileTransactionMenuItem"
+                                            role="menuitem"
+                                            onClick={() => handleDownloadDocument("invoice")}
+                                            disabled={Boolean(downloadingDocument)}
+                                        >
+                                            {isDownloadingInvoice ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
+                                            <span>{isDownloadingInvoice ? "Preparing..." : "Invoice"}</span>
+                                        </button>
+                                    ) : null}
+
+                                    {canDownloadRefundReceipt ? (
+                                        <button
+                                            type="button"
+                                            className="profileTransactionMenuItem"
+                                            role="menuitem"
+                                            onClick={() => handleDownloadDocument("refund")}
+                                            disabled={Boolean(downloadingDocument)}
+                                        >
+                                            {isDownloadingRefund ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
+                                            <span>{isDownloadingRefund ? "Preparing..." : "Refund Receipt"}</span>
+                                        </button>
+                                    ) : showRefundPendingReceiptMessage ? (
+                                        <span className="profileTransactionMenuItem profileTransactionMenuItem--muted" role="menuitem">
+                                            Refund receipt after completion
+                                        </span>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="profileTransactionAside">
@@ -1010,61 +1113,6 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
                     <span>{payment.currency}</span>
                 </div>
             </div>
-
-            {showActions ? (
-                <div className="profileTransactionMenu" ref={actionMenuRef}>
-                    <button
-                        type="button"
-                        className="profileTransactionMenuButton"
-                        aria-label="Transaction actions"
-                        aria-expanded={isActionMenuOpen}
-                        onClick={() => setIsActionMenuOpen((current) => !current)}
-                    >
-                        <MoreVertical size={16} aria-hidden="true" />
-                    </button>
-
-                    {isActionMenuOpen ? (
-                        <div className="profileTransactionMenuPanel" role="menu">
-                            {lifecycle === "refund_pending" ? (
-                                <span className="profileTransactionMenuItem profileTransactionMenuItem--muted" role="menuitem">
-                                    <Loader2 size={13} className="spinner" />
-                                    <span>Refund Pending</span>
-                                </span>
-                            ) : null}
-
-                            {canDownloadInvoice ? (
-                                <button
-                                    type="button"
-                                    className="profileTransactionMenuItem"
-                                    role="menuitem"
-                                    onClick={() => handleDownloadDocument("invoice")}
-                                    disabled={Boolean(downloadingDocument)}
-                                >
-                                    {isDownloadingInvoice ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
-                                    <span>{isDownloadingInvoice ? "Preparing..." : "Invoice"}</span>
-                                </button>
-                            ) : null}
-
-                            {canDownloadRefundReceipt ? (
-                                <button
-                                    type="button"
-                                    className="profileTransactionMenuItem"
-                                    role="menuitem"
-                                    onClick={() => handleDownloadDocument("refund")}
-                                    disabled={Boolean(downloadingDocument)}
-                                >
-                                    {isDownloadingRefund ? <Loader2 size={13} className="spinner" /> : <Download size={13} />}
-                                    <span>{isDownloadingRefund ? "Preparing..." : "Refund Receipt"}</span>
-                                </button>
-                            ) : showRefundPendingReceiptMessage ? (
-                                <span className="profileTransactionMenuItem profileTransactionMenuItem--muted" role="menuitem">
-                                    Refund receipt after completion
-                                </span>
-                            ) : null}
-                        </div>
-                    ) : null}
-                </div>
-            ) : null}
 
             {status.message ? (
                 <div className={`profileTransactionNotice ${status.className}`}>
@@ -1080,10 +1128,12 @@ function PaymentRecordCard({ payment }: { payment: PaymentRecord }) {
 
             <div className="profileTransactionMeta">
                 <span className="profileTransactionDate">
+                    <Calendar size={13} aria-hidden="true" />
                     <span>{dateString}</span>
                 </span>
                 {payment.receipt ? (
                     <span className="profileTransactionRef">
+                        <Receipt size={13} aria-hidden="true" />
                         Receipt #{formatTransactionReference(payment.receipt)}
                     </span>
                 ) : null}

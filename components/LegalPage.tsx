@@ -51,7 +51,7 @@ export function LegalPage({
         <>
             <main className="legalPage">
                 <header className="legalHero">
-                    <Link href="/templates" className="legalBack">
+                    <Link href="/" className="legalBack">
                         <ArrowLeft size={16} aria-hidden="true" />
                         <span>Back to Vilique</span>
                     </Link>

@@ -1,7 +1,13 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
+    const { pathname } = request.nextUrl;
+    if (pathname === "/templates" || pathname === "/templates/") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        return NextResponse.redirect(url, 308);
+    }
     return updateSession(request);
 }
 

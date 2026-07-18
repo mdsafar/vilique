@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useSyncExternalStore } from "react";
+import React, { createContext, useContext, useState, useEffect, useSyncExternalStore, useCallback } from "react";
 
 type NavigationState = {
     templatesSearch: string;
@@ -13,52 +13,86 @@ type NavigationState = {
     setInvitationsFilter: (s: string) => void;
     scrollPositions: Record<string, number>;
     setScrollPosition: (path: string, y: number) => void;
+    listSizes: Record<string, number>;
+    setListSize: (listKey: string, size: number) => void;
+};
+
+type QueryBackedState = {
+    value: string;
+    touched: boolean;
+    source: string | null;
 };
 
 const NavigationStateContext = createContext<NavigationState | undefined>(undefined);
 
+function createQueryBackedState(source: string | null, defaultValue: string): QueryBackedState {
+    return {
+        value: source ?? defaultValue,
+        touched: false,
+        source,
+    };
+}
+
+function getQueryBackedValue(state: QueryBackedState, source: string | null, defaultValue: string) {
+    if (state.source !== source) return source ?? defaultValue;
+    return state.touched ? state.value : source ?? state.value;
+}
+
 export function NavigationStateProvider({ children }: { children: React.ReactNode }) {
-    const templatesSearchFromUrl = useUrlQueryValue("/templates", "search");
-    const templatesFilterFromUrl = useUrlQueryValue("/templates", "category");
+    const templatesSearchFromUrl = useUrlQueryValue("/", "search");
+    const templatesFilterFromUrl = useUrlQueryValue("/", "category");
     const invitationsSearchFromUrl = useUrlQueryValue("/invitations", "search");
     const invitationsFilterFromUrl = useUrlQueryValue("/invitations", "status");
-    const [templatesSearchState, setTemplatesSearchState] = useState("");
-    const [templatesFilterState, setTemplatesFilterState] = useState("all");
-    const [invitationsSearchState, setInvitationsSearchState] = useState("");
-    const [invitationsFilterState, setInvitationsFilterState] = useState("all");
-    const [templatesSearchTouched, setTemplatesSearchTouched] = useState(false);
-    const [templatesFilterTouched, setTemplatesFilterTouched] = useState(false);
-    const [invitationsSearchTouched, setInvitationsSearchTouched] = useState(false);
-    const [invitationsFilterTouched, setInvitationsFilterTouched] = useState(false);
+    const resetFromUrl = useUrlQueryValue("/invitations", "reset");
+    const isInvitationsReset = resetFromUrl === "1";
+    const activeInvitationsSearchFromUrl = isInvitationsReset ? null : invitationsSearchFromUrl;
+    const activeInvitationsFilterFromUrl = isInvitationsReset ? null : invitationsFilterFromUrl;
+    const [templatesSearchState, setTemplatesSearchState] = useState(() => createQueryBackedState(templatesSearchFromUrl, ""));
+    const [templatesFilterState, setTemplatesFilterState] = useState(() => createQueryBackedState(templatesFilterFromUrl, "all"));
+    const [invitationsSearchState, setInvitationsSearchState] = useState(() => createQueryBackedState(activeInvitationsSearchFromUrl, ""));
+    const [invitationsFilterState, setInvitationsFilterState] = useState(() => createQueryBackedState(activeInvitationsFilterFromUrl, "all"));
     const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
-    const templatesSearch = templatesSearchTouched ? templatesSearchState : templatesSearchFromUrl ?? templatesSearchState;
-    const templatesFilter = templatesFilterTouched ? templatesFilterState : templatesFilterFromUrl ?? templatesFilterState;
-    const invitationsSearch = invitationsSearchTouched ? invitationsSearchState : invitationsSearchFromUrl ?? invitationsSearchState;
-    const invitationsFilter = invitationsFilterTouched ? invitationsFilterState : invitationsFilterFromUrl ?? invitationsFilterState;
+    const [listSizes, setListSizes] = useState<Record<string, number>>({});
 
-    const setTemplatesSearch = (value: string) => {
-        setTemplatesSearchTouched(true);
-        setTemplatesSearchState(value);
-    };
+    useEffect(() => {
+        if (resetFromUrl === "1" && typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            params.delete("reset");
+            const nextUrl = params.toString() ? `/invitations?${params.toString()}` : "/invitations";
+            window.history.replaceState(null, "", nextUrl);
+            window.dispatchEvent(new PopStateEvent("popstate"));
+        }
+    }, [resetFromUrl]);
 
-    const setTemplatesFilter = (value: string) => {
-        setTemplatesFilterTouched(true);
-        setTemplatesFilterState(value);
-    };
+    const templatesSearch = getQueryBackedValue(templatesSearchState, templatesSearchFromUrl, "");
+    const templatesFilter = getQueryBackedValue(templatesFilterState, templatesFilterFromUrl, "all");
+    const invitationsSearch = getQueryBackedValue(invitationsSearchState, activeInvitationsSearchFromUrl, "");
+    const invitationsFilter = getQueryBackedValue(invitationsFilterState, activeInvitationsFilterFromUrl, "all");
+    const effectiveListSizes = isInvitationsReset ? { ...listSizes, invitations: 1 } : listSizes;
 
-    const setInvitationsSearch = (value: string) => {
-        setInvitationsSearchTouched(true);
-        setInvitationsSearchState(value);
-    };
+    const setTemplatesSearch = useCallback((value: string) => {
+        setTemplatesSearchState({ value, touched: true, source: templatesSearchFromUrl });
+    }, [templatesSearchFromUrl]);
 
-    const setInvitationsFilter = (value: string) => {
-        setInvitationsFilterTouched(true);
-        setInvitationsFilterState(value);
-    };
+    const setTemplatesFilter = useCallback((value: string) => {
+        setTemplatesFilterState({ value, touched: true, source: templatesFilterFromUrl });
+    }, [templatesFilterFromUrl]);
 
-    const setScrollPosition = (path: string, y: number) => {
+    const setInvitationsSearch = useCallback((value: string) => {
+        setInvitationsSearchState({ value, touched: true, source: activeInvitationsSearchFromUrl });
+    }, [activeInvitationsSearchFromUrl]);
+
+    const setInvitationsFilter = useCallback((value: string) => {
+        setInvitationsFilterState({ value, touched: true, source: activeInvitationsFilterFromUrl });
+    }, [activeInvitationsFilterFromUrl]);
+
+    const setScrollPosition = useCallback((path: string, y: number) => {
         setScrollPositions((prev) => ({ ...prev, [path]: y }));
-    };
+    }, []);
+
+    const setListSize = useCallback((listKey: string, size: number) => {
+        setListSizes((prev) => ({ ...prev, [listKey]: size }));
+    }, []);
 
     return (
         <NavigationStateContext.Provider
@@ -73,6 +107,8 @@ export function NavigationStateProvider({ children }: { children: React.ReactNod
                 setInvitationsFilter,
                 scrollPositions,
                 setScrollPosition,
+                listSizes: effectiveListSizes,
+                setListSize,
             }}
         >
             {children}

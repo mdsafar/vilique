@@ -46,20 +46,20 @@ export default function BottomNav({ initialUser }: Props) {
         };
     }, []);
 
-    const hiddenRoutes = ["/builder", "/invite", "/templates/", "/signup", "/dashboard/payment-history"];
-    const protectedNavRoutes = ["/invitations", "/profile", "/dashboard"];
+    const hiddenRoutes = ["/builder", "/invite", "/templates/", "/signup"];
+    const protectedNavRoutes = ["/invitations", "/profile"];
     const isProtectedNavRoute = protectedNavRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
     const profileName = getProfileName(user);
     const profileImage = getProfileImage(user);
     const profileInitials = getInitials(profileName || user?.email || "User");
     const navItems = useMemo(() => {
         const baseItems = [
-            { href: "/templates", label: "Templates", icon: LayoutGrid, active: pathname === "/" || pathname.startsWith("/templates") },
+            { href: "/", label: "Templates", icon: LayoutGrid, active: pathname === "/" || (pathname.startsWith("/templates") && !pathname.startsWith("/templates/")) },
             {
                 href: "/invitations",
                 label: "Invitations",
                 icon: Mail,
-                active: pathname.startsWith("/invitations") || pathname.startsWith("/dashboard"),
+                active: pathname.startsWith("/invitations"),
             },
         ];
 

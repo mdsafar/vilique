@@ -161,7 +161,7 @@ export async function DELETE(_request: Request, { params }: Context) {
         .select("id")
         .eq("invitation_id", id)
         .eq("user_id", user.id)
-        .eq("status", "paid")
+        .in("status", ["paid", "published"])
         .maybeSingle();
 
     if (paidPayment || invite.payment_status === "paid" || invite.first_published_at) {

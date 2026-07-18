@@ -13,6 +13,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import TemplateCardSkeleton from "@/components/skeletons/TemplateCardSkeleton";
 import { ButtonSkeleton } from "@/components/ui/Skeleton";
+import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
 
 type TemplateItem = {
     id: string;
@@ -58,34 +59,53 @@ export default function TemplatesCatalog() {
         setTemplatesSearch: setSearchTerm,
         templatesFilter: activeCategory,
         setTemplatesFilter: setActiveCategory,
+        listSizes,
+        setListSize,
     } = useNavigationState();
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const [isMobileHeaderCollapsed, setIsMobileHeaderCollapsed] = useState(false);
+    const savedSize = listSizes["templates"] ?? 1;
+
+    const getFirstPageKey = (category: string, search: string) => {
+        const params = new URLSearchParams({
+            category,
+            sort: "popular",
+            limit: "10",
+        });
+        if (search) params.set("search", search);
+        return `/api/templates?${params.toString()}`;
+    };
+
     const {
         data,
         error,
+        size,
         setSize,
         isLoading,
         isValidating,
         mutate,
     } = useSWRInfinite<TemplatesResponse>((pageIndex, previousPageData) => {
-        if (previousPageData && !previousPageData.hasMore) return null;
+        if (shouldStopRequesting(previousPageData)) return null;
         const params = new URLSearchParams({
             category: activeCategory,
             sort: "popular",
-            limit: "12",
+            limit: "10",
         });
         if (debouncedSearch) params.set("search", debouncedSearch);
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
         return `/api/templates?${params.toString()}`;
     }, null, {
         suspense: false,
-        keepPreviousData: true,
+        keepPreviousData: false,
         revalidateFirstPage: false,
-        onSuccess: (templatePages) => {
-            const nextCounts = templatePages?.[0]?.counts;
-            if (nextCounts) setCachedCounts(nextCounts);
+        initialSize: savedSize,
+        onSuccess: (templatePages, key) => {
+            const currentActiveKey = getFirstPageKey(activeCategory, debouncedSearch);
+            if (key && key.includes(currentActiveKey)) {
+                const nextCounts = templatePages?.[0]?.counts;
+                if (nextCounts) setCachedCounts(nextCounts);
+            }
         },
     });
     const todayLabel = new Intl.DateTimeFormat("en-US", {
@@ -93,7 +113,8 @@ export default function TemplatesCatalog() {
         day: "2-digit",
     }).format(new Date()).toUpperCase();
     const pages = data || [];
-    const templates = pages.flatMap((page) => page.items);
+    const rawTemplates = pages.flatMap((page) => page.items);
+    const templates = deduplicateItems(rawTemplates, "id");
     const latestCounts = pages[0]?.counts;
     const counts = latestCounts || cachedCounts || { all: 0 };
     const categories = Object.keys(categoryLabels).filter((category) => category === "all" || counts[category] > 0) as (InvitationCategory | "all")[];
@@ -110,21 +131,45 @@ export default function TemplatesCatalog() {
     const isSearching = searchTerm !== debouncedSearch;
     const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
     const isLoadingInitialTabs = isLoading && !pages.length && !cachedCounts;
-    const isLoadingNextPage = isValidating && pages.length > 0;
+    const isLoadingNextPage = isValidating && pages.length > 0 && hasMore && size > pages.length;
+
+    const handleLoadMore = () => {
+        setSize((current) => {
+            const next = current + 1;
+            setListSize("templates", next);
+            return next;
+        });
+    };
+
     const sentinelRef = useInfiniteScroll<HTMLDivElement>({
-        disabled: !hasMore || isLoadingNextPage,
-        onLoadMore: () => setSize((current) => current + 1),
+        disabled: shouldDisableSentinel({ hasMore, isLoading: isLoadingNextPage, size, pageCount: pages.length }),
+        onLoadMore: handleLoadMore,
     });
 
     useEffect(() => {
-        if (window.location.pathname !== "/templates") return;
+        if (size !== 1) {
+            setSize(1);
+        }
+        if (listSizes["templates"] !== 1) {
+            setListSize("templates", 1);
+        }
+    }, [activeCategory, debouncedSearch, size, listSizes, setSize, setListSize]);
+
+    useEffect(() => {
+        if (window.location.pathname !== "/") return;
         const params = new URLSearchParams(window.location.search);
-        if (activeCategory === "all") params.delete("category");
-        else params.set("category", activeCategory);
-        if (debouncedSearch) params.set("search", debouncedSearch);
-        else params.delete("search");
-        const nextUrl = params.toString() ? `/templates?${params.toString()}` : "/templates";
-        window.history.replaceState(null, "", nextUrl);
+        
+        const nextParams = new URLSearchParams();
+        if (activeCategory !== "all") nextParams.set("category", activeCategory);
+        if (debouncedSearch) nextParams.set("search", debouncedSearch);
+        
+        params.sort();
+        nextParams.sort();
+        
+        if (params.toString() !== nextParams.toString()) {
+            const nextUrl = nextParams.toString() ? `/?${nextParams.toString()}` : "/";
+            window.history.replaceState(null, "", nextUrl);
+        }
     }, [activeCategory, debouncedSearch]);
 
     useEffect(() => {
@@ -180,7 +225,7 @@ export default function TemplatesCatalog() {
                     <header className="marketHeader">
                         <div className="marketHeaderTop">
                             <div className="templatesAppHeader" aria-label="Vilique">
-                                <Link href="/templates" className="templatesBrand">
+                                <Link href="/" className="templatesBrand">
                                     <AppLogo size={36} />
                                 </Link>
                             </div>
@@ -229,7 +274,7 @@ export default function TemplatesCatalog() {
                     actionLabel="Try again"
                     className="templatesListState"
                     description="We could not load the template catalog. Check your connection and try again."
-                    onAction={() => void mutate()}
+                    onAction={() => { setSize(1); setListSize("templates", 1); void mutate(); }}
                     title="Templates did not load"
                     variant="error"
                 />

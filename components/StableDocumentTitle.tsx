@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 const titleByPath = [
-    { test: (path: string) => path === "/", title: "Templates | Vilique" },
-    { test: (path: string) => path.startsWith("/invitations") || path.startsWith("/dashboard"), title: "Invitations | Vilique" },
+    { test: (path: string) => path === "/", title: "Vilique" },
+    { test: (path: string) => path.startsWith("/invitations"), title: "Invitations | Vilique" },
     { test: (path: string) => path.startsWith("/profile"), title: "Profile | Vilique" },
     { test: (path: string) => path.startsWith("/builder/preview"), title: "Preview | Vilique" },
     { test: (path: string) => path.startsWith("/builder"), title: "Builder | Vilique" },
