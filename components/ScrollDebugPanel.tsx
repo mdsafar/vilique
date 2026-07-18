@@ -36,11 +36,40 @@ type ScrollDebugSnapshot = {
         clientHeight: number;
         overflowY: string;
     }>;
+    thanksLayout: ThanksLayoutSnapshot;
 };
 
 type ScrollDebugApi = {
     record: (stage: string, source?: string) => void;
     setView: (view: string, source?: string) => void;
+    setThanksRoot: (element: HTMLElement | null, source?: string) => void;
+};
+
+type ElementRectSnapshot = {
+    label: string;
+    top: number;
+    bottom: number;
+    height: number;
+    offsetTop: number | null;
+    marginTop: string;
+    paddingTop: string;
+    transform: string;
+    position: string;
+    topStyle: string;
+    display: string;
+    visibility: string;
+    opacity: string;
+};
+
+type ThanksLayoutSnapshot = {
+    present: boolean;
+    root: ElementRectSnapshot | null;
+    parentRects: ElementRectSnapshot[];
+    inviteScreens: ElementRectSnapshot[];
+    inviteScreenMounted: boolean;
+    inviteScreenLayoutAboveThanks: boolean;
+    visualViewportOffsetTop: number | null;
+    visualViewportHeight: number | null;
 };
 
 type Props = {
@@ -72,6 +101,7 @@ export default function ScrollDebugPanel({ enabled, invitationRootRef, currentVi
 
         let snapshotId = 0;
         let currentDebugView = currentView;
+        let thanksRoot: HTMLElement | null = null;
         const originals = installScrollInstrumentation((stage, source) => {
             record(stage, source);
         });
@@ -82,7 +112,8 @@ export default function ScrollDebugPanel({ enabled, invitationRootRef, currentVi
                 stage,
                 source,
                 currentDebugView,
-                invitationRootRef.current
+                invitationRootRef.current,
+                thanksRoot
             );
             setSnapshots((items) => [snapshot, ...items].slice(0, MAX_SNAPSHOTS));
         }
@@ -92,6 +123,10 @@ export default function ScrollDebugPanel({ enabled, invitationRootRef, currentVi
             setView: (nextView, source = "debug") => {
                 currentDebugView = nextView;
                 record(`RSVP view changed: ${nextView}`, source);
+            },
+            setThanksRoot: (element, source = "debug") => {
+                thanksRoot = element;
+                record(element ? "Thanks root registered" : "Thanks root cleared", source);
             },
         };
         window._logState = (label: string) => record(label, "legacy _logState");
@@ -142,6 +177,18 @@ export default function ScrollDebugPanel({ enabled, invitationRootRef, currentVi
                 <DebugValue label="invite root scrollTop" value={formatNumber(latest?.invitationRootScrollTop)} />
                 <DebugValue label="activeElement" value={latest?.activeElement || "-"} />
             </div>
+            <div style={sectionTitleStyle}>Thanks Layout</div>
+            <pre style={preStyle}>
+                {formatThanksLayout(latest?.thanksLayout)}
+            </pre>
+            <div style={sectionTitleStyle}>Thanks Parents</div>
+            <pre style={preStyle}>
+                {(latest?.thanksLayout.parentRects.length ? latest.thanksLayout.parentRects : []).map(formatElementRect).join("\n") || "-"}
+            </pre>
+            <div style={sectionTitleStyle}>Invitation Screens</div>
+            <pre style={preStyle}>
+                {(latest?.thanksLayout.inviteScreens.length ? latest.thanksLayout.inviteScreens : []).map(formatElementRect).join("\n") || "-"}
+            </pre>
             <div style={sectionTitleStyle}>Scrollable Ancestors</div>
             <pre style={preStyle}>
                 {(latest?.ancestors.length ? latest.ancestors : []).map((item) =>
@@ -172,7 +219,8 @@ function createSnapshot(
     stage: string,
     source: string,
     view: string,
-    invitationRoot: HTMLElement | null
+    invitationRoot: HTMLElement | null,
+    thanksRoot: HTMLElement | null
 ): ScrollDebugSnapshot {
     const scrollingElement = document.scrollingElement;
     const now = new Date();
@@ -193,6 +241,61 @@ function createSnapshot(
         invitationRootScrollTop: readNumber(() => invitationRoot?.scrollTop),
         activeElement: describeElement(document.activeElement),
         ancestors: getScrollableAncestors(invitationRoot),
+        thanksLayout: getThanksLayoutSnapshot(thanksRoot),
+    };
+}
+
+function getThanksLayoutSnapshot(thanksRoot: HTMLElement | null): ThanksLayoutSnapshot {
+    const root = thanksRoot && document.documentElement.contains(thanksRoot)
+        ? readElementRect(thanksRoot)
+        : null;
+    const inviteScreens = Array.from(document.querySelectorAll<HTMLElement>(".inviteScreen"))
+        .map(readElementRect);
+    const parentRects: ElementRectSnapshot[] = [];
+
+    if (thanksRoot && document.documentElement.contains(thanksRoot)) {
+        let current = thanksRoot.parentElement;
+        while (current) {
+            parentRects.push(readElementRect(current));
+            current = current.parentElement;
+        }
+    }
+
+    return {
+        present: Boolean(root),
+        root,
+        parentRects,
+        inviteScreens,
+        inviteScreenMounted: inviteScreens.length > 0,
+        inviteScreenLayoutAboveThanks: Boolean(root && inviteScreens.some((item) =>
+            item.display !== "none" &&
+            item.visibility !== "hidden" &&
+            Number(item.opacity) !== 0 &&
+            item.height > 0 &&
+            item.bottom <= root.top
+        )),
+        visualViewportOffsetTop: readNumber(() => window.visualViewport?.offsetTop),
+        visualViewportHeight: readNumber(() => window.visualViewport?.height),
+    };
+}
+
+function readElementRect(element: HTMLElement): ElementRectSnapshot {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return {
+        label: describeElement(element),
+        top: roundNumber(rect.top),
+        bottom: roundNumber(rect.bottom),
+        height: roundNumber(rect.height),
+        offsetTop: readNumber(() => element.offsetTop),
+        marginTop: style.marginTop,
+        paddingTop: style.paddingTop,
+        transform: style.transform,
+        position: style.position,
+        topStyle: style.top,
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
     };
 }
 
@@ -339,6 +442,26 @@ function readNumber(read: () => number | undefined) {
 
 function formatNumber(value: number | null | undefined) {
     return typeof value === "number" ? String(value) : "-";
+}
+
+function roundNumber(value: number) {
+    return Math.round(value * 10) / 10;
+}
+
+function formatElementRect(item: ElementRectSnapshot) {
+    return `${item.label} rect.top=${item.top} bottom=${item.bottom} h=${item.height} offsetTop=${formatNumber(item.offsetTop)} marginTop=${item.marginTop} paddingTop=${item.paddingTop} transform=${item.transform} position=${item.position} top=${item.topStyle} display=${item.display} visibility=${item.visibility} opacity=${item.opacity}`;
+}
+
+function formatThanksLayout(layout: ThanksLayoutSnapshot | undefined) {
+    if (!layout) return "-";
+    const rootLine = layout.root ? formatElementRect(layout.root) : "thanksRoot=null";
+    return [
+        `present=${String(layout.present)}`,
+        `visualViewport offsetTop=${formatNumber(layout.visualViewportOffsetTop)} height=${formatNumber(layout.visualViewportHeight)}`,
+        `inviteScreenMounted=${String(layout.inviteScreenMounted)}`,
+        `inviteScreenLayoutAboveThanks=${String(layout.inviteScreenLayoutAboveThanks)}`,
+        rootLine,
+    ].join("\n");
 }
 
 const panelStyle = {

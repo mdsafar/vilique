@@ -623,15 +623,30 @@ function ThanksCard({
     const containerRef = useRef<HTMLElement>(null);
 
     useLayoutEffect(() => {
+        window.__viliqueScrollDebug?.setThanksRoot(containerRef.current, "ThanksCard useLayoutEffect");
+        window.__viliqueScrollDebug?.record("Immediately when Thanks mounts", "ThanksCard useLayoutEffect");
         const winObj = window as unknown as { _logState?: (label: string) => void };
         if (winObj._logState) winObj._logState("ThanksCard useLayoutEffect");
         resetInvitationScroll(containerRef.current);
     }, []);
 
     useEffect(() => {
+        window.__viliqueScrollDebug?.record("Thanks layout one animation frame queued", "ThanksCard useEffect");
+        window.requestAnimationFrame(() => {
+            window.__viliqueScrollDebug?.record("Thanks layout one animation frame later", "ThanksCard useEffect");
+        });
+        window.setTimeout(() => {
+            window.__viliqueScrollDebug?.record("Thanks layout 500ms later", "ThanksCard useEffect");
+        }, 500);
+        window.setTimeout(() => {
+            window.__viliqueScrollDebug?.record("Thanks layout 1000ms later", "ThanksCard useEffect");
+        }, 1000);
         const winObj = window as unknown as { _logState?: (label: string) => void };
         if (winObj._logState) winObj._logState("ThanksCard useEffect");
         scheduleInvitationScrollReset(containerRef.current);
+        return () => {
+            window.__viliqueScrollDebug?.setThanksRoot(null, "ThanksCard cleanup");
+        };
     }, []);
 
     return (
