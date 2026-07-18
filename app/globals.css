@@ -11588,6 +11588,17 @@ p {
 .invitePreviewShell {
   position: relative;
   isolation: isolate;
+  overflow-anchor: none;
+}
+
+.publicInviteScrollAnchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  overflow-anchor: none;
 }
 
 .publicInvitationWrapper::before,

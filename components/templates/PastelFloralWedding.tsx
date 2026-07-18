@@ -380,9 +380,9 @@ export default function PastelFloralWedding({
 
     function handleChangeRsvp() {
         if (rsvpProcessing) return;
+        scheduleInvitationScrollReset(pageRef.current);
         setIsAccepted(false);
         onChangeRsvp?.();
-        scheduleInvitationScrollReset(pageRef.current);
     }
 
     function handleDecline(event: MouseEvent<HTMLButtonElement>) {

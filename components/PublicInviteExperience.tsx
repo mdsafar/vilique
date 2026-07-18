@@ -26,6 +26,9 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const [rsvpStatus, setRsvpStatus] = useState<RSVPStatus | null>(null);
     const [isChangingResponse, setIsChangingResponse] = useState(false);
     const [isRsvpSubmitting, setIsRsvpSubmitting] = useState(false);
+    const shellRef = useRef<HTMLDivElement>(null);
+    const topAnchorRef = useRef<HTMLDivElement>(null);
+    const previousVisibleScreenRef = useRef<boolean | null>(null);
     const guestTokenRef = useRef("");
     const rsvpRequestIdRef = useRef(0);
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
@@ -66,6 +69,18 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             void trackInvitationEvent(invitation.id, "view");
         }
     }, [invitation.id, isPublic]);
+
+    useLayoutEffect(() => {
+        if (previousVisibleScreenRef.current === null) {
+            previousVisibleScreenRef.current = showAccepted;
+            return;
+        }
+
+        if (previousVisibleScreenRef.current !== showAccepted) {
+            previousVisibleScreenRef.current = showAccepted;
+            schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
+        }
+    }, [showAccepted]);
 
     useEffect(() => {
         if (!isPublic) {
@@ -155,7 +170,8 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     }
 
     return (
-        <div className="invitePreviewShell">
+        <div className="invitePreviewShell" ref={shellRef}>
+            <div className="publicInviteScrollAnchor" ref={topAnchorRef} aria-hidden="true" />
             <TemplateRenderer
                 invitation={invitation}
                 accepted={showAccepted}
@@ -163,6 +179,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 onAccept={() => submitRsvp("accepted")}
                 onDecline={() => submitRsvp("declined")}
                 onChangeRsvp={() => {
+                    schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
                     if (isPublic) {
                         setIsChangingResponseFlag(invitation.id);
                         rsvpRequestIdRef.current += 1;
@@ -180,6 +197,49 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             />
         </div>
     );
+}
+
+function schedulePublicInviteScrollReset(shell: HTMLElement | null, anchor: HTMLElement | null) {
+    const run = () => resetPublicInviteScroll(shell, anchor);
+    run();
+    window.requestAnimationFrame(() => {
+        run();
+        window.requestAnimationFrame(run);
+    });
+    window.setTimeout(run, 80);
+    window.setTimeout(run, 220);
+    window.setTimeout(run, 420);
+}
+
+function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement | null) {
+    const previousHtmlScrollBehavior = document.documentElement.style.scrollBehavior;
+    const previousBodyScrollBehavior = document.body.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = "auto";
+    document.body.style.scrollBehavior = "auto";
+
+    try {
+        anchor?.scrollIntoView({ block: "start", inline: "nearest", behavior: "auto" });
+        const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
+        const scrollingElement = document.scrollingElement || document.documentElement;
+
+        window.scrollTo(scrollOptions);
+        window.scrollTo(0, 0);
+        scrollingElement.scrollTo(scrollOptions);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+
+        let current: HTMLElement | null = shell;
+        while (current) {
+            if (current.scrollHeight > current.clientHeight) {
+                current.scrollTo(scrollOptions);
+                current.scrollTop = 0;
+            }
+            current = current.parentElement;
+        }
+    } finally {
+        document.documentElement.style.scrollBehavior = previousHtmlScrollBehavior;
+        document.body.style.scrollBehavior = previousBodyScrollBehavior;
+    }
 }
 
 function getOrCreateGuestToken(invitationId: string) {
