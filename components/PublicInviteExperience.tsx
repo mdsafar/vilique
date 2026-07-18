@@ -337,9 +337,7 @@ function scheduleIosWebKitVisualViewportNudge() {
         didNudge = true;
         window.requestAnimationFrame(() => {
             window.scrollTo(0, 1);
-            window.requestAnimationFrame(() => {
-                window.scrollTo(0, 0);
-            });
+            window.scrollTo(0, 0);
         });
     };
 
