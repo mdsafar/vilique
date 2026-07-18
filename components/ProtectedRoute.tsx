@@ -10,9 +10,10 @@ type Props = {
     children: ReactNode;
     next: string;
     className?: string;
+    fallback?: ReactNode;
 };
 
-export default function ProtectedRoute({ children, next, className }: Props) {
+export default function ProtectedRoute({ children, next, className, fallback }: Props) {
     const [authState, setAuthState] = useState<AuthState>("checking");
     const shellClassName = ["protectedRouteShell", className].filter(Boolean).join(" ");
 
@@ -40,7 +41,7 @@ export default function ProtectedRoute({ children, next, className }: Props) {
     }, []);
 
     if (authState === "checking") {
-        return <main className={shellClassName} aria-hidden="true" />;
+        return fallback || <main className={shellClassName} aria-hidden="true" />;
     }
 
     if (authState === "guest") {

@@ -15,7 +15,7 @@ export default async function AppLayout({
     return (
         <>
             {children}
-            <BottomNav key={navUser?.id ?? "signed-out"} initialUser={navUser} />
+            <BottomNav initialUser={navUser} />
         </>
     );
 }

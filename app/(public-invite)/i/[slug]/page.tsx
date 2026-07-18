@@ -2,9 +2,8 @@ import { notFound } from "next/navigation";
 import { getPublishedInvitationBySlug } from "@/features/invitations/data";
 import PublicInviteExperience from "@/components/PublicInviteExperience";
 import { Metadata } from "next";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import { Suspense } from "react";
+import PublicInviteLoading from "./loading";
 
 type Props = {
     params: Promise<{
@@ -48,7 +47,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicInvitationSlugPage({ params }: Props) {
-    const { slug } = await params;
+    return (
+        <Suspense fallback={<PublicInviteLoading />}>
+            {params.then(({ slug }) => (
+                <InvitationContent slug={slug} />
+            ))}
+        </Suspense>
+    );
+}
+
+async function InvitationContent({ slug }: { slug: string }) {
     const invitation = await getPublishedInvitationBySlug(slug);
 
     if (!invitation) {

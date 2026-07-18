@@ -415,6 +415,27 @@ function InvitationTabsSkeleton() {
     );
 }
 
+export function ProfileInvitationsSkeleton() {
+    return (
+        <main className="profilePage invitationsPage" aria-busy="true">
+            <section className="profileInvitations profileInvitationsFull">
+                <header className="profileControls">
+                    <div className="profileControlsTitle">
+                        <h2>Your invitations</h2>
+                        <p>Manage and track all your invitation websites</p>
+                    </div>
+                </header>
+                <div className="profileInvitationsContainer">
+                    <nav className="profileFilterTabs" aria-label="Invitation filters">
+                        <InvitationTabsSkeleton />
+                    </nav>
+                    <InvitationListSkeleton />
+                </div>
+            </section>
+        </main>
+    );
+}
+
 function removeInvitationFromPages(
     pages: InvitationsPageResponse[] | undefined,
     invitation: InvitationData

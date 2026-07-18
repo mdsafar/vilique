@@ -968,7 +968,6 @@ function BuilderContent() {
 
             <PublishSuccessModal
                 details={publishSuccessDetails}
-                title={invitation.title}
                 onViewProfile={() => router.push("/invitations?reset=1")}
             />
         </main>
@@ -977,11 +976,9 @@ function BuilderContent() {
 
 function PublishSuccessModal({
     details,
-    title,
     onViewProfile,
 }: {
     details: PublishSuccessDetails | null;
-    title: string;
     onViewProfile: () => void;
 }) {
     const [copied, setCopied] = useState(false);
@@ -989,12 +986,6 @@ function PublishSuccessModal({
     if (!details) return null;
 
     const publicUrl = getPublicInvitationUrl(details.slug);
-    const publishedDate = details.publishedAt
-        ? new Intl.DateTimeFormat("en-IN", {
-            dateStyle: "medium",
-            timeStyle: "short",
-        }).format(new Date(details.publishedAt))
-        : "Just now";
 
     function copyLink() {
         navigator.clipboard.writeText(publicUrl).then(() => {
@@ -1028,12 +1019,6 @@ function PublishSuccessModal({
                             <h2>Your invitation is live</h2>
                             <span>Guests can now open, view, and RSVP from your public invitation site.</span>
                         </div>
-                    </div>
-
-                    <div className="publishSuccessReceipt">
-                        <span>Published invitation</span>
-                        <strong>{title}</strong>
-                        <small>{publishedDate}</small>
                     </div>
 
                     <div className="publishSuccessLinkBox">

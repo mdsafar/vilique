@@ -4,7 +4,7 @@ import { initiateUnrecoverablePublishRefund } from "@/lib/payments/refunds";
 import { reportError } from "@/lib/observability";
 import { getClientIp, rateLimit, rateLimitResponse } from "@/lib/security/requestGuard";
 
-export const runtime = "nodejs";
+
 
 const initiateRefundSchema = z.object({
     paymentId: z.string().uuid(),

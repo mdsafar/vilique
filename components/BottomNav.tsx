@@ -93,7 +93,6 @@ export default function BottomNav({ initialUser }: Props) {
                     <Link
                         key={item.href}
                         href={item.href}
-                        prefetch={false}
                         className={[
                             item.active ? "active" : "",
                             item.href === "/profile" ? "bottomNavProfileLink" : "",

@@ -6,6 +6,7 @@ import StableDocumentTitle from "@/components/StableDocumentTitle";
 import { ToastProvider } from "@/components/Toast";
 import { AppProviders } from "@/components/AppProviders";
 
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {

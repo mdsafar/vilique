@@ -14357,14 +14357,6 @@ body:has(.invitePreviewShell) {
   overflow: hidden;
 }
 
-.publishSuccessPanel::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 6px;
-  background: linear-gradient(90deg, #16a34a, #8c4cf3);
-}
-
 .publishSuccessTop {
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
@@ -14415,34 +14407,12 @@ body:has(.invitePreviewShell) {
   font-weight: 600;
 }
 
-.publishSuccessReceipt {
-  display: grid;
-  gap: 4px;
-  padding: 13px 14px;
-  border-radius: 15px;
-  background: linear-gradient(135deg, rgba(236, 253, 245, 0.92), rgba(248, 244, 255, 0.78));
-  border: 1px solid rgba(199, 231, 214, 0.85);
-}
-
-.publishSuccessReceipt span,
 .publishSuccessLinkBox small {
   color: #6d647b;
   font-size: 10.5px;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
-}
-
-.publishSuccessReceipt strong {
-  color: #1f1235;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.publishSuccessReceipt small {
-  color: #746b84;
-  font-size: 12.5px;
-  font-weight: 700;
 }
 
 .publishSuccessLinkBox {
@@ -14556,10 +14526,6 @@ body:has(.invitePreviewShell) {
 
   .publishSuccessCopy span {
     font-size: 12.5px;
-  }
-
-  .publishSuccessReceipt {
-    padding: 12px;
   }
 
   .publishSuccessLinkBox {
@@ -16214,6 +16180,16 @@ body:has(.invitePreviewShell) {
 
   .publishActions {
     gap: 8px;
+  }
+}
+
+@media (max-width: 480px) and (max-height: 720px) {
+  .publishModalOverlay {
+    padding: 0;
+  }
+
+  .publishModalPanel {
+    max-height: 100svh;
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import ProfileInvitationsList from "@/components/ProfileInvitationsList";
+import ProfileInvitationsList, { ProfileInvitationsSkeleton } from "@/components/ProfileInvitationsList";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useScrollPreservation } from "./NavigationStateProvider";
 
@@ -9,7 +9,11 @@ export default function InvitationsPageClient() {
     useScrollPreservation("/invitations");
 
     return (
-        <ProtectedRoute next="/invitations" className="profilePage invitationsPage">
+        <ProtectedRoute
+            next="/invitations"
+            className="profilePage invitationsPage"
+            fallback={<ProfileInvitationsSkeleton />}
+        >
             <main className="profilePage invitationsPage">
                 <section className="profileInvitations profileInvitationsFull">
                     <ProfileInvitationsList />
