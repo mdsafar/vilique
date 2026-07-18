@@ -385,6 +385,9 @@ export default function PastelFloralWedding({
         }
         acceptTransitionTimeoutRef.current = window.setTimeout(() => {
             acceptTransitionTimeoutRef.current = null;
+            if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
             setIsAccepted(true);
             setIsAcceptTransitioning(false);
             // Scroll reset is handled by the PIE useEffect([showAccepted]) after paint.
@@ -594,7 +597,15 @@ function ThanksCard({
 }) {
     const containerRef = useRef<HTMLElement>(null);
 
+    useLayoutEffect(() => {
+        const winObj = window as unknown as { _logState?: (label: string) => void };
+        if (winObj._logState) winObj._logState("ThanksCard useLayoutEffect");
+        resetInvitationScroll(containerRef.current);
+    }, []);
+
     useEffect(() => {
+        const winObj = window as unknown as { _logState?: (label: string) => void };
+        if (winObj._logState) winObj._logState("ThanksCard useEffect");
         scheduleInvitationScrollReset(containerRef.current);
     }, []);
 
@@ -993,6 +1004,8 @@ function stopAudio(audio: HTMLAudioElement | null) {
 }
 
 function resetInvitationScroll(element: Element | null) {
+    const winObj = window as unknown as { _logState?: (label: string) => void };
+    if (winObj._logState) winObj._logState("resetInvitationScroll");
     const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
     const scrollingElement = document.scrollingElement || document.documentElement;
 
@@ -1000,13 +1013,18 @@ function resetInvitationScroll(element: Element | null) {
     // scrollingElement may be document.body on Safari, document.documentElement elsewhere.
     const prevHtmlBehavior = document.documentElement.style.scrollBehavior;
     const prevBodyBehavior = document.body.style.scrollBehavior;
+    const prevHtmlAnchor = document.documentElement.style.overflowAnchor;
+    const prevBodyAnchor = document.body.style.overflowAnchor;
     const scrollingIsHtml = scrollingElement === document.documentElement;
     const scrollingIsBody = scrollingElement === document.body;
+
     if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
         (scrollingElement as HTMLElement).style.scrollBehavior = "auto";
     }
     document.documentElement.style.scrollBehavior = "auto";
     document.body.style.scrollBehavior = "auto";
+    document.documentElement.style.overflowAnchor = "none";
+    document.body.style.overflowAnchor = "none";
 
     try {
         // Reset window and the document scrolling element unconditionally.
@@ -1028,28 +1046,34 @@ function resetInvitationScroll(element: Element | null) {
             current = current.parentElement;
         }
     } finally {
-        document.documentElement.style.scrollBehavior = prevHtmlBehavior;
-        document.body.style.scrollBehavior = prevBodyBehavior;
-        if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
-            (scrollingElement as HTMLElement).style.scrollBehavior = "";
-        }
+        // Defer restoration to a later tick to ensure WebKit applies the instant scroll
+        // before scrollBehavior is restored to smooth.
+        window.requestAnimationFrame(() => {
+            document.documentElement.style.scrollBehavior = prevHtmlBehavior;
+            document.body.style.scrollBehavior = prevBodyBehavior;
+            document.documentElement.style.overflowAnchor = prevHtmlAnchor;
+            document.body.style.overflowAnchor = prevBodyAnchor;
+            if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
+                (scrollingElement as HTMLElement).style.scrollBehavior = "";
+            }
+        });
     }
 }
 
 function scheduleInvitationScrollReset(element: Element | null) {
-    // Do NOT call resetInvitationScroll() synchronously here.
-    // The caller (PIE useEffect) already runs post-paint; a synchronous call
-    // would execute before the browser has measured the new content height,
-    // causing browsers (especially Safari) to silently ignore or re-override it.
     window.requestAnimationFrame(() => {
         resetInvitationScroll(element);
         window.requestAnimationFrame(() => {
             resetInvitationScroll(element);
-            // Third attempt after 80 ms covers slow-rendering devices and
-            // Safari's deferred scroll-position restoration.
+            const winObj = window as unknown as { _logState?: (label: string) => void };
+            if (winObj._logState) winObj._logState("Template 2-frames post-reset");
             window.setTimeout(() => resetInvitationScroll(element), 80);
         });
     });
+    window.setTimeout(() => {
+        const winObj = window as unknown as { _logState?: (label: string) => void };
+        if (winObj._logState) winObj._logState("Template 500ms post-reset");
+    }, 500);
 }
 
 function playCelebrationSong(

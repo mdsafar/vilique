@@ -132,6 +132,8 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             acceptVisualTimeoutRef.current = null;
         }
         if (shouldAccept) {
+            const winObj = window as unknown as { _logState?: (label: string) => void };
+            if (winObj._logState) winObj._logState("Before Accept");
             // showAccepted = accepted || (rsvpStatus==="accepted" && !isChangingResponse).
             // If rsvpStatus is already "accepted" (Change RSVP → Accept again), clearing
             // isChangingResponse below would instantly flip showAccepted=true, causing the
@@ -146,6 +148,9 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             setIsChangingResponse(false);
             acceptVisualTimeoutRef.current = window.setTimeout(() => {
                 acceptVisualTimeoutRef.current = null;
+                if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
                 setAccepted(true);
                 setRsvpStatus("accepted");
             }, 620);
@@ -247,14 +252,24 @@ function schedulePublicInviteScrollReset(shell: HTMLElement | null, anchor: HTML
     run();
     window.requestAnimationFrame(() => {
         run();
-        window.requestAnimationFrame(run);
+        window.requestAnimationFrame(() => {
+            run();
+            const winObj = window as unknown as { _logState?: (label: string) => void };
+            if (winObj._logState) winObj._logState("PIE 2-frames post-reset");
+        });
     });
     window.setTimeout(run, 80);
     window.setTimeout(run, 220);
-    window.setTimeout(run, 420);
+    window.setTimeout(() => {
+        run();
+        const winObj = window as unknown as { _logState?: (label: string) => void };
+        if (winObj._logState) winObj._logState("PIE 500ms post-reset");
+    }, 500);
 }
 
 function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement | null) {
+    const winObj = window as unknown as { _logState?: (label: string) => void };
+    if (winObj._logState) winObj._logState("resetPublicInviteScroll");
     const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
     const scrollingElement = document.scrollingElement || document.documentElement;
 
@@ -262,13 +277,18 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
     // scrollingElement is document.body on Safari, document.documentElement elsewhere.
     const prevHtmlBehavior = document.documentElement.style.scrollBehavior;
     const prevBodyBehavior = document.body.style.scrollBehavior;
+    const prevHtmlAnchor = document.documentElement.style.overflowAnchor;
+    const prevBodyAnchor = document.body.style.overflowAnchor;
     const scrollingIsHtml = scrollingElement === document.documentElement;
     const scrollingIsBody = scrollingElement === document.body;
+
     if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
         (scrollingElement as HTMLElement).style.scrollBehavior = "auto";
     }
     document.documentElement.style.scrollBehavior = "auto";
     document.body.style.scrollBehavior = "auto";
+    document.documentElement.style.overflowAnchor = "none";
+    document.body.style.overflowAnchor = "none";
 
     try {
         anchor?.scrollIntoView({ block: "start", inline: "nearest", behavior: "auto" });
@@ -290,11 +310,17 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
             current = current.parentElement;
         }
     } finally {
-        document.documentElement.style.scrollBehavior = prevHtmlBehavior;
-        document.body.style.scrollBehavior = prevBodyBehavior;
-        if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
-            (scrollingElement as HTMLElement).style.scrollBehavior = "";
-        }
+        // Defer restoration to a later tick to ensure WebKit applies the instant scroll
+        // before scrollBehavior is restored to smooth.
+        window.requestAnimationFrame(() => {
+            document.documentElement.style.scrollBehavior = prevHtmlBehavior;
+            document.body.style.scrollBehavior = prevBodyBehavior;
+            document.documentElement.style.overflowAnchor = prevHtmlAnchor;
+            document.body.style.overflowAnchor = prevBodyAnchor;
+            if (!scrollingIsHtml && !scrollingIsBody && scrollingElement instanceof HTMLElement) {
+                (scrollingElement as HTMLElement).style.scrollBehavior = "";
+            }
+        });
     }
 }
 
