@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const visitorKey = getVisitorKey(request, parsed.data.guestToken);
     const limit = await rateLimit({
         key: `rsvp:${parsed.data.invitationId}:${visitorKey}`,
-        limit: 8,
+        limit: 30,
         windowMs: 10 * 60 * 1000,
     });
 

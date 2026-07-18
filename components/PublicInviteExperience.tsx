@@ -25,7 +25,9 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const [accepted, setAccepted] = useState(false);
     const [rsvpStatus, setRsvpStatus] = useState<RSVPStatus | null>(null);
     const [isChangingResponse, setIsChangingResponse] = useState(false);
+    const [isRsvpSubmitting, setIsRsvpSubmitting] = useState(false);
     const guestTokenRef = useRef("");
+    const rsvpRequestIdRef = useRef(0);
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
 
     useLayoutEffect(() => {
@@ -72,6 +74,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
 
         const token = getOrCreateGuestToken(invitation.id);
         guestTokenRef.current = token;
+        const lookupRequestId = rsvpRequestIdRef.current;
 
         const controller = new AbortController();
         const params = new URLSearchParams({
@@ -82,6 +85,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         fetch(`/api/rsvps?${params.toString()}`, { signal: controller.signal })
             .then((response) => response.ok ? response.json() : null)
             .then((payload: { rsvp?: StoredRsvp | null } | null) => {
+                if (lookupRequestId !== rsvpRequestIdRef.current) return;
                 const nextStatus = payload?.rsvp?.status || null;
                 const isChangingStoredResponse = getIsChangingResponse(invitation.id);
                 setRsvpStatus(nextStatus);
@@ -94,6 +98,8 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     }, [invitation.id, isPublic]);
 
     function submitRsvp(nextStatus: RSVPStatus, options: { keepalive?: boolean; keepChangingResponse?: boolean } = {}) {
+        const requestId = rsvpRequestIdRef.current + 1;
+        rsvpRequestIdRef.current = requestId;
         const shouldAccept = nextStatus === "accepted";
         if (!options.keepChangingResponse) {
             clearIsChangingResponse(invitation.id);
@@ -105,6 +111,8 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         if (!isPublic) {
             return;
         }
+
+        setIsRsvpSubmitting(true);
 
         const token = guestTokenRef.current || getOrCreateGuestToken(invitation.id);
         guestTokenRef.current = token;
@@ -123,16 +131,20 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         })
             .then((response) => response.ok ? response.json() : Promise.reject(response))
             .then((payload: { rsvp?: StoredRsvp | null }) => {
+                if (requestId !== rsvpRequestIdRef.current) return;
                 const persistedStatus = payload.rsvp?.status || nextStatus;
                 setRsvpStatus(persistedStatus);
                 setAccepted(persistedStatus === "accepted");
                 setIsChangingResponse(Boolean(options.keepChangingResponse && persistedStatus === "accepted"));
                 clearIsChangingResponse(invitation.id);
+                setIsRsvpSubmitting(false);
             })
             .catch(() => {
+                if (requestId !== rsvpRequestIdRef.current) return;
                 setAccepted(false);
                 setRsvpStatus(options.keepChangingResponse ? nextStatus : null);
                 setIsChangingResponse(Boolean(options.keepChangingResponse));
+                setIsRsvpSubmitting(false);
             });
     }
 
@@ -153,7 +165,10 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 onChangeRsvp={() => {
                     if (isPublic) {
                         setIsChangingResponseFlag(invitation.id);
-                        submitRsvp("maybe", { keepalive: true, keepChangingResponse: true });
+                        rsvpRequestIdRef.current += 1;
+                        setIsRsvpSubmitting(false);
+                        setAccepted(false);
+                        setIsChangingResponse(true);
                         return;
                     }
                     setAccepted(false);
@@ -161,6 +176,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 }}
                 onEvent={handleAnalyticsEvent}
                 enableAudio={true}
+                rsvpProcessing={isRsvpSubmitting}
             />
         </div>
     );

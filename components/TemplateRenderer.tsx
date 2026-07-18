@@ -14,6 +14,7 @@ type TemplateRendererProps = {
     onChangeRsvp?: () => void;
     onEvent?: (type: AnalyticsEventType) => void;
     enableAudio?: boolean;
+    rsvpProcessing?: boolean;
 };
 
 /**
@@ -33,8 +34,9 @@ export default function TemplateRenderer({
     onChangeRsvp,
     onEvent,
     enableAudio,
+    rsvpProcessing,
 }: TemplateRendererProps) {
-    const props = { invitation, accepted, rsvpStatus, demoCountdownTargetDate, onAccept, onDecline, onChangeRsvp, onEvent, enableAudio };
+    const props = { invitation, accepted, rsvpStatus, demoCountdownTargetDate, onAccept, onDecline, onChangeRsvp, onEvent, enableAudio, rsvpProcessing };
 
     switch (invitation.templateId) {
         case "pastel-floral-wedding":

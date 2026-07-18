@@ -12104,10 +12104,24 @@ body:has(.invitePreviewShell) {
   justify-content: center;
   gap: 12px;
   box-shadow: 0 4px 16px rgba(120, 80, 160, 0.08);
+  touch-action: manipulation;
 }
 
 .rsvpButtons button:hover {
   transform: translateY(-2px);
+}
+
+.rsvpButtons button:disabled,
+.rsvpChangeBtn:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+  box-shadow: 0 4px 16px rgba(120, 80, 160, 0.08);
+}
+
+.rsvpButtons button:disabled:hover,
+.rsvpChangeBtn:disabled:hover {
+  transform: none;
 }
 
 .rsvpButtons b {
@@ -12168,6 +12182,7 @@ body:has(.invitePreviewShell) {
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(120, 80, 160, 0.08);
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: manipulation;
 }
 
 .rsvpChangeBtn:hover {

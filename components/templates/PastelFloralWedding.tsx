@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { MapPin, MapPinned, Phone, CalendarOff, Clock, Flower2, Heart, HeartCrack, Sparkle, Star } from "lucide-react";
@@ -22,6 +22,7 @@ type Props = {
     onChangeRsvp?: () => void;
     onEvent?: (eventType: AnalyticsEventType) => void;
     enableAudio?: boolean;
+    rsvpProcessing?: boolean;
 };
 
 type CountdownValue = {
@@ -72,6 +73,7 @@ export default function PastelFloralWedding({
     onChangeRsvp,
     onEvent,
     enableAudio = false,
+    rsvpProcessing = false,
 }: Props) {
     const [isAccepted, setIsAccepted] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
@@ -187,7 +189,7 @@ export default function PastelFloralWedding({
 
     const showAcceptedScreen = accepted || isAccepted;
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (previousAcceptedScreenRef.current === null) {
             previousAcceptedScreenRef.current = showAcceptedScreen;
             if (showAcceptedScreen) {
@@ -293,7 +295,7 @@ export default function PastelFloralWedding({
         const startFromGesture = (event: Event) => {
             if (audioSuspendedRef.current || hasStartedTickRef.current || !shouldPlayCountdownTickRef.current) return;
             const target = event.target as Element | null;
-            if (target?.closest(".rsvpAcceptBtn")) return;
+            if (target?.closest("button, a, input, textarea, select, [role='button']")) return;
             hasStartedTickRef.current = true;
             playTick(tickRef.current);
         };
@@ -344,10 +346,14 @@ export default function PastelFloralWedding({
 
     function handleAccept(event: MouseEvent<HTMLButtonElement>) {
         event.stopPropagation();
+        if (rsvpProcessing) return;
         const { x, y } = getPagePointFromEvent(event);
         const pageElement = event.currentTarget.closest(".pastelWeddingPage");
 
         setIsAccepting(true);
+        setIsAccepted(true);
+        onAccept?.();
+        scheduleInvitationScrollReset(pageElement);
         createSparkles(x, y, setParticles);
         createPetals(setPetals);
         if (enableAudio) {
@@ -369,16 +375,11 @@ export default function PastelFloralWedding({
             onEvent?.("music_play");
         }
 
-        window.setTimeout(() => {
-            setIsAccepted(true);
-            onAccept?.();
-            scheduleInvitationScrollReset(pageElement);
-        }, 700);
-
         window.setTimeout(() => setIsAccepting(false), 900);
     }
 
     function handleChangeRsvp() {
+        if (rsvpProcessing) return;
         setIsAccepted(false);
         onChangeRsvp?.();
         scheduleInvitationScrollReset(pageRef.current);
@@ -386,6 +387,7 @@ export default function PastelFloralWedding({
 
     function handleDecline(event: MouseEvent<HTMLButtonElement>) {
         event.stopPropagation();
+        if (rsvpProcessing) return;
         const { x, y } = getPagePointFromEvent(event);
         createDeclineBurst(x, y, setParticles);
         setDeclineOpen(true);
@@ -423,6 +425,7 @@ export default function PastelFloralWedding({
                         onAccept={handleAccept}
                         onDecline={handleDecline}
                         rsvpStatus={rsvpStatus}
+                        rsvpProcessing={rsvpProcessing}
                         completed={completed}
                         inProgress={inProgress}
                         countdownTitle={countdownTitle}
@@ -434,6 +437,7 @@ export default function PastelFloralWedding({
                         countdown={countdown}
                         onEvent={onEvent}
                         onChangeRsvp={handleChangeRsvp}
+                        rsvpProcessing={rsvpProcessing}
                         completed={completed}
                         inProgress={inProgress}
                         countdownTitle={countdownTitle}
@@ -453,6 +457,7 @@ function InviteCard({
     onAccept,
     onDecline,
     rsvpStatus,
+    rsvpProcessing,
     completed,
     inProgress,
     countdownTitle,
@@ -464,6 +469,7 @@ function InviteCard({
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
     onDecline: (event: MouseEvent<HTMLButtonElement>) => void;
     rsvpStatus?: RSVPStatus | null;
+    rsvpProcessing: boolean;
     completed: boolean;
     inProgress: boolean;
     countdownTitle: string;
@@ -520,12 +526,12 @@ function InviteCard({
                         </div>
                     ) : null}
                     <div className={`rsvpButtons ${rsvpStatus === "declined" ? "rsvpButtons--single" : ""}`}>
-                        <button className="rsvpAcceptBtn" onClick={onAccept}>
+                        <button className="rsvpAcceptBtn" onClick={onAccept} disabled={rsvpProcessing} aria-busy={rsvpProcessing}>
                             <span>{rsvpStatus === "declined" ? "Accept Instead" : "Accept"}</span>
                             <Heart size={23} strokeWidth={1.8} aria-hidden="true" />
                         </button>
                         {rsvpStatus === "declined" ? null : (
-                            <button className="rsvpDeclineBtn" onClick={onDecline}>
+                            <button className="rsvpDeclineBtn" onClick={onDecline} disabled={rsvpProcessing} aria-busy={rsvpProcessing}>
                                 <span>Decline</span>
                                 <HeartCrack size={23} strokeWidth={1.8} aria-hidden="true" />
                             </button>
@@ -546,6 +552,7 @@ function ThanksCard({
     countdown,
     onEvent,
     onChangeRsvp,
+    rsvpProcessing,
     completed,
     inProgress,
     countdownTitle,
@@ -555,6 +562,7 @@ function ThanksCard({
     countdown: CountdownValue;
     onEvent?: (eventType: AnalyticsEventType) => void;
     onChangeRsvp?: () => void;
+    rsvpProcessing: boolean;
     completed: boolean;
     inProgress: boolean;
     countdownTitle: string;
@@ -610,7 +618,7 @@ function ThanksCard({
             {!completed && !inProgress ? <CountdownGrid countdown={countdown} /> : null}
             {completed ? <EventClosedMessage /> : inProgress ? <EventInProgressMessage category={invitation.category} /> : null}
             {!completed && onChangeRsvp ? (
-                <button className="rsvpChangeBtn" type="button" onClick={onChangeRsvp}>
+                <button className="rsvpChangeBtn" type="button" onClick={onChangeRsvp} disabled={rsvpProcessing} aria-busy={rsvpProcessing}>
                     Change RSVP
                 </button>
             ) : null}
@@ -956,21 +964,35 @@ function stopAudio(audio: HTMLAudioElement | null) {
 function resetInvitationScroll(element: Element | null) {
     const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
     const scrollingElement = document.scrollingElement || document.documentElement;
+    const previousHtmlScrollBehavior = document.documentElement.style.scrollBehavior;
+    const previousBodyScrollBehavior = document.body.style.scrollBehavior;
 
-    scrollingElement.scrollTo(scrollOptions);
-    window.scrollTo(scrollOptions);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    document.documentElement.style.scrollBehavior = "auto";
+    document.body.style.scrollBehavior = "auto";
 
-    let current = element?.parentElement || null;
-    while (current) {
-        const style = window.getComputedStyle(current);
-        const canScrollY = current.scrollHeight > current.clientHeight;
-        const overflowY = style.overflowY;
-        if (canScrollY && /(auto|scroll|overlay)/.test(overflowY)) {
-            current.scrollTo(scrollOptions);
+    try {
+        scrollingElement.scrollTo(scrollOptions);
+        window.scrollTo(scrollOptions);
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+
+        let current: Element | null = element;
+        while (current) {
+            const style = window.getComputedStyle(current);
+            const canScrollY = current.scrollHeight > current.clientHeight;
+            const overflowY = style.overflowY;
+            if (canScrollY && /(auto|scroll|overlay)/.test(overflowY)) {
+                current.scrollTo(scrollOptions);
+                if (current instanceof HTMLElement) {
+                    current.scrollTop = 0;
+                }
+            }
+            current = current.parentElement;
         }
-        current = current.parentElement;
+    } finally {
+        document.documentElement.style.scrollBehavior = previousHtmlScrollBehavior;
+        document.body.style.scrollBehavior = previousBodyScrollBehavior;
     }
 }
 
