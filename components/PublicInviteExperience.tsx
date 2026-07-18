@@ -79,8 +79,11 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         if (previousVisibleScreenRef.current !== showAccepted) {
             previousVisibleScreenRef.current = showAccepted;
             schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
+            if (isPublic && invitation.templateId === "pastel-floral-wedding") {
+                scheduleIosWebKitVisualViewportNudge();
+            }
         }
-    }, [showAccepted]);
+    }, [invitation.templateId, isPublic, showAccepted]);
 
     useEffect(() => {
         if (!isPublic) {
@@ -314,6 +317,48 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
             }
         });
     }
+}
+
+function scheduleIosWebKitVisualViewportNudge() {
+    if (!isIosWebKit() || !window.visualViewport) return;
+
+    let didNudge = false;
+    let fallbackTimeout = 0;
+    let cleanupTimeout = 0;
+
+    const cleanup = () => {
+        window.visualViewport?.removeEventListener("resize", runNudge);
+        window.clearTimeout(fallbackTimeout);
+        window.clearTimeout(cleanupTimeout);
+    };
+
+    const runNudge = () => {
+        if (didNudge) return;
+        didNudge = true;
+        window.requestAnimationFrame(() => {
+            window.scrollTo(0, 1);
+            window.requestAnimationFrame(() => {
+                window.scrollTo(0, 0);
+            });
+        });
+    };
+
+    window.visualViewport.addEventListener("resize", runNudge, { passive: true });
+    fallbackTimeout = window.setTimeout(runNudge, 160);
+    cleanupTimeout = window.setTimeout(cleanup, 1200);
+}
+
+function isIosWebKit() {
+    if (typeof navigator === "undefined") return false;
+
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    const isIosDevice =
+        /iP(hone|ad|od)/.test(platform) ||
+        (/Mac/.test(platform) && navigator.maxTouchPoints > 1);
+    const isWebKit = /AppleWebKit/.test(userAgent);
+
+    return isIosDevice && isWebKit;
 }
 
 function getOrCreateGuestToken(invitationId: string) {
