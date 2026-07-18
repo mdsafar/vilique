@@ -77,6 +77,7 @@ export default function PastelFloralWedding({
 }: Props) {
     const [isAccepted, setIsAccepted] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
+    const [isAcceptTransitioning, setIsAcceptTransitioning] = useState(false);
     const [declineOpen, setDeclineOpen] = useState(false);
     const [particles, setParticles] = useState<CelebrationParticle[]>([]);
     const [petals, setPetals] = useState<FallingPetal[]>([]);
@@ -88,6 +89,7 @@ export default function PastelFloralWedding({
     const tickRef = useRef<HTMLAudioElement>(null);
     const pageRef = useRef<HTMLElement>(null);
     const songTimeoutRef = useRef<number | null>(null);
+    const acceptTransitionTimeoutRef = useRef<number | null>(null);
     const mountedRef = useRef(true);
     const previousAcceptedScreenRef = useRef<boolean | null>(null);
     const audioSuspendedRef = useRef(false);
@@ -187,7 +189,7 @@ export default function PastelFloralWedding({
     const shouldPlayCountdownTick = enableAudio && !completed && !inProgress && !isStarted;
     const tickUrl = shouldPlayCountdownTick ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
-    const showAcceptedScreen = accepted || isAccepted;
+    const showAcceptedScreen = (accepted || isAccepted) && !isAcceptTransitioning;
 
     useLayoutEffect(() => {
         if (previousAcceptedScreenRef.current === null) {
@@ -215,10 +217,15 @@ export default function PastelFloralWedding({
 
     useEffect(() => {
         if (!accepted) {
+            if (acceptTransitionTimeoutRef.current) {
+                window.clearTimeout(acceptTransitionTimeoutRef.current);
+                acceptTransitionTimeoutRef.current = null;
+            }
             stopThisTemplateAudio();
             const frame = window.requestAnimationFrame(() => {
                 setIsAccepted(false);
                 setIsAccepting(false);
+                setIsAcceptTransitioning(false);
                 setDeclineOpen(false);
                 setParticles([]);
                 setPetals([]);
@@ -286,6 +293,10 @@ export default function PastelFloralWedding({
             window.removeEventListener("vilique:template-audio-suspend", handleModalAudioSuspend);
             window.removeEventListener("vilique:template-audio-resume", handleModalAudioResume);
             stopThisTemplateAudio(false);
+            if (acceptTransitionTimeoutRef.current) {
+                window.clearTimeout(acceptTransitionTimeoutRef.current);
+                acceptTransitionTimeoutRef.current = null;
+            }
         };
     }, [pathname]);
 
@@ -351,9 +362,8 @@ export default function PastelFloralWedding({
         const pageElement = event.currentTarget.closest(".pastelWeddingPage");
 
         setIsAccepting(true);
-        setIsAccepted(true);
+        setIsAcceptTransitioning(true);
         onAccept?.();
-        scheduleInvitationScrollReset(pageElement);
         createSparkles(x, y, setParticles);
         createPetals(setPetals);
         if (enableAudio) {
@@ -375,14 +385,27 @@ export default function PastelFloralWedding({
             onEvent?.("music_play");
         }
 
+        if (acceptTransitionTimeoutRef.current) {
+            window.clearTimeout(acceptTransitionTimeoutRef.current);
+        }
+        acceptTransitionTimeoutRef.current = window.setTimeout(() => {
+            acceptTransitionTimeoutRef.current = null;
+            setIsAccepted(true);
+            setIsAcceptTransitioning(false);
+            scheduleInvitationScrollReset(pageElement);
+        }, 620);
+
         window.setTimeout(() => setIsAccepting(false), 900);
     }
 
     function handleChangeRsvp() {
         if (rsvpProcessing) return;
         scheduleInvitationScrollReset(pageRef.current);
-        setIsAccepted(false);
-        onChangeRsvp?.();
+        window.requestAnimationFrame(() => {
+            scheduleInvitationScrollReset(pageRef.current);
+            setIsAccepted(false);
+            onChangeRsvp?.();
+        });
     }
 
     function handleDecline(event: MouseEvent<HTMLButtonElement>) {

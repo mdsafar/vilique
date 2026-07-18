@@ -180,16 +180,19 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 onDecline={() => submitRsvp("declined")}
                 onChangeRsvp={() => {
                     schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
-                    if (isPublic) {
-                        setIsChangingResponseFlag(invitation.id);
-                        rsvpRequestIdRef.current += 1;
-                        setIsRsvpSubmitting(false);
+                    window.requestAnimationFrame(() => {
+                        schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
+                        if (isPublic) {
+                            setIsChangingResponseFlag(invitation.id);
+                            rsvpRequestIdRef.current += 1;
+                            setIsRsvpSubmitting(false);
+                            setAccepted(false);
+                            setIsChangingResponse(true);
+                            return;
+                        }
                         setAccepted(false);
                         setIsChangingResponse(true);
-                        return;
-                    }
-                    setAccepted(false);
-                    setIsChangingResponse(true);
+                    });
                 }}
                 onEvent={handleAnalyticsEvent}
                 enableAudio={true}
