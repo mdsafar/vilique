@@ -6,7 +6,6 @@ import Image from "next/image";
 import { MapPin, MapPinned, Phone, CalendarOff, Clock, Flower2, Heart, HeartCrack, Sparkle, Star } from "lucide-react";
 import { siteConfig } from "@/lib/config/site";
 import type { AnalyticsEventType } from "@/lib/analytics";
-import type { ScrollDebugStage } from "@/components/ScrollDebugPanel";
 import { getEventPhase, isInvitationCompleted } from "@/lib/lifecycle";
 import { parseInvitationDateParts } from "@/lib/invitationDate";
 import { createDemoCountdownTargetDate } from "@/lib/demoCountdown";
@@ -22,7 +21,6 @@ type Props = {
     onDecline?: () => void;
     onChangeRsvp?: () => void;
     onEvent?: (eventType: AnalyticsEventType) => void;
-    onScrollDebugStage?: (stage: ScrollDebugStage | string, source?: string) => void;
     enableAudio?: boolean;
     rsvpProcessing?: boolean;
 };
@@ -74,7 +72,6 @@ export default function PastelFloralWedding({
     onDecline,
     onChangeRsvp,
     onEvent,
-    onScrollDebugStage,
     enableAudio = false,
     rsvpProcessing = false,
 }: Props) {
@@ -193,14 +190,6 @@ export default function PastelFloralWedding({
     const tickUrl = shouldPlayCountdownTick ? normalizeAudioUrl(invitation.theme?.tickSoundUrl || invitation.tickSoundUrl || invitation.defaultTickSoundUrl) : null;
 
     const showAcceptedScreen = (accepted || isAccepted) && !isAcceptTransitioning;
-
-    useEffect(() => {
-        onScrollDebugStage?.(`Template accepted prop effect: accepted=${accepted}`, "PastelFloralWedding");
-    }, [accepted, onScrollDebugStage]);
-
-    useEffect(() => {
-        onScrollDebugStage?.(`Template showAcceptedScreen=${showAcceptedScreen}`, "PastelFloralWedding");
-    }, [onScrollDebugStage, showAcceptedScreen]);
 
     // Scroll reset for the accepted screen transition is handled by the
     // post-paint useEffect in PublicInviteExperience (showAccepted changes).
@@ -369,7 +358,6 @@ export default function PastelFloralWedding({
 
         setIsAccepting(true);
         setIsAcceptTransitioning(true);
-        onScrollDebugStage?.("Immediately when Accept is tapped", "PastelFloralWedding handleAccept");
         onAccept?.();
         createSparkles(x, y, setParticles);
         createPetals(setPetals);
@@ -397,12 +385,9 @@ export default function PastelFloralWedding({
         }
         acceptTransitionTimeoutRef.current = window.setTimeout(() => {
             acceptTransitionTimeoutRef.current = null;
-            onScrollDebugStage?.("When the sparkle animation completes", "PastelFloralWedding accept timeout");
             if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-                onScrollDebugStage?.("activeElement.blur call", "PastelFloralWedding accept timeout");
                 document.activeElement.blur();
             }
-            onScrollDebugStage?.("Before Thanks content mounts", "PastelFloralWedding accept timeout");
             setIsAccepted(true);
             setIsAcceptTransitioning(false);
             // Scroll reset is handled by the PIE useEffect([showAccepted]) after paint.
@@ -465,7 +450,6 @@ export default function PastelFloralWedding({
                         eventParts={eventParts}
                         countdown={countdown}
                         isAccepting={isAccepting}
-                        onBeforeAcceptTap={() => onScrollDebugStage?.("Before tapping Accept", "PastelFloralWedding accept button pointerdown")}
                         onAccept={handleAccept}
                         onDecline={handleDecline}
                         rsvpStatus={rsvpStatus}
@@ -498,7 +482,6 @@ function InviteCard({
     eventParts,
     countdown,
     isAccepting,
-    onBeforeAcceptTap,
     onAccept,
     onDecline,
     rsvpStatus,
@@ -511,7 +494,6 @@ function InviteCard({
     eventParts: ReturnType<typeof formatEventParts>;
     countdown: CountdownValue;
     isAccepting: boolean;
-    onBeforeAcceptTap?: () => void;
     onAccept: (event: MouseEvent<HTMLButtonElement>) => void;
     onDecline: (event: MouseEvent<HTMLButtonElement>) => void;
     rsvpStatus?: RSVPStatus | null;
@@ -574,8 +556,6 @@ function InviteCard({
                     <div className={`rsvpButtons ${rsvpStatus === "declined" ? "rsvpButtons--single" : ""}`}>
                         <button
                             className="rsvpAcceptBtn"
-                            onPointerDown={onBeforeAcceptTap}
-                            onTouchStart={onBeforeAcceptTap}
                             onClick={onAccept}
                             disabled={rsvpProcessing}
                             aria-busy={rsvpProcessing}
@@ -623,29 +603,23 @@ function ThanksCard({
     const containerRef = useRef<HTMLElement>(null);
 
     useLayoutEffect(() => {
-        window.__viliqueScrollDebug?.setThanksRoot(containerRef.current, "ThanksCard useLayoutEffect");
-        window.__viliqueScrollDebug?.record("Immediately when Thanks mounts", "ThanksCard useLayoutEffect");
-        const winObj = window as unknown as { _logState?: (label: string) => void };
-        if (winObj._logState) winObj._logState("ThanksCard useLayoutEffect");
+        window.__viliqueScrollDebug?.setThanksRoot(containerRef.current, "Immediately when Thanks mounts");
         resetInvitationScroll(containerRef.current);
     }, []);
 
     useEffect(() => {
-        window.__viliqueScrollDebug?.record("Thanks layout one animation frame queued", "ThanksCard useEffect");
         window.requestAnimationFrame(() => {
-            window.__viliqueScrollDebug?.record("Thanks layout one animation frame later", "ThanksCard useEffect");
+            window.__viliqueScrollDebug?.record("Thanks layout one animation frame later");
         });
         window.setTimeout(() => {
-            window.__viliqueScrollDebug?.record("Thanks layout 500ms later", "ThanksCard useEffect");
+            window.__viliqueScrollDebug?.record("Thanks layout 500ms later");
         }, 500);
         window.setTimeout(() => {
-            window.__viliqueScrollDebug?.record("Thanks layout 1000ms later", "ThanksCard useEffect");
+            window.__viliqueScrollDebug?.record("Thanks layout 1000ms later");
         }, 1000);
-        const winObj = window as unknown as { _logState?: (label: string) => void };
-        if (winObj._logState) winObj._logState("ThanksCard useEffect");
         scheduleInvitationScrollReset(containerRef.current);
         return () => {
-            window.__viliqueScrollDebug?.setThanksRoot(null, "ThanksCard cleanup");
+            window.__viliqueScrollDebug?.setThanksRoot(null, "Thanks root unmounted");
         };
     }, []);
 
@@ -1044,8 +1018,6 @@ function stopAudio(audio: HTMLAudioElement | null) {
 }
 
 function resetInvitationScroll(element: Element | null) {
-    const winObj = window as unknown as { _logState?: (label: string) => void };
-    if (winObj._logState) winObj._logState("resetInvitationScroll");
     const scrollOptions: ScrollToOptions = { top: 0, left: 0, behavior: "auto" };
     const scrollingElement = document.scrollingElement || document.documentElement;
 
@@ -1105,15 +1077,9 @@ function scheduleInvitationScrollReset(element: Element | null) {
         resetInvitationScroll(element);
         window.requestAnimationFrame(() => {
             resetInvitationScroll(element);
-            const winObj = window as unknown as { _logState?: (label: string) => void };
-            if (winObj._logState) winObj._logState("Template 2-frames post-reset");
             window.setTimeout(() => resetInvitationScroll(element), 80);
         });
     });
-    window.setTimeout(() => {
-        const winObj = window as unknown as { _logState?: (label: string) => void };
-        if (winObj._logState) winObj._logState("Template 500ms post-reset");
-    }, 500);
 }
 
 function playCelebrationSong(
