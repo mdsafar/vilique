@@ -16,6 +16,7 @@ type StoredRsvp = {
 };
 
 const RSVP_TOKEN_PREFIX = "vilique:rsvp-token:";
+const RSVP_STATUS_PREFIX = "vilique:rsvp-status:";
 const PUBLIC_INVITE_BACKGROUND =
     "radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%)";
 const PUBLIC_INVITE_BACKGROUND_COLOR = "#ecdcf7";
@@ -25,6 +26,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const [rsvpStatus, setRsvpStatus] = useState<RSVPStatus | null>(null);
     const [isChangingResponse, setIsChangingResponse] = useState(false);
     const [isRsvpSubmitting, setIsRsvpSubmitting] = useState(false);
+    const [resolvedRsvpInvitationId, setResolvedRsvpInvitationId] = useState(isPublic ? "" : invitation.id);
     const shellRef = useRef<HTMLDivElement>(null);
     const topAnchorRef = useRef<HTMLDivElement>(null);
     const previousVisibleScreenRef = useRef<boolean | null>(null);
@@ -32,9 +34,23 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const rsvpRequestIdRef = useRef(0);
     const acceptVisualTimeoutRef = useRef<number | null>(null);
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
+    const isInitialRsvpResolved = !isPublic || resolvedRsvpInvitationId === invitation.id;
 
     useLayoutEffect(() => {
         if (!isPublic) return;
+
+        const storedRsvpStatus = getStoredRsvpStatus(invitation.id);
+        if (storedRsvpStatus || !getStoredGuestToken(invitation.id)) {
+            /* eslint-disable react-hooks/set-state-in-effect -- intentional: this
+               localStorage check must resolve the initial public screen before paint
+               when the browser already has a verified RSVP status, or when there
+               is no token and therefore no possible stored RSVP for this browser. */
+            setRsvpStatus(storedRsvpStatus);
+            setAccepted(storedRsvpStatus === "accepted");
+            setIsChangingResponse(false);
+            setResolvedRsvpInvitationId(invitation.id);
+            /* eslint-enable react-hooks/set-state-in-effect */
+        }
 
         const previousHtmlBackground = document.documentElement.style.background;
         const previousHtmlBackgroundColor = document.documentElement.style.backgroundColor;
@@ -62,7 +78,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             document.body.style.backgroundColor = previousBodyBackgroundColor;
             document.body.style.minHeight = previousBodyMinHeight;
         };
-    }, [isPublic]);
+    }, [invitation.id, isPublic]);
 
     useEffect(() => {
         if (isPublic) {
@@ -71,6 +87,10 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     }, [invitation.id, isPublic]);
 
     useEffect(() => {
+        if (!isInitialRsvpResolved) {
+            return;
+        }
+
         if (previousVisibleScreenRef.current === null) {
             previousVisibleScreenRef.current = showAccepted;
             return;
@@ -80,18 +100,24 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             previousVisibleScreenRef.current = showAccepted;
             schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
             if (isPublic && invitation.templateId === "pastel-floral-wedding") {
-                scheduleIosWebKitVisualViewportNudge();
+                scheduleIosWebKitVisualViewportNudge(shellRef.current);
             }
         }
-    }, [invitation.templateId, isPublic, showAccepted]);
+    }, [invitation.templateId, isInitialRsvpResolved, isPublic, showAccepted]);
 
     useEffect(() => {
         if (!isPublic) {
             return;
         }
 
-        const token = getOrCreateGuestToken(invitation.id);
+        const existingToken = getStoredGuestToken(invitation.id);
+        const token = existingToken || getOrCreateGuestToken(invitation.id);
         guestTokenRef.current = token;
+
+        if (!existingToken) {
+            return;
+        }
+
         const lookupRequestId = rsvpRequestIdRef.current;
 
         const controller = new AbortController();
@@ -106,11 +132,16 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 if (lookupRequestId !== rsvpRequestIdRef.current) return;
                 const nextStatus = payload?.rsvp?.status || null;
                 const isChangingStoredResponse = getIsChangingResponse();
+                setStoredRsvpStatus(invitation.id, nextStatus);
                 setRsvpStatus(nextStatus);
                 setAccepted(nextStatus === "accepted" && !isChangingStoredResponse);
                 setIsChangingResponse(isChangingStoredResponse);
+                setResolvedRsvpInvitationId(invitation.id);
             })
-            .catch(() => undefined);
+            .catch(() => {
+                if (lookupRequestId !== rsvpRequestIdRef.current) return;
+                setResolvedRsvpInvitationId(invitation.id);
+            });
 
         return () => controller.abort();
     }, [invitation.id, isPublic]);
@@ -187,9 +218,11 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                 if (requestId !== rsvpRequestIdRef.current) return;
                 const persistedStatus = payload.rsvp?.status || nextStatus;
                 if (persistedStatus === "accepted" && acceptVisualTimeoutRef.current) {
+                    setStoredRsvpStatus(invitation.id, persistedStatus);
                     setIsRsvpSubmitting(false);
                     return;
                 }
+                setStoredRsvpStatus(invitation.id, persistedStatus);
                 setRsvpStatus(persistedStatus);
                 setAccepted(persistedStatus === "accepted");
                 setIsChangingResponse(Boolean(options.keepChangingResponse && persistedStatus === "accepted"));
@@ -218,32 +251,59 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     return (
         <div className="invitePreviewShell" ref={shellRef}>
             <div className="publicInviteScrollAnchor" ref={topAnchorRef} aria-hidden="true" />
-            <TemplateRenderer
-                invitation={invitation}
-                accepted={showAccepted}
-                rsvpStatus={isPublic ? rsvpStatus : null}
-                onAccept={() => submitRsvp("accepted")}
-                onDecline={() => submitRsvp("declined")}
-                onChangeRsvp={() => {
-                    if (acceptVisualTimeoutRef.current) {
-                        window.clearTimeout(acceptVisualTimeoutRef.current);
-                        acceptVisualTimeoutRef.current = null;
-                    }
-                    if (isPublic) {
-                        setIsChangingResponseFlag();
-                        rsvpRequestIdRef.current += 1;
-                        setIsRsvpSubmitting(false);
+            {isInitialRsvpResolved ? (
+                <TemplateRenderer
+                    invitation={invitation}
+                    accepted={showAccepted}
+                    rsvpStatus={isPublic ? rsvpStatus : null}
+                    onAccept={() => submitRsvp("accepted")}
+                    onDecline={() => submitRsvp("declined")}
+                    onChangeRsvp={() => {
+                        if (acceptVisualTimeoutRef.current) {
+                            window.clearTimeout(acceptVisualTimeoutRef.current);
+                            acceptVisualTimeoutRef.current = null;
+                        }
+                        if (isPublic) {
+                            setIsChangingResponseFlag();
+                            rsvpRequestIdRef.current += 1;
+                            setIsRsvpSubmitting(false);
+                            setAccepted(false);
+                            setIsChangingResponse(true);
+                            return;
+                        }
                         setAccepted(false);
                         setIsChangingResponse(true);
-                        return;
-                    }
-                    setAccepted(false);
-                    setIsChangingResponse(true);
-                }}
-                onEvent={handleAnalyticsEvent}
-                enableAudio={true}
-                rsvpProcessing={isRsvpSubmitting}
-            />
+                    }}
+                    onEvent={handleAnalyticsEvent}
+                    enableAudio={true}
+                    rsvpProcessing={isRsvpSubmitting}
+                />
+            ) : (
+                <PublicInviteInitialLoader invitation={invitation} />
+            )}
+        </div>
+    );
+}
+
+function PublicInviteInitialLoader({ invitation }: { invitation: InvitationData }) {
+    const isWedding = invitation.category === "wedding";
+
+    return (
+        <div className="templateLoaderOverlay pastelWeddingPage" role="status" aria-live="polite">
+            <div className="templateLoaderCard">
+                <div className="templateLoaderRings" aria-hidden="true">
+                    <div className="ring1" />
+                    <div className="ring2" />
+                    <div className="heartCenter" />
+                </div>
+                <p className="loaderCoupleName">
+                    {invitation.primaryName} {invitation.secondaryName ? `& ${invitation.secondaryName}` : ""}
+                </p>
+                <p className="loaderStatusText">
+                    {isWedding ? "Opening Wedding Invitation" : "Opening Invitation"}
+                </p>
+                <div className="loaderLine" />
+            </div>
         </div>
     );
 }
@@ -319,7 +379,7 @@ function resetPublicInviteScroll(shell: HTMLElement | null, anchor: HTMLElement 
     }
 }
 
-function scheduleIosWebKitVisualViewportNudge() {
+function scheduleIosWebKitVisualViewportNudge(shell: HTMLElement | null) {
     if (!isIosWebKit() || !window.visualViewport) return;
 
     let didNudge = false;
@@ -336,8 +396,25 @@ function scheduleIosWebKitVisualViewportNudge() {
         if (didNudge) return;
         didNudge = true;
         window.requestAnimationFrame(() => {
+            const previousTransform = shell?.style.transform || "";
+            const previousTransition = shell?.style.transition || "";
+            const previousWillChange = shell?.style.willChange || "";
+            if (shell) {
+                shell.style.transition = "none";
+                shell.style.willChange = "transform";
+                shell.style.transform = previousTransform && previousTransform !== "none"
+                    ? `${previousTransform} translateY(1px)`
+                    : "translateY(1px)";
+            }
             window.scrollTo(0, 1);
-            window.scrollTo(0, 0);
+            window.requestAnimationFrame(() => {
+                window.scrollTo(0, 0);
+                if (shell) {
+                    shell.style.transform = previousTransform;
+                    shell.style.transition = previousTransition;
+                    shell.style.willChange = previousWillChange;
+                }
+            });
         });
     };
 
@@ -363,7 +440,7 @@ function getOrCreateGuestToken(invitationId: string) {
     const storageKey = `${RSVP_TOKEN_PREFIX}${invitationId}`;
 
     try {
-        const existing = localStorage.getItem(storageKey);
+        const existing = getStoredGuestToken(invitationId);
         if (existing && existing.length >= 16) return existing;
 
         const nextToken = crypto.randomUUID();
@@ -372,6 +449,47 @@ function getOrCreateGuestToken(invitationId: string) {
     } catch {
         return crypto.randomUUID();
     }
+}
+
+function getStoredGuestToken(invitationId: string) {
+    if (typeof localStorage === "undefined") return null;
+
+    try {
+        const existing = localStorage.getItem(`${RSVP_TOKEN_PREFIX}${invitationId}`);
+        return existing && existing.length >= 16 ? existing : null;
+    } catch {
+        return null;
+    }
+}
+
+function getStoredRsvpStatus(invitationId: string): RSVPStatus | null {
+    if (typeof localStorage === "undefined") return null;
+
+    try {
+        const existing = localStorage.getItem(`${RSVP_STATUS_PREFIX}${invitationId}`);
+        return isRsvpStatus(existing) ? existing : null;
+    } catch {
+        return null;
+    }
+}
+
+function setStoredRsvpStatus(invitationId: string, status: RSVPStatus | null) {
+    if (typeof localStorage === "undefined") return;
+
+    try {
+        const storageKey = `${RSVP_STATUS_PREFIX}${invitationId}`;
+        if (status) {
+            localStorage.setItem(storageKey, status);
+        } else {
+            localStorage.removeItem(storageKey);
+        }
+    } catch {
+        // Ignore blocked storage; the API lookup remains the source of truth.
+    }
+}
+
+function isRsvpStatus(value: string | null): value is RSVPStatus {
+    return value === "accepted" || value === "declined" || value === "maybe";
 }
 
 function getIsChangingResponse() {
