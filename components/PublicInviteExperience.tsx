@@ -31,6 +31,7 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
     const previousVisibleScreenRef = useRef<boolean | null>(null);
     const guestTokenRef = useRef("");
     const rsvpRequestIdRef = useRef(0);
+    const acceptVisualTimeoutRef = useRef<number | null>(null);
     const showAccepted = accepted || (rsvpStatus === "accepted" && !isChangingResponse);
 
     useLayoutEffect(() => {
@@ -112,6 +113,14 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         return () => controller.abort();
     }, [invitation.id, isPublic]);
 
+    useEffect(() => {
+        return () => {
+            if (acceptVisualTimeoutRef.current) {
+                window.clearTimeout(acceptVisualTimeoutRef.current);
+            }
+        };
+    }, []);
+
     function submitRsvp(nextStatus: RSVPStatus, options: { keepalive?: boolean; keepChangingResponse?: boolean } = {}) {
         const requestId = rsvpRequestIdRef.current + 1;
         rsvpRequestIdRef.current = requestId;
@@ -119,8 +128,21 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
         if (!options.keepChangingResponse) {
             clearIsChangingResponse(invitation.id);
         }
-        setAccepted(shouldAccept);
-        setRsvpStatus(nextStatus);
+        if (acceptVisualTimeoutRef.current) {
+            window.clearTimeout(acceptVisualTimeoutRef.current);
+            acceptVisualTimeoutRef.current = null;
+        }
+        if (shouldAccept) {
+            setIsChangingResponse(false);
+            acceptVisualTimeoutRef.current = window.setTimeout(() => {
+                acceptVisualTimeoutRef.current = null;
+                setAccepted(true);
+                setRsvpStatus("accepted");
+            }, 620);
+        } else {
+            setAccepted(false);
+            setRsvpStatus(nextStatus);
+        }
         setIsChangingResponse(Boolean(options.keepChangingResponse));
 
         if (!isPublic) {
@@ -148,6 +170,10 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             .then((payload: { rsvp?: StoredRsvp | null }) => {
                 if (requestId !== rsvpRequestIdRef.current) return;
                 const persistedStatus = payload.rsvp?.status || nextStatus;
+                if (persistedStatus === "accepted" && acceptVisualTimeoutRef.current) {
+                    setIsRsvpSubmitting(false);
+                    return;
+                }
                 setRsvpStatus(persistedStatus);
                 setAccepted(persistedStatus === "accepted");
                 setIsChangingResponse(Boolean(options.keepChangingResponse && persistedStatus === "accepted"));
@@ -156,6 +182,10 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
             })
             .catch(() => {
                 if (requestId !== rsvpRequestIdRef.current) return;
+                if (acceptVisualTimeoutRef.current) {
+                    window.clearTimeout(acceptVisualTimeoutRef.current);
+                    acceptVisualTimeoutRef.current = null;
+                }
                 setAccepted(false);
                 setRsvpStatus(options.keepChangingResponse ? nextStatus : null);
                 setIsChangingResponse(Boolean(options.keepChangingResponse));
@@ -182,6 +212,10 @@ export default function PublicInviteExperience({ invitation, isPublic = false }:
                     schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
                     window.requestAnimationFrame(() => {
                         schedulePublicInviteScrollReset(shellRef.current, topAnchorRef.current);
+                        if (acceptVisualTimeoutRef.current) {
+                            window.clearTimeout(acceptVisualTimeoutRef.current);
+                            acceptVisualTimeoutRef.current = null;
+                        }
                         if (isPublic) {
                             setIsChangingResponseFlag(invitation.id);
                             rsvpRequestIdRef.current += 1;

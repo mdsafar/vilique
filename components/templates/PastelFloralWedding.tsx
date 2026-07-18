@@ -403,7 +403,9 @@ export default function PastelFloralWedding({
         scheduleInvitationScrollReset(pageRef.current);
         window.requestAnimationFrame(() => {
             scheduleInvitationScrollReset(pageRef.current);
-            setIsAccepted(false);
+            if (!accepted) {
+                setIsAccepted(false);
+            }
             onChangeRsvp?.();
         });
     }
