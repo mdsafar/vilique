@@ -13,8 +13,25 @@ type Props = {
     fallback?: ReactNode;
 };
 
+function hasAuthCookie(): boolean {
+    if (typeof document === "undefined") return false;
+    const cookies = document.cookie;
+    if (!cookies) return false;
+    return cookies.split(";").some((c) => {
+        const key = c.trim().split("=")[0];
+        return key.startsWith("sb-") || key.includes("auth-token") || key.includes("access_token");
+    });
+}
+
+function getInitialAuthState(): AuthState {
+    if (typeof window === "undefined") {
+        return "checking";
+    }
+    return hasAuthCookie() ? "checking" : "guest";
+}
+
 export default function ProtectedRoute({ children, next, className, fallback }: Props) {
-    const [authState, setAuthState] = useState<AuthState>("checking");
+    const [authState, setAuthState] = useState<AuthState>(getInitialAuthState);
     const shellClassName = ["protectedRouteShell", className].filter(Boolean).join(" ");
 
     useEffect(() => {

@@ -135,7 +135,9 @@ export default function ProfileInvitationsList({
     }, null, {
         suspense: false,
         keepPreviousData: false,
-        revalidateFirstPage: false,
+        revalidateFirstPage: true,
+        revalidateOnMount: true,
+        revalidateIfStale: true,
         initialSize: savedSize,
         onSuccess: (invitationPages, key) => {
             const currentActiveKey = getFirstPageKey(statusFilter, debouncedSearch);
@@ -216,6 +218,16 @@ export default function ProfileInvitationsList({
     }, [setSize, setListSize, refreshInvitationLists]);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("reset") === "1") {
+            setListSize("invitations", 1);
+            void setSize(1);
+            void refreshInvitationLists();
+        }
+    }, [setSize, setListSize, refreshInvitationLists]);
+
+    useEffect(() => {
         if (window.location.pathname !== "/invitations") return;
         const params = new URLSearchParams(window.location.search);
         
@@ -232,19 +244,6 @@ export default function ProfileInvitationsList({
         }
     }, [debouncedSearch, statusFilter]);
 
-    if (isUnauthorized && showAuthModalOnUnauthorized) {
-        return (
-            <main className="profilePage invitationsPage">
-                <AuthRequiredModal next="/invitations" forceOpen />
-            </main>
-        );
-    }
-
-    const handleClearSearch = () => setSearchTerm("");
-    const handleResetAll = () => {
-        setSearchTerm("");
-        setStatusFilter("all");
-    };
     const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
         if (!window.matchMedia("(max-width: 560px)").matches) {
             setIsMobileTitleCollapsed(false);
@@ -263,6 +262,20 @@ export default function ProfileInvitationsList({
         }
 
         lastListScrollTopRef.current = currentScrollTop;
+    };
+
+    if (isUnauthorized && showAuthModalOnUnauthorized) {
+        return (
+            <main className="profilePage invitationsPage">
+                <AuthRequiredModal next="/invitations" forceOpen />
+            </main>
+        );
+    }
+
+    const handleClearSearch = () => setSearchTerm("");
+    const handleResetAll = () => {
+        setSearchTerm("");
+        setStatusFilter("all");
     };
 
     return (
