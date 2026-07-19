@@ -5013,10 +5013,11 @@ p {
   margin: 0;
   color: #111827;
   font-size: 24px;
-  font-weight: 950;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
 }
+
 
 .analyticsHeader p {
   margin: 0;
@@ -5349,11 +5350,12 @@ p {
 
 @media (max-width: 560px) {
   .analyticsHeader {
-    min-height: 58px;
+    min-height: 66px;
   }
 
   .analyticsHeader h1 {
     font-size: 20px;
+    font-weight: 800;
   }
 
   .analyticsHeader p {
@@ -10055,41 +10057,43 @@ p {
   }
 
   .builderTopbar {
-    grid-template-columns: minmax(86px, 0.68fr) minmax(120px, 1fr) minmax(86px, 0.68fr);
+    grid-template-columns: minmax(40px, auto) minmax(0, 1fr) minmax(40px, auto);
     column-gap: 8px;
     box-sizing: border-box;
-    height: 76px;
-    min-height: 76px;
-    padding: 8px 14px;
+    height: 64px;
+    min-height: 64px;
+    padding: max(8px, env(safe-area-inset-top)) 14px 8px;
     background: rgba(255, 255, 255, 0.94);
     border-bottom: 1px solid rgba(23, 23, 23, 0.07);
-    box-shadow: 0 10px 28px rgba(60, 35, 55, 0.07);
+    box-shadow: 0 4px 16px rgba(60, 35, 55, 0.06);
   }
 
   .builderTopbar.analyticsHeader {
     box-sizing: border-box;
-    height: 76px;
-    min-height: 76px;
-    padding: 8px 14px;
+    height: 64px;
+    min-height: 64px;
+    padding: max(8px, env(safe-area-inset-top)) 14px 8px;
   }
 
   .builderBack {
-    width: auto;
-    min-height: 40px;
-    justify-content: flex-start;
-    gap: 8px;
-    border-radius: 0;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    justify-content: center;
+    gap: 0;
+    border-radius: 11px;
     padding: 0;
-    background: transparent;
-    border: 0;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(23, 23, 23, 0.08);
     color: #171717;
-    box-shadow: none;
-    font-size: 14px;
-    font-weight: 900;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    font-size: 13px;
+    font-weight: 800;
   }
 
   .builderBack span {
-    display: inline;
+    display: none;
   }
 
   .builderHeaderActions {
@@ -10125,7 +10129,7 @@ p {
   }
 
   .builderTitle.analyticsHeaderText {
-    gap: 4px;
+    gap: 2px;
     justify-self: center;
     text-align: center;
   }
@@ -10133,18 +10137,21 @@ p {
   .builderTitle.analyticsHeaderText h1 {
     max-width: 100%;
     color: #080a16;
-    font-size: 16px;
-    line-height: 1.08;
-    font-weight: 950;
+    font-size: 15px;
+    line-height: 1.15;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .builderTitle.analyticsHeaderText p {
     color: #7c3aed;
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 950;
+    letter-spacing: 0.055em;
+    font-weight: 900;
   }
 
   .builderPreviewBtn {
@@ -10157,9 +10164,11 @@ p {
     height: 100svh;
     min-height: 0;
     display: flex;
-    padding: 76px 0 0;
+    padding: 64px 0 0;
     overflow: hidden;
   }
+
+
 
   .builderToolRail {
     display: none;
@@ -17828,7 +17837,7 @@ body:has(.invitePreviewShell) {
   .templateDetailTopbar.analyticsHeader {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) 48px;
-    min-height: 58px;
+    min-height: 66px;
   }
 
   .templateDetailTopbar .analyticsHeaderText {
@@ -17852,6 +17861,7 @@ body:has(.invitePreviewShell) {
 
   .templateDetailTopbar.analyticsHeader h1 {
     font-size: 18px;
+    font-weight: 800;
   }
 
   .templateDetailTopbar.analyticsHeader p {
