@@ -20,12 +20,12 @@ const fetcher = async (url: string) => {
 const swrConfig = {
     fetcher,
     suspense: false,
-    dedupingInterval: CLIENT_CACHE_TTL_MS,
+    dedupingInterval: 2000,
     focusThrottleInterval: CLIENT_CACHE_TTL_MS,
     keepPreviousData: true,
     revalidateIfStale: true,
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
     shouldRetryOnError: false,
 };
 

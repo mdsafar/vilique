@@ -7,20 +7,18 @@ type EventTimingInput = {
     eventTime?: string | null;
     eventTimezone?: string | null;
 };
-type EventLifecycleInput = EventTimingInput & {
+export type EventLifecycleInput = EventTimingInput & {
     status?: string | null;
     lifecycleStatus?: string | null;
+    lifecycle_status?: string | null;
     eventStatus?: string | null;
+    event_status?: string | null;
     firstPublishedAt?: string | null;
     first_published_at?: string | null;
     publishedAt?: string | null;
     published_at?: string | null;
 };
 
-/**
- * Checks whether an event has completed based on its date, time range,
- * timezone, and a grace period (in hours).
- */
 export function isEventCompleted(
     invitation: EventTimingInput,
     graceHours?: number,
@@ -46,10 +44,20 @@ export function isEventCompleted(
     return getEventPhase(invitation, resolvedGraceHours, resolvedNow) === "completed";
 }
 
+function getNormalizedStatusFields(invitation: EventLifecycleInput) {
+    return {
+        status: invitation.status || null,
+        lifecycleStatus: invitation.lifecycleStatus || invitation.lifecycle_status || null,
+        eventStatus: invitation.eventStatus || invitation.event_status || null,
+    };
+}
+
 export function isInvitationCompleted(invitation: EventLifecycleInput, now: Date = new Date()): boolean {
+    const { status, lifecycleStatus, eventStatus } = getNormalizedStatusFields(invitation);
     if (isExplicitDraft(invitation)) return false;
     if (!hasEverBeenPublished(invitation)) return false;
-    if (invitation.lifecycleStatus === "completed" || invitation.eventStatus === "completed") return true;
+    if (lifecycleStatus === "unpublished" || eventStatus === "unpublished" || status !== "published") return false;
+    if (lifecycleStatus === "completed" || eventStatus === "completed") return true;
     return isEventCompleted(invitation, 0, now);
 }
 
@@ -57,6 +65,19 @@ export function getInvitationLifecycle(
     invitation: EventLifecycleInput,
     now: Date = new Date()
 ): InvitationLifecycleStatus {
+    const { status, lifecycleStatus, eventStatus } = getNormalizedStatusFields(invitation);
+
+    const isOfflineState =
+        lifecycleStatus === "unpublished" ||
+        lifecycleStatus === "offline" ||
+        eventStatus === "unpublished" ||
+        eventStatus === "offline" ||
+        status === "unpublished" ||
+        status === "offline";
+    if (isOfflineState) {
+        return "offline";
+    }
+
     if (isExplicitDraft(invitation)) {
         return "draft";
     }
@@ -65,12 +86,12 @@ export function getInvitationLifecycle(
         return "draft";
     }
 
-    if (isInvitationCompleted(invitation, now)) {
-        return "completed";
+    if (status !== "published") {
+        return "offline";
     }
 
-    if (invitation.lifecycleStatus === "unpublished" || invitation.eventStatus === "unpublished" || invitation.status !== "published") {
-        return "offline";
+    if (isInvitationCompleted(invitation, now)) {
+        return "completed";
     }
 
     const phase = getEventPhase(invitation, 0, now);
@@ -89,9 +110,10 @@ export function hasEverBeenPublished(invitation: EventLifecycleInput): boolean {
 }
 
 function isExplicitDraft(invitation: EventLifecycleInput): boolean {
-    return invitation.status === "draft" &&
-        invitation.lifecycleStatus === "draft" &&
-        invitation.eventStatus === "draft";
+    const { status, lifecycleStatus, eventStatus } = getNormalizedStatusFields(invitation);
+    return status === "draft" &&
+        (lifecycleStatus === "draft" || !lifecycleStatus) &&
+        (eventStatus === "draft" || !eventStatus);
 }
 
 export function getEventPhase(

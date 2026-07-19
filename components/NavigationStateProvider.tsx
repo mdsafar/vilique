@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useSyncExternalStore, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 type NavigationState = {
     templatesSearch: string;
@@ -23,7 +24,16 @@ type QueryBackedState = {
     source: string | null;
 };
 
+type UrlQueries = {
+    templatesSearchFromUrl: string | null;
+    templatesFilterFromUrl: string | null;
+    invitationsSearchFromUrl: string | null;
+    invitationsFilterFromUrl: string | null;
+    resetFromUrl: string | null;
+};
+
 const NavigationStateContext = createContext<NavigationState | undefined>(undefined);
+const UrlQuerySyncContext = createContext<((queries: UrlQueries) => void) | undefined>(undefined);
 
 function createQueryBackedState(source: string | null, defaultValue: string): QueryBackedState {
     return {
@@ -39,14 +49,52 @@ function getQueryBackedValue(state: QueryBackedState, source: string | null, def
 }
 
 export function NavigationStateProvider({ children }: { children: React.ReactNode }) {
-    const templatesSearchFromUrl = useUrlQueryValue("/", "search");
-    const templatesFilterFromUrl = useUrlQueryValue("/", "category");
-    const invitationsSearchFromUrl = useUrlQueryValue("/invitations", "search");
-    const invitationsFilterFromUrl = useUrlQueryValue("/invitations", "status");
-    const resetFromUrl = useUrlQueryValue("/invitations", "reset");
+    return (
+        <NavigationStateProviderCore>
+            <React.Suspense fallback={null}>
+                <UrlQueryListener />
+            </React.Suspense>
+            {children}
+        </NavigationStateProviderCore>
+    );
+}
+
+function NavigationStateProviderCore({ children }: { children: React.ReactNode }) {
+    const [urlQueries, setUrlQueries] = useState<UrlQueries>({
+        templatesSearchFromUrl: null,
+        templatesFilterFromUrl: null,
+        invitationsSearchFromUrl: null,
+        invitationsFilterFromUrl: null,
+        resetFromUrl: null,
+    });
+
+    const syncUrlQueries = useCallback((queries: UrlQueries) => {
+        setUrlQueries((prev) => {
+            if (
+                prev.templatesSearchFromUrl === queries.templatesSearchFromUrl &&
+                prev.templatesFilterFromUrl === queries.templatesFilterFromUrl &&
+                prev.invitationsSearchFromUrl === queries.invitationsSearchFromUrl &&
+                prev.invitationsFilterFromUrl === queries.invitationsFilterFromUrl &&
+                prev.resetFromUrl === queries.resetFromUrl
+            ) {
+                return prev;
+            }
+            return queries;
+        });
+    }, []);
+
+    const {
+        templatesSearchFromUrl,
+        templatesFilterFromUrl,
+        invitationsSearchFromUrl,
+        invitationsFilterFromUrl,
+        resetFromUrl,
+    } = urlQueries;
+
     const isInvitationsReset = resetFromUrl === "1";
     const activeInvitationsSearchFromUrl = isInvitationsReset ? null : invitationsSearchFromUrl;
     const activeInvitationsFilterFromUrl = isInvitationsReset ? null : invitationsFilterFromUrl;
+
     const [templatesSearchState, setTemplatesSearchState] = useState(() => createQueryBackedState(templatesSearchFromUrl, ""));
     const [templatesFilterState, setTemplatesFilterState] = useState(() => createQueryBackedState(templatesFilterFromUrl, "all"));
     const [invitationsSearchState, setInvitationsSearchState] = useState(() => createQueryBackedState(activeInvitationsSearchFromUrl, ""));
@@ -82,12 +130,10 @@ export function NavigationStateProvider({ children }: { children: React.ReactNod
 
     const setInvitationsSearch = useCallback((value: string) => {
         setInvitationsSearchState({ value, touched: true, source: activeInvitationsSearchFromUrl });
-        setListSizes((prev) => ({ ...prev, invitations: 1 }));
     }, [activeInvitationsSearchFromUrl]);
 
     const setInvitationsFilter = useCallback((value: string) => {
         setInvitationsFilterState({ value, touched: true, source: activeInvitationsFilterFromUrl });
-        setListSizes((prev) => ({ ...prev, invitations: 1 }));
     }, [activeInvitationsFilterFromUrl]);
 
     const setScrollPosition = useCallback((path: string, y: number) => {
@@ -99,43 +145,51 @@ export function NavigationStateProvider({ children }: { children: React.ReactNod
     }, []);
 
     return (
-        <NavigationStateContext.Provider
-            value={{
-                templatesSearch,
-                setTemplatesSearch,
-                templatesFilter,
-                setTemplatesFilter,
-                invitationsSearch,
-                setInvitationsSearch,
-                invitationsFilter,
-                setInvitationsFilter,
-                scrollPositions,
-                setScrollPosition,
-                listSizes: effectiveListSizes,
-                setListSize,
-            }}
-        >
-            {children}
-        </NavigationStateContext.Provider>
+        <UrlQuerySyncContext.Provider value={syncUrlQueries}>
+            <NavigationStateContext.Provider
+                value={{
+                    templatesSearch,
+                    setTemplatesSearch,
+                    templatesFilter,
+                    setTemplatesFilter,
+                    invitationsSearch,
+                    setInvitationsSearch,
+                    invitationsFilter,
+                    setInvitationsFilter,
+                    scrollPositions,
+                    setScrollPosition,
+                    listSizes: effectiveListSizes,
+                    setListSize,
+                }}
+            >
+                {children}
+            </NavigationStateContext.Provider>
+        </UrlQuerySyncContext.Provider>
     );
 }
 
-function useUrlQueryValue(pathname: string, key: string) {
-    return useSyncExternalStore(
-        subscribeToLocationChanges,
-        () => getUrlQueryValue(pathname, key),
-        () => null
-    );
-}
+function UrlQueryListener() {
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const syncUrlQueries = useContext(UrlQuerySyncContext);
 
-function subscribeToLocationChanges(onStoreChange: () => void) {
-    window.addEventListener("popstate", onStoreChange);
-    return () => window.removeEventListener("popstate", onStoreChange);
-}
+    const templatesSearchFromUrl = pathname === "/" ? searchParams.get("search") : null;
+    const templatesFilterFromUrl = pathname === "/" ? searchParams.get("category") : null;
+    const invitationsSearchFromUrl = pathname === "/invitations" ? searchParams.get("search") : null;
+    const invitationsFilterFromUrl = pathname === "/invitations" ? searchParams.get("status") : null;
+    const resetFromUrl = pathname === "/invitations" ? searchParams.get("reset") : null;
 
-function getUrlQueryValue(pathname: string, key: string) {
-    if (typeof window === "undefined" || window.location.pathname !== pathname) return null;
-    return new URLSearchParams(window.location.search).get(key);
+    useEffect(() => {
+        syncUrlQueries?.({
+            templatesSearchFromUrl,
+            templatesFilterFromUrl,
+            invitationsSearchFromUrl,
+            invitationsFilterFromUrl,
+            resetFromUrl,
+        });
+    }, [templatesSearchFromUrl, templatesFilterFromUrl, invitationsSearchFromUrl, invitationsFilterFromUrl, resetFromUrl, syncUrlQueries]);
+
+    return null;
 }
 
 export function useNavigationState() {

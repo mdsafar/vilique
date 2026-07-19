@@ -12,13 +12,18 @@ import {
     Copy,
     Eye,
     ExternalLink,
+    FileText,
     Loader2,
+    Mail,
+    Monitor,
     Pause,
     PencilLine,
     Play,
     Rocket,
     Save,
     Smartphone,
+    Users,
+    Volume2,
     X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -27,13 +32,21 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublishModal from "@/components/PublishModal";
 import { useToast } from "@/components/Toast";
+import { useSWRConfig } from "swr";
+import { mutateInvitationState } from "@/lib/invitationCache";
 import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { normalizeInvitationDateValue, parseInvitationDateParts } from "@/lib/invitationDate";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { createDemoCountdownTargetDate } from "@/lib/demoCountdown";
 import { templates } from "@/data/templates";
 import TemplateRenderer from "@/components/TemplateRenderer";
+import { FloatingFlowers } from "@/components/templates/PastelFloralWedding";
 import type { InvitationData } from "@/types/invitation";
+import {
+    validateInvitationFields,
+    type BuilderValidationErrors,
+    type BuilderValidationFieldKey,
+} from "@/features/invitations/validation";
 
 type EditorTab = "content" | "event" | "contact" | "sound";
 type PreviewScreen = "invite" | "thanks";
@@ -41,30 +54,22 @@ type PublishSuccessDetails = {
     slug: string;
     publishedAt?: string | null;
 };
-type BuilderFieldKey = "title" | "primaryName" | "eventDate" | "eventTime" | "venueName" | "phone" | "secondaryPhone" | "message";
-type BuilderValidationErrors = Partial<Record<BuilderFieldKey, string>>;
 
-const requiredFieldTabs: Record<BuilderFieldKey, EditorTab> = {
+const requiredFieldTabs: Record<BuilderValidationFieldKey, EditorTab> = {
     title: "content",
     primaryName: "content",
+    secondaryName: "content",
     message: "content",
     eventDate: "event",
     eventTime: "event",
     venueName: "event",
+    venueAddress: "event",
     phone: "contact",
     secondaryPhone: "contact",
+    mapLink: "contact",
+    musicUrl: "sound",
 };
 
-const requiredFieldLabels: Record<BuilderFieldKey, string> = {
-    title: "Title",
-    primaryName: "Primary name",
-    message: "Message",
-    eventDate: "Date",
-    eventTime: "Time",
-    venueName: "Venue name",
-    phone: "Primary phone",
-    secondaryPhone: "Secondary phone",
-};
 
 function formatSaveError(error: unknown): string {
     if (!error) return "Save failed";
@@ -98,38 +103,21 @@ function formatSaveError(error: unknown): string {
 
 function parseServerValidationErrors(fields: unknown): BuilderValidationErrors {
     if (!fields || typeof fields !== "object") {
-        return { title: "Complete the required fields before updating." };
+        return { title: "Please fix the highlighted fields before continuing." };
     }
 
     const errors: BuilderValidationErrors = {};
     Object.entries(fields as Record<string, unknown>).forEach(([key, value]) => {
-        if (!(key in requiredFieldLabels)) return;
         if (typeof value === "string" && value.trim()) {
-            errors[key as BuilderFieldKey] = value;
+            errors[key as BuilderValidationFieldKey] = value;
         } else {
-            errors[key as BuilderFieldKey] = `${requiredFieldLabels[key as BuilderFieldKey]} is required.`;
+            errors[key as BuilderValidationFieldKey] = "Required field missing.";
         }
     });
 
-    return Object.keys(errors).length > 0 ? errors : { title: "Complete the required fields before updating." };
+    return Object.keys(errors).length > 0 ? errors : { title: "Please fix the highlighted fields before continuing." };
 }
 
-function validateRequiredFields(source: InvitationData) {
-    const nextErrors: BuilderValidationErrors = {};
-    const phone = source.phone || "";
-    const secondaryPhone = source.secondaryPhone || "";
-    if (!source.title.trim()) nextErrors.title = "Enter a title before updating.";
-    if (!source.primaryName.trim()) nextErrors.primaryName = "Enter the primary name before updating.";
-    if (!normalizeInvitationDateValue(source.eventDate)) nextErrors.eventDate = "Choose a valid event date.";
-    if (!source.eventTime.trim()) nextErrors.eventTime = "Choose an event time.";
-    if (!source.venueName.trim()) nextErrors.venueName = "Enter the venue name before updating.";
-    if (!phone.trim()) nextErrors.phone = "Enter the primary phone number before updating.";
-    else if (phone.length !== 10) nextErrors.phone = "Primary phone number must be 10 digits.";
-    if (!secondaryPhone.trim()) nextErrors.secondaryPhone = "Enter the secondary phone number before updating.";
-    else if (secondaryPhone.length !== 10) nextErrors.secondaryPhone = "Secondary phone number must be 10 digits.";
-    if (!source.message.trim()) nextErrors.message = "Enter an invitation message before updating.";
-    return nextErrors;
-}
 
 const editorTabs: { id: EditorTab; label: string }[] = [
     { id: "content", label: "Content" },
@@ -137,6 +125,16 @@ const editorTabs: { id: EditorTab; label: string }[] = [
     { id: "contact", label: "Contact" },
     { id: "sound", label: "Sound" },
 ];
+const builderRailItems: {
+    id: EditorTab;
+    label: string;
+    icon: typeof FileText;
+}[] = [
+        { id: "content", label: "Content", icon: FileText },
+        { id: "event", label: "Event", icon: Mail },
+        { id: "contact", label: "Contact", icon: Users },
+        { id: "sound", label: "Sound", icon: Volume2 },
+    ];
 const weddingTemplateTitleOptions = ["Wedding Invitation", "Reception"] as const;
 const weddingTemplateDefaultTitle = weddingTemplateTitleOptions[0];
 const builderLocalPreviewKey = "vilique-builder-local-preview";
@@ -198,12 +196,15 @@ function BuilderContent() {
     const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
     const [activeTab, setActiveTab] = useState<EditorTab>("content");
     const [previewScreen, setPreviewScreen] = useState<PreviewScreen>("invite");
+    const [previewDeviceMode, setPreviewDeviceMode] = useState<"mobile" | "desktop">("mobile");
+    const [editorCollapsed, setEditorCollapsed] = useState(false);
     const [demoCountdownTargetDate, setDemoCountdownTargetDate] = useState<Date | null>(createDemoCountdownTargetDate);
-    const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
+    const [mobileEditorOpen, setMobileEditorOpen] = useState(() => (
+        typeof window !== "undefined" ? window.matchMedia("(max-width: 899px)").matches : false
+    ));
     const [saveState, setSaveState] = useState("Creating draft...");
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [leaveModalOpen, setLeaveModalOpen] = useState(false);
-    const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [isUploadingMusic, setIsUploadingMusic] = useState(false);
@@ -211,21 +212,67 @@ function BuilderContent() {
     const [publishSuccessDetails, setPublishSuccessDetails] = useState<PublishSuccessDetails | null>(null);
     const [previewScrolledToBottom, setPreviewScrolledToBottom] = useState(false);
     const previewViewportRef = useRef<HTMLDivElement>(null);
-    const lastSavedPayload = useRef("");
+    const [initialSavedPayload, setInitialSavedPayload] = useState("");
+    const lastSavedPayloadRef = useRef("");
     const lastSaveErrorToast = useRef("");
     const hasLoadedDraft = useRef(false);
     const createDraftPromise = useRef<Promise<InvitationData> | null>(null);
     const isNewDraft = useRef(true);
     const initialInvitation = useRef<InvitationData | null>(null);
-    const openedFromExistingInvitation = useRef(false);
-    const builderBackLabel = useRef("Templates");
-    const builderBackTarget = useRef("/");
+    const autosaveControllerRef = useRef<AbortController | null>(null);
+    const isIntentionalNavigationRef = useRef(false);
+    const { mutate: globalMutate } = useSWRConfig();
+
+    const existingId = searchParams.get("id");
+    const templateKey = searchParams.get("template") || "pastel-floral-wedding";
+    const openedFromProfile = searchParams.get("from") === "profile";
+    const openedFromInvitations = searchParams.get("from") === "invitations";
+    const openedFromTemplateDetails = searchParams.get("from") === "template-details";
+
+    const openedFromExistingInvitation = useMemo(() => {
+        const isSessionNewDraft = !openedFromProfile && !openedFromInvitations && existingId && typeof window !== "undefined"
+            ? sessionStorage.getItem(`vilique-new-draft-${existingId}`) === "true"
+            : !existingId;
+        return openedFromProfile || openedFromInvitations || (!!existingId && !isSessionNewDraft);
+    }, [existingId, openedFromInvitations, openedFromProfile]);
+
+    const builderBackLabel = useMemo(() => {
+        if (openedFromExistingInvitation) return "Invitations";
+        if (existingId && typeof window !== "undefined") {
+            const stored = sessionStorage.getItem(`vilique-builder-back-label-${existingId}`);
+            if (stored) return stored;
+        }
+        return "Templates";
+    }, [existingId, openedFromExistingInvitation]);
+
+    const builderBackTarget = useMemo(() => {
+        const returnToParam = searchParams.get("returnTo");
+        if (returnToParam) return returnToParam;
+        if (existingId && typeof window !== "undefined") {
+            const stored = sessionStorage.getItem(`vilique-builder-back-target-${existingId}`);
+            if (stored) return stored;
+        }
+        if (openedFromExistingInvitation) {
+            return invitation.status === "published" ? "/invitations?status=upcoming" : "/invitations";
+        }
+        if (openedFromTemplateDetails) return `/templates/${templateKey}`;
+        return "/";
+    }, [existingId, invitation.status, openedFromExistingInvitation, openedFromTemplateDetails, searchParams, templateKey]);
+
+    const updateLastSavedPayload = useCallback((payload: string) => {
+        lastSavedPayloadRef.current = payload;
+    }, []);
+
+    const invalidateInvitationsCache = useCallback((updatedInvitation?: InvitationData, previousInvitation?: InvitationData | null) => {
+        mutateInvitationState(globalMutate, updatedInvitation, previousInvitation);
+    }, [globalMutate]);
     const currentBuilderPath = `/builder${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
     const isPersistedDraft = invitation.id !== "default-draft-placeholder-id";
-    const isEditingPublished = openedFromExistingInvitation.current && invitation.status === "published";
+    const isEditingPublished = openedFromExistingInvitation && invitation.status === "published";
 
     useEffect(() => {
         if (!mobileEditorOpen) return;
+        if (!window.matchMedia("(max-width: 899px)").matches) return;
 
         const scrollY = window.scrollY;
         const bodyStyle = document.body.style;
@@ -252,13 +299,7 @@ function BuilderContent() {
         () => templates.find((item) => item.id === invitation.templateId),
         [invitation.templateId]
     );
-    const displayedValidationErrors = useMemo(() => {
-        if (!isEditingPublished) return validationErrors;
-        return {
-            ...validateRequiredFields(invitation),
-            ...validationErrors,
-        };
-    }, [invitation, isEditingPublished, validationErrors]);
+    const displayedValidationErrors = useMemo(() => validationErrors, [validationErrors]);
 
     const buildSavePayload = useCallback((source: InvitationData = invitation) => {
         const normalizedEventDate = normalizeInvitationDateValue(source.eventDate);
@@ -286,6 +327,9 @@ function BuilderContent() {
             sections: source.sections || {},
         });
     }, [invitation]);
+
+    // Track whether the current payload differs from initial loaded payload or last saved payload
+    const hasUnsavedChanges = !isLoadingInvitation && initialSavedPayload !== "" && buildSavePayload(invitation) !== initialSavedPayload;
 
     async function ensureDraftExists() {
         if (invitation.id !== "default-draft-placeholder-id") return invitation;
@@ -329,8 +373,8 @@ function BuilderContent() {
                 if (typeof window !== "undefined") {
                     sessionStorage.removeItem(builderLocalPreviewKey);
                     sessionStorage.setItem(`vilique-new-draft-${draft.id}`, "true");
-                    sessionStorage.setItem(`vilique-builder-back-target-${draft.id}`, builderBackTarget.current);
-                    sessionStorage.setItem(`vilique-builder-back-label-${draft.id}`, builderBackLabel.current);
+                    sessionStorage.setItem(`vilique-builder-back-target-${draft.id}`, builderBackTarget);
+                    sessionStorage.setItem(`vilique-builder-back-label-${draft.id}`, builderBackLabel);
                 }
                 setInvitation(nextInvitation);
                 router.replace(`/builder?id=${draft.id}`, { scroll: false });
@@ -343,15 +387,24 @@ function BuilderContent() {
         return createDraftPromise.current;
     }
 
-    function showRequiredFieldErrors(errors: BuilderValidationErrors) {
-        const firstField = Object.keys(errors)[0] as BuilderFieldKey | undefined;
+    const handleValidationFailure = useCallback((errors: BuilderValidationErrors) => {
+        const firstField = Object.keys(errors)[0] as BuilderValidationFieldKey | undefined;
         if (firstField) {
-            setActiveTab(requiredFieldTabs[firstField]);
-            const message = errors[firstField] || `${requiredFieldLabels[firstField]} is required.`;
+            const tab = requiredFieldTabs[firstField];
+            if (tab) setActiveTab(tab);
+            setMobileEditorOpen(true);
             setSaveState("Fix required fields");
-            showToast(message, "error");
+            showToast("Please fix the highlighted fields before continuing.", "error");
+
+            window.setTimeout(() => {
+                const element = document.querySelector(`[data-field-key="${firstField}"]`) as HTMLElement | null;
+                if (element) {
+                    element.scrollIntoView({ behavior: "smooth", block: "center" });
+                    element.focus();
+                }
+            }, 120);
         }
-    }
+    }, [showToast]);
 
     const showSaveFailure = useCallback((message: string) => {
         setSaveState(message);
@@ -361,23 +414,26 @@ function BuilderContent() {
         }
     }, [showToast]);
 
-    async function saveInvitation(options: { createIfNeeded?: boolean; isExplicitUserSave?: boolean; validateRequired?: boolean } = {}) {
-        if (options.validateRequired) {
-            const errors = validateRequiredFields(invitation);
+    async function saveInvitation(options: { createIfNeeded?: boolean; isExplicitUserSave?: boolean } = {}) {
+        // Cancel any in-flight autosave to avoid race conditions with explicit saves
+        autosaveControllerRef.current?.abort();
+        autosaveControllerRef.current = null;
+
+        const errors = validateInvitationFields(invitation);
+        if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
-            if (Object.keys(errors).length > 0) {
-                showRequiredFieldErrors(errors);
-                return null;
-            }
+            handleValidationFailure(errors);
+            return null;
         }
 
         const source = options.createIfNeeded ? await ensureDraftExists() : invitation;
         if (source.id === "default-draft-placeholder-id") return null;
 
         const payload = buildSavePayload(source);
-        if (payload === lastSavedPayload.current) {
-            setSaveState("Saved");
+        if (payload === lastSavedPayloadRef.current) {
+            setSaveState("✓ Saved");
             if (options.isExplicitUserSave) {
+                setInitialSavedPayload(payload);
                 isNewDraft.current = false;
                 if (typeof window !== "undefined") {
                     sessionStorage.removeItem(builderLocalPreviewKey);
@@ -386,10 +442,12 @@ function BuilderContent() {
                     sessionStorage.removeItem(`vilique-builder-back-label-${source.id}`);
                 }
             }
+            invalidateInvitationsCache(source, initialInvitation.current);
+            initialInvitation.current = source;
             return source;
         }
 
-        setSaveState("Saving...");
+        setSaveState("Saving…");
         const response = await fetch(`/api/invitations/${source.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -397,11 +455,13 @@ function BuilderContent() {
         });
 
         if (response.ok) {
-            lastSavedPayload.current = payload;
+            const previousInvitation = initialInvitation.current;
+            updateLastSavedPayload(payload);
             lastSaveErrorToast.current = "";
             setValidationErrors({});
-            setSaveState("Saved");
+            setSaveState("✓ Saved");
             if (options.isExplicitUserSave) {
+                setInitialSavedPayload(payload);
                 isNewDraft.current = false;
                 if (typeof window !== "undefined") {
                     sessionStorage.removeItem(builderLocalPreviewKey);
@@ -410,6 +470,7 @@ function BuilderContent() {
                     sessionStorage.removeItem(`vilique-builder-back-label-${source.id}`);
                 }
             }
+            invalidateInvitationsCache(source, previousInvitation);
             initialInvitation.current = source;
             return source;
         }
@@ -418,7 +479,7 @@ function BuilderContent() {
         if (result.code === "REQUIRED_FIELDS_MISSING") {
             const serverErrors = parseServerValidationErrors(result.fields);
             setValidationErrors(serverErrors);
-            showRequiredFieldErrors(serverErrors);
+            handleValidationFailure(serverErrors);
             return null;
         }
         if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
@@ -436,57 +497,74 @@ function BuilderContent() {
         return null;
     }
 
-    async function handleSaveDraft() {
-        setIsSavingDraft(true);
-        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
-        if (saved) {
-            router.push("/invitations?reset=1");
-        } else {
-            setIsSavingDraft(false);
-        }
-    }
-
     async function handleUpdateInvitation() {
         setIsPublishing(true);
-        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true, validateRequired: true });
-        setIsPublishing(false);
-        if (saved) {
-            setSaveState(invitation.status === "published" ? "Updated" : "Saved");
-            showToast("Invitation updated successfully", "success");
-            window.setTimeout(navigateBackToList, 450);
-        }
-    }
-
-    function navigateBackToList() {
-        router.replace(builderBackTarget.current);
-    }
-
-    async function saveAndPreview() {
-        setIsPreviewing(true);
-        if (invitation.id === "default-draft-placeholder-id") {
-            if (typeof window !== "undefined") {
-                sessionStorage.setItem(builderLocalPreviewKey, JSON.stringify({
-                    invitation,
-                    backLabel: builderBackLabel.current,
-                    backTarget: builderBackTarget.current,
-                }));
-            }
-            router.push(`/builder/preview?local=1&template=${encodeURIComponent(invitation.templateId)}`);
+        const errors = validateInvitationFields(invitation);
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            handleValidationFailure(errors);
+            setIsPublishing(false);
             return;
         }
-
-        const savedInvitation = await saveInvitation({ createIfNeeded: true });
-        if (savedInvitation) {
-            router.push(`/builder/preview?id=${savedInvitation.id}`);
-        } else {
-            setIsPreviewing(false);
+        const saved = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+        if (!saved) {
+            setIsPublishing(false);
+            return;
         }
+        setSaveState(invitation.status === "published" ? "✓ Updated" : "✓ Saved");
+        showToast("Invitation updated successfully", "success");
+        window.setTimeout(() => navigateBackToList(), 450);
+    }
+
+    const navigateBackToList = useCallback(() => {
+        isIntentionalNavigationRef.current = true;
+        if (!openedFromExistingInvitation && invitation.id === "default-draft-placeholder-id") {
+            router.replace(builderBackTarget);
+        } else if (!openedFromExistingInvitation && invitation.status !== "published") {
+            router.replace("/invitations?status=draft");
+        } else {
+            router.replace(builderBackTarget);
+        }
+    }, [builderBackTarget, invitation.id, invitation.status, openedFromExistingInvitation, router]);
+
+    const handleBackClick = useCallback(() => {
+        if (hasUnsavedChanges) {
+            setLeaveModalOpen(true);
+        } else {
+            navigateBackToList();
+        }
+    }, [hasUnsavedChanges, navigateBackToList]);
+
+    function saveAndPreview() {
+        setIsPreviewing(true);
+        // Always write live in-memory state to sessionStorage so preview reflects
+        // exactly what the user sees in the builder — no implicit save to DB.
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem(builderLocalPreviewKey, JSON.stringify({
+                invitation,
+                backLabel: builderBackLabel,
+                backTarget: builderBackTarget,
+            }));
+        }
+        if (invitation.id !== "default-draft-placeholder-id") {
+            router.push(`/builder/preview?id=${invitation.id}&local=1`);
+        } else {
+            router.push(`/builder/preview?local=1&template=${encodeURIComponent(invitation.templateId)}`);
+        }
+        // Navigation is underway; component will unmount. No need to reset isPreviewing.
     }
 
     async function saveAndOpenPublish() {
         setIsPublishing(true);
+        const errors = validateInvitationFields(invitation);
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            handleValidationFailure(errors);
+            setIsPublishing(false);
+            return;
+        }
         // Don't mark as explicit user save yet — user can still cancel out of the publish modal
-        const savedInvitation = await saveInvitation({ createIfNeeded: true, validateRequired: true });
+        const savedInvitation = await saveInvitation({ createIfNeeded: true });
         setIsPublishing(false);
         if (savedInvitation) {
             setIsPublishModalOpen(true);
@@ -494,38 +572,66 @@ function BuilderContent() {
     }
 
     async function handleDiscard() {
+        autosaveControllerRef.current?.abort();
+        autosaveControllerRef.current = null;
+
         const isPersisted = invitation.id !== "default-draft-placeholder-id";
         if (isPersisted) {
             if (isNewDraft.current) {
                 // Delete the new draft since it was only created in this session (e.g. from Preview/file upload)
                 await fetch(`/api/invitations/${invitation.id}`, {
                     method: "DELETE",
-                });
+                }).catch(() => { });
+                isIntentionalNavigationRef.current = true;
+                if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(builderLocalPreviewKey);
+                    sessionStorage.removeItem(`vilique-new-draft-${invitation.id}`);
+                    sessionStorage.removeItem(`vilique-builder-back-target-${invitation.id}`);
+                    sessionStorage.removeItem(`vilique-builder-back-label-${invitation.id}`);
+                }
+                mutateInvitationState(globalMutate, undefined, undefined, invitation, true);
+                router.replace(builderBackTarget);
+                return;
             } else if (initialInvitation.current) {
                 // Revert existing draft to pristine state when loaded
+                const revertedInvitation: InvitationData = {
+                    ...initialInvitation.current,
+                    updatedAt: new Date().toISOString(),
+                };
                 await fetch(`/api/invitations/${invitation.id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: buildSavePayload(initialInvitation.current),
-                });
+                    body: buildSavePayload(revertedInvitation),
+                }).catch(() => { });
+                isIntentionalNavigationRef.current = true;
+                if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(builderLocalPreviewKey);
+                }
+                mutateInvitationState(globalMutate, revertedInvitation, invitation, undefined, true);
+                router.replace(builderBackTarget);
+                return;
             }
         }
-        navigateBackToList();
+        isIntentionalNavigationRef.current = true;
+        if (typeof window !== "undefined") {
+            sessionStorage.removeItem(builderLocalPreviewKey);
+        }
+        router.replace(builderBackTarget);
     }
 
     function updateField(key: string, value: string) {
         if (key === "eventDate" || key === "eventTime") {
             setDemoCountdownTargetDate(null);
         }
+        const nextInvitation = { ...invitation, [key]: value };
+        const nextErrors = validateInvitationFields(nextInvitation);
         setValidationErrors((prev) => {
-            if (!(key in prev)) return prev;
-            const nextInvitation = { ...invitation, [key]: value };
-            const nextErrors = validateRequiredFields(nextInvitation);
-            if (nextErrors[key as BuilderFieldKey]) {
-                return { ...prev, [key]: nextErrors[key as BuilderFieldKey] };
-            }
             const next = { ...prev };
-            delete next[key as BuilderFieldKey];
+            if (nextErrors[key as BuilderValidationFieldKey]) {
+                next[key as BuilderValidationFieldKey] = nextErrors[key as BuilderValidationFieldKey];
+            } else {
+                delete next[key as BuilderValidationFieldKey];
+            }
             return next;
         });
         setInvitation((prev) => ({
@@ -583,7 +689,7 @@ function BuilderContent() {
                     updatedAt: new Date().toISOString(),
                 };
             });
-            setSaveState("Saved");
+            setSaveState("✓ Saved");
         } finally {
             setIsUploadingMusic(false);
         }
@@ -627,31 +733,10 @@ function BuilderContent() {
         if (hasLoadedDraft.current) return;
         hasLoadedDraft.current = true;
 
-        const existingId = searchParams.get("id");
-        const templateKey = searchParams.get("template") || "pastel-floral-wedding";
-        const openedFromProfile = searchParams.get("from") === "profile";
-        const openedFromInvitations = searchParams.get("from") === "invitations";
-        const openedFromTemplateDetails = searchParams.get("from") === "template-details";
-
         const isSessionNewDraft = !openedFromProfile && !openedFromInvitations && existingId && typeof window !== "undefined"
             ? sessionStorage.getItem(`vilique-new-draft-${existingId}`) === "true"
             : !existingId;
         isNewDraft.current = !!isSessionNewDraft;
-        openedFromExistingInvitation.current = openedFromProfile || openedFromInvitations || (!!existingId && !isSessionNewDraft);
-
-        if (openedFromExistingInvitation.current) {
-            builderBackLabel.current = "Invitations";
-            builderBackTarget.current = "/invitations";
-        } else if (existingId && typeof window !== "undefined") {
-            builderBackLabel.current = sessionStorage.getItem(`vilique-builder-back-label-${existingId}`) || "Templates";
-            builderBackTarget.current = sessionStorage.getItem(`vilique-builder-back-target-${existingId}`) || "/";
-        } else if (openedFromTemplateDetails) {
-            builderBackLabel.current = "Templates";
-            builderBackTarget.current = `/templates/${templateKey}`;
-        } else {
-            builderBackLabel.current = "Templates";
-            builderBackTarget.current = "/";
-        }
 
         async function loadDraft() {
             if (existingId) {
@@ -661,8 +746,10 @@ function BuilderContent() {
                     setDemoCountdownTargetDate(null);
                     setInvitation(draft);
                     initialInvitation.current = draft;
-                    lastSavedPayload.current = buildSavePayload(draft);
-                    setSaveState(draft.status === "published" ? "Published" : "Saved");
+                    const draftPayload = buildSavePayload(draft);
+                    setInitialSavedPayload(draftPayload);
+                    updateLastSavedPayload(draftPayload);
+                    setSaveState(draft.status === "published" ? "✓ Published" : "✓ Saved");
                     setIsLoadingInvitation(false);
                     return;
                 }
@@ -688,8 +775,10 @@ function BuilderContent() {
             if (localPreviewDraft) {
                 const restoredDraft = normalizeInvitationDate(localPreviewDraft.invitation);
                 setInvitation(restoredDraft);
-                initialInvitation.current = null;
-                lastSavedPayload.current = buildSavePayload(restoredDraft);
+                initialInvitation.current = restoredDraft;
+                const draftPayload = buildSavePayload(restoredDraft);
+                setInitialSavedPayload(draftPayload);
+                updateLastSavedPayload(draftPayload);
                 setSaveState("Not saved");
                 setIsLoadingInvitation(false);
                 return;
@@ -697,65 +786,127 @@ function BuilderContent() {
 
             const normalizedDefaultInv = normalizeInvitationDate(defaultInv);
             setInvitation(normalizedDefaultInv);
-            initialInvitation.current = null;
-            lastSavedPayload.current = buildSavePayload(normalizedDefaultInv);
+            initialInvitation.current = normalizedDefaultInv;
+            const draftPayload = buildSavePayload(normalizedDefaultInv);
+            setInitialSavedPayload(draftPayload);
+            updateLastSavedPayload(draftPayload);
             setSaveState("Not saved");
             setIsLoadingInvitation(false);
         }
 
         void loadDraft();
-    }, [buildSavePayload, router, searchParams, showToast]);
+    }, [buildSavePayload, existingId, openedFromInvitations, openedFromProfile, router, showToast, templateKey, updateLastSavedPayload]);
 
     useEffect(() => {
         if (!hasLoadedDraft.current || !isPersistedDraft) return;
 
         const payload = buildSavePayload(invitation);
 
-        if (payload === lastSavedPayload.current) return;
+        if (payload === lastSavedPayloadRef.current) return;
 
-        setSaveState("Saving...");
+        setSaveState("Saving…");
+
+        // Each render cycle gets its own AbortController so the previous in-flight
+        // request is cancelled when a new edit arrives, preventing last-writer-wins races.
+        const controller = new AbortController();
+        autosaveControllerRef.current = controller;
 
         const timeout = window.setTimeout(async () => {
-            if (isEditingPublished) {
-                const errors = validateRequiredFields(invitation);
-                if (Object.keys(errors).length > 0) {
-                    setSaveState("Fix required fields");
-                    return;
-                }
-            }
+            if (controller.signal.aborted) return;
 
-            const response = await fetch(`/api/invitations/${invitation.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: payload,
-            });
-
-            if (response.ok) {
-                lastSavedPayload.current = payload;
-                lastSaveErrorToast.current = "";
-                setValidationErrors({});
-                setSaveState("Saved");
+            const errors = validateInvitationFields(invitation);
+            if (Object.keys(errors).length > 0) {
+                setValidationErrors(errors);
+                setSaveState("Fix required fields");
                 return;
             }
 
-            const result = await response.json().catch(() => ({}));
-            if (result.code === "REQUIRED_FIELDS_MISSING") {
-                setValidationErrors(parseServerValidationErrors(result.fields));
-                setSaveState("Fix required fields");
-            } else if (response.status === 409 && (result.code === "MAJOR_CHANGE_DETECTED" || result.code === "EVENT_IDENTITY_CHANGED" || result.code === "NEW_EVENT_DETECTED" || result.code === "PROTECTED_EVENT_IDENTITY")) {
-                const message = result.error || "This invitation is protected after publishing.";
-                showSaveFailure(message);
-            } else if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
-                const message = result.error || "This invitation is completed and can no longer be edited.";
-                showSaveFailure(message);
-                window.setTimeout(() => router.replace(builderBackTarget.current), 450);
-            } else {
-                showSaveFailure(formatSaveError(result.error));
+            // An explicit save (Publish / Save Draft) may have already persisted this payload
+            if (payload === lastSavedPayloadRef.current) {
+                setSaveState("✓ Saved");
+                return;
+            }
+
+
+            try {
+                const response = await fetch(`/api/invitations/${invitation.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: payload,
+                    signal: controller.signal,
+                });
+
+                if (controller.signal.aborted) return;
+
+                if (response.ok) {
+                    updateLastSavedPayload(payload);
+                    lastSaveErrorToast.current = "";
+                    setValidationErrors({});
+                    setSaveState("✓ Saved");
+                    invalidateInvitationsCache(invitation, initialInvitation.current);
+                    return;
+                }
+
+                const result = await response.json().catch(() => ({}));
+                if (controller.signal.aborted) return;
+                if (result.code === "REQUIRED_FIELDS_MISSING") {
+                    setValidationErrors(parseServerValidationErrors(result.fields));
+                    setSaveState("Fix required fields");
+                } else if (response.status === 409 && (result.code === "MAJOR_CHANGE_DETECTED" || result.code === "EVENT_IDENTITY_CHANGED" || result.code === "NEW_EVENT_DETECTED" || result.code === "PROTECTED_EVENT_IDENTITY")) {
+                    const message = result.error || "This invitation is protected after publishing.";
+                    showSaveFailure(message);
+                } else if (response.status === 409 && result.code === "INVITATION_COMPLETED_LOCKED") {
+                    const message = result.error || "This invitation is completed and can no longer be edited.";
+                    showSaveFailure(message);
+                    window.setTimeout(() => router.replace(builderBackTarget), 450);
+                } else {
+                    showSaveFailure(formatSaveError(result.error));
+                }
+            } catch (err) {
+                // AbortError is expected whenever cleanup cancels an in-flight request
+                // (e.g. rapid edits trigger a new autosave cycle). Silence it.
+                if (err instanceof Error && err.name === "AbortError") return;
+                throw err;
+            } finally {
+                if (autosaveControllerRef.current === controller) {
+                    autosaveControllerRef.current = null;
+                }
             }
         }, 650);
 
-        return () => window.clearTimeout(timeout);
-    }, [buildSavePayload, invitation, isEditingPublished, isPersistedDraft, router, showSaveFailure]);
+        return () => {
+            controller.abort();
+            window.clearTimeout(timeout);
+        };
+    }, [buildSavePayload, builderBackTarget, invalidateInvitationsCache, invitation, isPersistedDraft, router, showSaveFailure, updateLastSavedPayload]);
+
+
+    // Warn the browser (refresh / tab-close) when there are unsaved changes
+    useEffect(() => {
+        if (!hasUnsavedChanges) return;
+
+        function handleBeforeUnload(e: BeforeUnloadEvent) {
+            e.preventDefault();
+        }
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [hasUnsavedChanges]);
+
+    // Intercept browser Back / swipe-back / OS back gesture when there are unsaved changes
+    useEffect(() => {
+        if (!hasUnsavedChanges) return;
+
+        function handlePopState() {
+            if (isIntentionalNavigationRef.current) return;
+            // Push the current entry back so the URL doesn't change
+            window.history.pushState(null, "", window.location.href);
+            setLeaveModalOpen(true);
+        }
+
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    }, [hasUnsavedChanges]);
 
     if (isLoadingInvitation) {
         return <BuilderLoadingState />;
@@ -775,10 +926,10 @@ function BuilderContent() {
                 <button
                     type="button"
                     className="builderBack analyticsBackBtn"
-                    onClick={() => setLeaveModalOpen(true)}
+                    onClick={handleBackClick}
                 >
                     <ArrowLeft size={16} aria-hidden="true" />
-                    <span>{builderBackLabel.current}</span>
+                    <span>{builderBackLabel}</span>
                 </button>
 
                 <div className="builderTitle analyticsHeaderText">
@@ -786,10 +937,41 @@ function BuilderContent() {
                     <p>{saveState}</p>
                 </div>
 
-                <div className="analyticsHeaderSpacer" aria-hidden="true" />
+                <div className="builderHeaderActions">
+                    <button
+                        type="button"
+                        className="builderPreviewAction"
+                        onClick={saveAndPreview}
+                        disabled={isPreviewing || isPublishing}
+                    >
+                        {isPreviewing ? <Loader2 size={17} className="spinner" /> : <Eye size={17} aria-hidden="true" />}
+                        <span>Preview</span>
+                    </button>
+                    <button
+                        type="button"
+                        className="builderPublishAction"
+                        onClick={isEditingPublished ? handleUpdateInvitation : saveAndOpenPublish}
+                        disabled={isPreviewing || isPublishing}
+                    >
+                        {isPublishing ? <Loader2 size={17} className="spinner" /> : <Rocket size={17} aria-hidden="true" />}
+                        <span>
+                            {isPublishing
+                                ? isEditingPublished ? "Updating..." : "Publishing..."
+                                : isEditingPublished ? "Update" : "Publish"}
+                        </span>
+                    </button>
+                </div>
             </header>
 
-            <section className="builderWorkspace">
+            <section className={`builderWorkspace${editorCollapsed ? " editorCollapsed" : ""}`}>
+                <BuilderToolRail
+                    activeTab={activeTab}
+                    setActiveTab={(tab) => {
+                        setActiveTab(tab);
+                        setEditorCollapsed(false);
+                    }}
+                />
+
                 <aside className="editorPanel">
                     <div className="editorPanelHeader">
                         <div>
@@ -810,6 +992,15 @@ function BuilderContent() {
                         isUploadingMusic={isUploadingMusic}
                     />
                 </aside>
+
+                <button
+                    className="builderEditorCollapse"
+                    type="button"
+                    aria-label={editorCollapsed ? "Show editor" : "Hide editor"}
+                    onClick={() => setEditorCollapsed((collapsed) => !collapsed)}
+                >
+                    <ChevronLeft size={18} aria-hidden="true" />
+                </button>
 
                 <section className="builderCanvas" aria-label="Invitation canvas">
                     <div className="previewColumn">
@@ -839,7 +1030,10 @@ function BuilderContent() {
                             </div>
                         </div>
 
-                        <div className={`previewDevice${!previewScrolledToBottom ? " hasScrollCue" : ""}`}>
+                        <div className={`previewDevice previewDevice--${previewDeviceMode}${!previewScrolledToBottom ? " hasScrollCue" : ""}`}>
+                            <div className="previewFixedTemplateBg" aria-hidden="true">
+                                <FloatingFlowers />
+                            </div>
                             <div className="previewViewport" ref={previewViewportRef}>
                                 <div className="previewScaleFrame">
                                     <TemplateRenderer
@@ -857,15 +1051,36 @@ function BuilderContent() {
                         </div>
                     </div>
                 </section>
+
+                <div className="builderCanvasControls" aria-label="Preview device">
+                    <button
+                        type="button"
+                        className={previewDeviceMode === "mobile" ? "active" : ""}
+                        aria-label="Mobile preview"
+                        title="Mobile preview"
+                        onClick={() => setPreviewDeviceMode("mobile")}
+                    >
+                        <Smartphone size={18} aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        className={previewDeviceMode === "desktop" ? "active" : ""}
+                        aria-label="Desktop preview"
+                        title="Desktop preview"
+                        onClick={() => setPreviewDeviceMode("desktop")}
+                    >
+                        <Monitor size={18} aria-hidden="true" />
+                    </button>
+                </div>
             </section>
 
             <button
-                className="mobileEditorTrigger"
+                className={`mobileEditorTrigger ${mobileEditorOpen ? "hidden" : ""}`}
                 type="button"
                 onClick={() => setMobileEditorOpen(true)}
             >
                 <PencilLine size={17} aria-hidden="true" />
-                Edit Content
+                Edit
             </button>
 
             <button
@@ -900,20 +1115,18 @@ function BuilderContent() {
             </section>
 
             <div className="builderBottomBar">
-                {!isEditingPublished ? (
-                    <button type="button" onClick={handleSaveDraft} disabled={isSavingDraft || isPreviewing || isPublishing}>
-                        {isSavingDraft ? <Loader2 size={17} className="spinner" /> : <Save size={17} aria-hidden="true" />}
-                        <span>Save Draft</span>
-                    </button>
-                ) : null}
-                <button type="button" onClick={saveAndPreview} disabled={isSavingDraft || isPreviewing || isPublishing}>
+                <button type="button" onClick={() => setMobileEditorOpen(true)}>
+                    <PencilLine size={17} aria-hidden="true" />
+                    <span>Edit Content</span>
+                </button>
+                <button type="button" onClick={saveAndPreview} disabled={isPreviewing || isPublishing}>
                     {isPreviewing ? <Loader2 size={17} className="spinner" /> : <Eye size={17} aria-hidden="true" />}
                     <span>Preview</span>
                 </button>
                 <button
                     type="button"
                     onClick={isEditingPublished ? handleUpdateInvitation : saveAndOpenPublish}
-                    disabled={isSavingDraft || isPreviewing || isPublishing}
+                    disabled={isPreviewing || isPublishing}
                 >
                     {isPublishing ? <Loader2 size={17} className="spinner" /> : <Rocket size={17} aria-hidden="true" />}
                     <span>
@@ -928,8 +1141,23 @@ function BuilderContent() {
                 isOpen={leaveModalOpen}
                 mode={isEditingPublished ? "update" : "draft"}
                 onSave={async () => {
-                    const savedInvitation = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true, validateRequired: isEditingPublished });
-                    if (savedInvitation) navigateBackToList();
+                    const startTime = Date.now();
+                    const savedInvitation = await saveInvitation({ createIfNeeded: true, isExplicitUserSave: true });
+
+                    if (savedInvitation) {
+                        const elapsed = Date.now() - startTime;
+                        if (elapsed < 400) {
+                            await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+                        }
+                        isIntentionalNavigationRef.current = true;
+                        if (!openedFromExistingInvitation && invitation.status !== "published") {
+                            router.replace("/invitations?status=draft");
+                        } else {
+                            router.replace(builderBackTarget);
+                        }
+                        return true;
+                    }
+                    return false;
                 }}
                 onDiscard={handleDiscard}
                 onCancel={() => setLeaveModalOpen(false)}
@@ -948,14 +1176,18 @@ function BuilderContent() {
                         sessionStorage.removeItem(`vilique-builder-back-target-${invitation.id}`);
                         sessionStorage.removeItem(`vilique-builder-back-label-${invitation.id}`);
                     }
-                    setInvitation((prev) => ({
-                        ...prev,
+                    const publishedInvitation: InvitationData = {
+                        ...invitation,
                         status: updatedInvitation.status,
-                        publishedAt: updatedInvitation.published_at || undefined,
+                        publishedAt: updatedInvitation.published_at || new Date().toISOString(),
                         slug: updatedInvitation.slug,
                         updatedAt: new Date().toISOString(),
-                    }));
-                    setSaveState(updatedInvitation.status === "published" ? "Published" : "Saved");
+                        lifecycleStatus: updatedInvitation.status === "published" ? "published" : invitation.lifecycleStatus,
+                        eventStatus: updatedInvitation.status === "published" ? "published" : invitation.eventStatus,
+                    };
+                    setInvitation(publishedInvitation);
+                    invalidateInvitationsCache(publishedInvitation, invitation);
+                    setSaveState(updatedInvitation.status === "published" ? "✓ Published" : "✓ Saved");
                     if (updatedInvitation.status === "published") {
                         setIsPublishModalOpen(false);
                         setPublishSuccessDetails({
@@ -968,7 +1200,7 @@ function BuilderContent() {
 
             <PublishSuccessModal
                 details={publishSuccessDetails}
-                onViewProfile={() => router.push("/invitations?reset=1")}
+                onViewProfile={() => router.push("/invitations?status=upcoming")}
             />
         </main>
     );
@@ -1071,7 +1303,7 @@ function LeaveModal({
 }: {
     isOpen: boolean;
     mode: "draft" | "update";
-    onSave: () => Promise<void>;
+    onSave: () => Promise<boolean | void>;
     onDiscard: () => Promise<void> | void;
     onCancel: () => void;
 }) {
@@ -1109,8 +1341,15 @@ function LeaveModal({
 
     async function handleSave() {
         setSaving(true);
-        await onSave();
-        setSaving(false);
+        try {
+            const result = await onSave();
+            if (result === false) {
+                setSaving(false);
+            }
+        } catch (error) {
+            console.error("Save failed", error);
+            setSaving(false);
+        }
     }
 
     async function handleDiscardConfirm() {
@@ -1186,7 +1425,7 @@ function LeaveModal({
                                 color: "#111827",
                                 fontFamily: "Arial, Helvetica, sans-serif",
                                 letterSpacing: "-0.02em",
-                             }}>
+                            }}>
                                 {isUpdateMode ? "Discard changes?" : "Save before leaving?"}
                             </h2>
                             <p style={{
@@ -1291,6 +1530,36 @@ function LeaveModal({
     );
 }
 
+function BuilderToolRail({
+    activeTab,
+    setActiveTab,
+}: {
+    activeTab: EditorTab;
+    setActiveTab: (tab: EditorTab) => void;
+}) {
+    return (
+        <nav className="builderToolRail" aria-label="Builder tools">
+            {builderRailItems.map(({ id, label, icon: Icon }) => {
+                const active = activeTab === id;
+
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        className={active ? "active" : ""}
+                        onClick={() => setActiveTab(id)}
+                        title={label}
+                    >
+                        <span className="builderToolIcon">
+                            <Icon size={18} aria-hidden="true" />
+                        </span>
+                        <span>{label}</span>
+                    </button>
+                );
+            })}
+        </nav>
+    );
+}
 
 function EditorTabs({
     activeTab,
@@ -1385,6 +1654,7 @@ function EditorForm({
                     <span>Title</span>
                     {usesWeddingTitleDropdown ? (
                         <select
+                            data-field-key="title"
                             value={selectedWeddingTitle}
                             onChange={(e) => updateField("title", e.target.value)}
                             aria-invalid={!!errors.title}
@@ -1394,25 +1664,26 @@ function EditorForm({
                             ))}
                         </select>
                     ) : (
-                        <input value={invitation.title} onChange={(e) => updateField("title", e.target.value)} maxLength={45} aria-invalid={!!errors.title} />
+                        <input data-field-key="title" value={invitation.title} onChange={(e) => updateField("title", e.target.value)} maxLength={45} aria-invalid={!!errors.title} />
                     )}
                     {errors.title ? <small className="fieldError">{errors.title}</small> : null}
                 </label>
 
                 <label className={errors.primaryName ? "hasError" : ""}>
                     <span>Primary Name</span>
-                    <input value={invitation.primaryName} onChange={(e) => updateField("primaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.primaryName} />
+                    <input data-field-key="primaryName" value={invitation.primaryName} onChange={(e) => updateField("primaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.primaryName} />
                     {errors.primaryName ? <small className="fieldError">{errors.primaryName}</small> : null}
                 </label>
 
-                <label>
+                <label className={errors.secondaryName ? "hasError" : ""}>
                     <span>Secondary Name</span>
-                    <input value={invitation.secondaryName || ""} onChange={(e) => updateField("secondaryName", e.target.value)} maxLength={25} />
+                    <input data-field-key="secondaryName" value={invitation.secondaryName || ""} onChange={(e) => updateField("secondaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.secondaryName} />
+                    {errors.secondaryName ? <small className="fieldError">{errors.secondaryName}</small> : null}
                 </label>
 
                 <label className={errors.message ? "hasError" : ""}>
                     <span>Message</span>
-                    <textarea value={invitation.message} onChange={(e) => updateField("message", e.target.value)} maxLength={200} aria-invalid={!!errors.message} />
+                    <textarea data-field-key="message" value={invitation.message} onChange={(e) => updateField("message", e.target.value)} maxLength={200} aria-invalid={!!errors.message} />
                     {errors.message ? <small className="fieldError">{errors.message}</small> : null}
                 </label>
             </div>
@@ -1424,25 +1695,29 @@ function EditorForm({
             <div className="editorForm">
                 <label className={errors.eventDate ? "hasError" : ""}>
                     <span>Date</span>
-                    <DatePickerField
-                        value={invitation.eventDate}
-                        onChange={(value) => updateField("eventDate", value)}
-                        isOpen={activePicker === "date"}
-                        onToggle={(open) => setActivePicker(open ? "date" : null)}
-                    />
+                    <div data-field-key="eventDate" tabIndex={-1}>
+                        <DatePickerField
+                            value={invitation.eventDate}
+                            onChange={(value) => updateField("eventDate", value)}
+                            isOpen={activePicker === "date"}
+                            onToggle={(open) => setActivePicker(open ? "date" : null)}
+                        />
+                    </div>
                     {errors.eventDate ? <small className="fieldError">{errors.eventDate}</small> : null}
                 </label>
 
                 <label className={errors.eventTime ? "hasError" : ""}>
                     <span>Start Time</span>
-                    <TimePickerField
-                        value={startTime}
-                        onChange={(value) => updateField("eventTime", normalizeTimeRangeForStart(value, endTime))}
-                        minTimeMinutes={minTimeMinutes}
-                        maxTimeMinutes={maxStartTimeMinutes}
-                        isOpen={activePicker === "startTime"}
-                        onToggle={(open) => setActivePicker(open ? "startTime" : null)}
-                    />
+                    <div data-field-key="eventTime" tabIndex={-1}>
+                        <TimePickerField
+                            value={startTime}
+                            onChange={(value) => updateField("eventTime", normalizeTimeRangeForStart(value, endTime))}
+                            minTimeMinutes={minTimeMinutes}
+                            maxTimeMinutes={maxStartTimeMinutes}
+                            isOpen={activePicker === "startTime"}
+                            onToggle={(open) => setActivePicker(open ? "startTime" : null)}
+                        />
+                    </div>
                     {errors.eventTime ? <small className="fieldError">{errors.eventTime}</small> : null}
                 </label>
 
@@ -1460,13 +1735,14 @@ function EditorForm({
 
                 <label className={errors.venueName ? "hasError" : ""}>
                     <span>Venue Name</span>
-                    <input value={invitation.venueName} onChange={(e) => updateField("venueName", e.target.value)} maxLength={45} aria-invalid={!!errors.venueName} />
+                    <input data-field-key="venueName" value={invitation.venueName} onChange={(e) => updateField("venueName", e.target.value)} maxLength={45} aria-invalid={!!errors.venueName} />
                     {errors.venueName ? <small className="fieldError">{errors.venueName}</small> : null}
                 </label>
 
-                <label>
+                <label className={errors.venueAddress ? "hasError" : ""}>
                     <span>Venue Address</span>
-                    <textarea value={invitation.venueAddress} onChange={(e) => updateField("venueAddress", e.target.value)} maxLength={120} />
+                    <textarea data-field-key="venueAddress" value={invitation.venueAddress} onChange={(e) => updateField("venueAddress", e.target.value)} maxLength={120} aria-invalid={!!errors.venueAddress} />
+                    {errors.venueAddress ? <small className="fieldError">{errors.venueAddress}</small> : null}
                 </label>
             </div>
         );
@@ -1478,6 +1754,7 @@ function EditorForm({
                 <label className={errors.phone ? "hasError" : ""}>
                     <span>Primary Phone</span>
                     <input
+                        data-field-key="phone"
                         type="tel"
                         inputMode="numeric"
                         pattern="[0-9]{10}"
@@ -1492,6 +1769,7 @@ function EditorForm({
                 <label className={errors.secondaryPhone ? "hasError" : ""}>
                     <span>Secondary Phone</span>
                     <input
+                        data-field-key="secondaryPhone"
                         type="tel"
                         inputMode="numeric"
                         pattern="[0-9]{10}"
@@ -1503,15 +1781,18 @@ function EditorForm({
                     {errors.secondaryPhone ? <small className="fieldError">{errors.secondaryPhone}</small> : null}
                 </label>
 
-                <label>
+                <label className={errors.mapLink ? "hasError" : ""}>
                     <span>Map Link</span>
                     <input
+                        data-field-key="mapLink"
                         type="url"
                         inputMode="url"
                         value={invitation.mapLink}
                         onChange={(e) => updateField("mapLink", e.target.value)}
                         maxLength={250}
+                        aria-invalid={!!errors.mapLink}
                     />
+                    {errors.mapLink ? <small className="fieldError">{errors.mapLink}</small> : null}
                 </label>
             </div>
         );
@@ -1532,24 +1813,28 @@ function EditorForm({
     return (
         <div className="editorForm">
             {/* ── Celebration Song ── */}
-            <div className="editorSoundField">
+            <div className={`editorSoundField ${errors.musicUrl ? "hasError" : ""}`}>
                 <span className="editorFieldLabel">Celebration Song</span>
-                <SoundPreviewCard
-                    icon="🎵"
-                    title={hasCustomSong ? "Custom Song" : "Default Celebration Song"}
-                    subtitle={
-                        defaultMusicUrl
-                            ? defaultMusicUrl.split("/").pop() || "song.mp3"
-                            : "No song uploaded yet"
-                    }
-                    url={defaultMusicUrl || undefined}
-                    badge={hasCustomSong ? "custom" : defaultMusicUrl ? "default" : undefined}
-                    onRemove={hasCustomSong ? () => updateMusicFile(null) : undefined}
-                    onUpload={(file) => updateMusicFile(file)}
-                    isUploading={isUploadingMusic}
-                    uploadId="musicUploadInput"
-                />
+                <div data-field-key="musicUrl" tabIndex={-1}>
+                    <SoundPreviewCard
+                        icon="🎵"
+                        title={hasCustomSong ? "Custom Song" : "Default Celebration Song"}
+                        subtitle={
+                            defaultMusicUrl
+                                ? defaultMusicUrl.split("/").pop() || "song.mp3"
+                                : "No song uploaded yet"
+                        }
+                        url={defaultMusicUrl || undefined}
+                        badge={hasCustomSong ? "custom" : defaultMusicUrl ? "default" : undefined}
+                        onRemove={hasCustomSong ? () => updateMusicFile(null) : undefined}
+                        onUpload={(file) => updateMusicFile(file)}
+                        isUploading={isUploadingMusic}
+                        uploadId="musicUploadInput"
+                    />
+                </div>
+                {errors.musicUrl ? <small className="fieldError">{errors.musicUrl}</small> : null}
             </div>
+
 
             {/* ── Clock Ticking Sound (read-only) ── */}
             <div className="editorSoundField">

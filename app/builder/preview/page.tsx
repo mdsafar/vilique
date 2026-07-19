@@ -27,6 +27,13 @@ export default async function BuilderPreviewPage({ searchParams }: Props) {
         redirect("/");
     }
 
+    // When local=1 is present alongside an id, the builder has written the current
+    // in-memory state to sessionStorage. Show that live state instead of the DB record
+    // so preview always reflects exactly what the user sees in the editor.
+    if (local === "1") {
+        return <BuilderSessionPreview templateId={template} invitationId={id} />;
+    }
+
     const supabase = await createClient();
     const {
         data: { user },

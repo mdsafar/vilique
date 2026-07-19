@@ -6254,8 +6254,8 @@ p {
 
 .templateDetailsPage {
   max-width: 1460px;
-  padding-top: 86px;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-top: 72px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
 .templateDetailTopbar {
@@ -6339,14 +6339,14 @@ p {
 
 .templateDetailHero {
   display: grid;
-  gap: 22px;
+  gap: 16px;
   align-items: stretch;
 }
 
 .templateDetailPreview {
   min-height: 500px;
   border-radius: 24px;
-  padding: 16px;
+  padding: 12px 14px;
   color: white;
   display: grid;
   align-content: space-between;
@@ -6386,7 +6386,7 @@ p {
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(20, 23, 42, 0.08);
   border-radius: 24px;
-  padding: clamp(18px, 1.7vw, 24px);
+  padding: clamp(14px, 1.4vw, 20px);
   box-shadow: 0 22px 62px rgba(42, 30, 36, 0.08);
   display: grid;
   align-content: start;
@@ -6523,9 +6523,9 @@ p {
 
 .templateLivePreview {
   --template-preview-width: 250px;
-  min-height: 540px;
+  min-height: 520px;
   height: 100%;
-  padding: 24px 16px;
+  padding: 20px 16px;
   align-content: center;
   justify-content: center;
   justify-items: center;
@@ -6537,7 +6537,7 @@ p {
 .templatePreviewTrack {
   display: grid;
   grid-template-columns: repeat(2, var(--template-preview-width));
-  gap: 20px;
+  gap: 18px;
   align-content: center;
   align-items: start;
   justify-content: center;
@@ -7282,7 +7282,7 @@ p {
 }
 
 .templateDetailSupport {
-  margin-top: 16px;
+  margin-top: 10px;
   display: grid;
   gap: 0;
   border-radius: 18px;
@@ -8598,12 +8598,14 @@ p {
     0 7px 16px rgba(35, 28, 34, 0.035);
 }
 
-.editorForm label.hasError {
+.editorForm label.hasError,
+.editorSoundField.hasError {
   background: rgba(255, 247, 247, 0.9);
   box-shadow:
     inset 0 0 0 1px rgba(239, 68, 68, 0.22),
     0 8px 18px rgba(239, 68, 68, 0.08);
 }
+
 
 .editorForm label > span,
 .editorFieldLabel {
@@ -9363,6 +9365,13 @@ p {
   display: none;
 }
 
+.builderHeaderActions,
+.builderCanvasControls,
+.builderEditorCollapse,
+.previewFixedTemplateBg {
+  display: none;
+}
+
 .builderBottomBar {
   position: fixed;
   left: 50%;
@@ -9375,7 +9384,7 @@ p {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(18px);
-  display: grid;
+  display: none;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 6px;
   border: 1px solid rgba(23, 23, 23, 0.08);
@@ -9400,6 +9409,554 @@ p {
 .builderBottomBar button:last-child {
   background: linear-gradient(135deg, #8c4cf3, #c56fb4);
   color: white;
+}
+
+@media (min-width: 900px) {
+  .builderShell {
+    background:
+      radial-gradient(circle at 52% 18%, rgba(229, 212, 255, 0.42), transparent 32%),
+      radial-gradient(circle at 94% 58%, rgba(250, 214, 230, 0.34), transparent 28%),
+      linear-gradient(180deg, #fbfcff 0%, #f7f2fb 100%);
+  }
+
+  .builderTopbar.analyticsHeader {
+    min-height: 58px;
+    grid-template-columns: minmax(140px, 0.42fr) minmax(260px, 1fr) minmax(270px, 0.42fr);
+    padding: max(8px, env(safe-area-inset-top)) 24px 8px;
+    background:
+      radial-gradient(circle at 94% 0%, rgba(167, 139, 250, 0.24), transparent 34%),
+      linear-gradient(100deg, #fffaf4 0%, #fffbff 55%, #eee7ff 100%);
+    border-bottom: 0;
+    box-shadow: none;
+  }
+
+  .builderBack.analyticsBackBtn {
+    min-height: 36px;
+    padding: 0 13px;
+    gap: 7px;
+    border-radius: 12px;
+    background: #ffffff;
+    border-color: rgba(32, 25, 46, 0.08);
+    color: #1f2937;
+    box-shadow: 0 10px 24px rgba(38, 28, 50, 0.08);
+    font-size: 12px;
+  }
+
+  .builderTitle.analyticsHeaderText {
+    justify-items: center;
+    gap: 4px;
+  }
+
+  .builderTitle.analyticsHeaderText h1 {
+    max-width: min(620px, 42vw);
+    color: #0f1020;
+    font-size: 17px;
+    font-weight: 900;
+    line-height: 1.12;
+  }
+
+  .builderTitle.analyticsHeaderText p {
+    color: #7c3aed;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+
+  .builderHeaderActions {
+    justify-self: end;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .builderPreviewAction,
+  .builderPublishAction {
+    appearance: none;
+    border: 1px solid rgba(32, 25, 46, 0.08);
+    background: #ffffff;
+    color: #1f2937;
+    min-height: 36px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(38, 28, 50, 0.08);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+
+  .builderPreviewAction,
+  .builderPublishAction {
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .builderPublishAction {
+    min-width: 104px;
+    border-color: rgba(124, 58, 237, 0.18);
+    background: linear-gradient(135deg, #7c3aed 0%, #b44ad8 100%);
+    color: #ffffff;
+    box-shadow: 0 16px 30px rgba(124, 58, 237, 0.22);
+  }
+
+  .builderPreviewAction:not(:disabled):hover,
+  .builderPublishAction:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 34px rgba(38, 28, 50, 0.12);
+  }
+
+  .builderPreviewAction:disabled,
+  .builderPublishAction:disabled {
+    cursor: not-allowed;
+    opacity: 0.46;
+  }
+
+  .builderWorkspace {
+    position: relative;
+    height: 100svh;
+    padding: 58px 0 0;
+    grid-template-columns: 64px 380px minmax(560px, 1fr);
+    column-gap: 0;
+    row-gap: 14px;
+    align-items: stretch;
+    transition: grid-template-columns 0.16s ease;
+  }
+
+  .builderWorkspace.editorCollapsed {
+    grid-template-columns: 64px 0 minmax(620px, 1fr);
+    column-gap: 0;
+    row-gap: 10px;
+  }
+
+  .builderToolRail {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    gap: 7px;
+    width: 64px;
+    padding: 12px 6px;
+    border-radius: 0;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(36, 28, 48, 0.06);
+    box-shadow: 0 18px 42px rgba(53, 42, 65, 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .builderToolRail button {
+    width: 100%;
+    min-height: 62px;
+    border-radius: 8px;
+    border: 0;
+    padding: 6px 3px;
+    background: transparent;
+    color: #6b6676;
+    display: grid;
+    place-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .builderToolRail button:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+  }
+
+  .builderToolRail button:not(:disabled):hover,
+  .builderToolRail button.active {
+    background: #f0e4ff;
+    color: #7c3aed;
+  }
+
+  .builderToolRail button.active {
+    box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.08);
+  }
+
+  .builderToolIcon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.64);
+  }
+
+  .builderToolRail button.active .builderToolIcon {
+    background: rgba(124, 58, 237, 0.12);
+  }
+
+  .editorPanel {
+    width: 380px;
+    min-width: 0;
+    border-radius: 0;
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(36, 28, 48, 0.06);
+    border-left: 0;
+    box-shadow: 0 18px 46px rgba(53, 42, 65, 0.08);
+    overflow: hidden;
+    transition: opacity 0.12s ease;
+  }
+
+  .builderWorkspace.editorCollapsed .editorPanel {
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
+    padding: 0;
+    border-width: 0;
+  }
+
+  .builderEditorCollapse {
+    position: absolute;
+    left: 430px;
+    top: 50%;
+    z-index: 20;
+    width: 28px;
+    min-height: 48px;
+    border: 1px solid rgba(36, 28, 48, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #6d5b7b;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 10px 22px rgba(53, 42, 65, 0.1);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: left 0.16s ease, color 0.12s ease, background 0.12s ease;
+  }
+
+  .builderEditorCollapse:hover {
+    color: #7c3aed;
+    background: #ffffff;
+  }
+
+  .builderWorkspace.editorCollapsed .builderEditorCollapse svg {
+    transform: rotate(180deg);
+  }
+
+  .builderWorkspace.editorCollapsed .builderEditorCollapse {
+    left: 50px;
+  }
+
+  .editorPanelHeader {
+    margin-bottom: 18px;
+  }
+
+  .editorPanelHeader p {
+    color: #777386;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .editorPanelHeader h2 {
+    color: #111827;
+    font-size: 24px;
+    font-weight: 900;
+  }
+
+  .editorPanel > .editorTabs {
+    display: none;
+  }
+
+  .editorForm {
+    gap: 14px;
+  }
+
+  .editorForm label,
+  .editorSoundField {
+    gap: 9px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .editorForm label:focus-within {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .editorForm label > span,
+  .editorFieldLabel {
+    color: #4f4b5f;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+  }
+
+  .editorForm input,
+  .editorForm textarea,
+  .editorForm select,
+  .customPickerTrigger {
+    min-height: 48px;
+    border-radius: 12px;
+    padding: 10px 14px;
+    background: #f7f7f9;
+    border: 1px solid rgba(35, 28, 48, 0.04);
+    font-size: 14px;
+    box-shadow: inset 0 1px 3px rgba(23, 23, 23, 0.03);
+  }
+
+  .editorForm textarea {
+    min-height: 160px;
+  }
+
+  .builderCanvas {
+    --public-invite-bg:
+      radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
+      linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%);
+    border-radius: 0;
+    background: var(--public-invite-bg);
+    background-size: 100% 100%;
+    border: 0;
+    border-bottom: 2px solid rgba(124, 58, 237, 0.24);
+    box-shadow:
+      inset 0 -2px 0 rgba(124, 58, 237, 0.16),
+      inset 0 -30px 42px rgba(255, 255, 255, 0.16);
+  }
+
+  .previewColumn {
+    width: 100%;
+    height: 100%;
+    align-self: stretch;
+    margin-top: 0;
+    gap: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .previewLabel {
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 8px 6px 12px;
+    border-radius: 0;
+    background:
+      radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.18) 0%, transparent 45%),
+      linear-gradient(135deg, rgba(245, 234, 255, 0.58), rgba(255, 232, 242, 0.5));
+    border: 0;
+    box-shadow: none;
+    color: #5d5668;
+    position: relative;
+    z-index: 4;
+  }
+
+  .previewScreenToggle {
+    height: 32px;
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .previewScreenToggle button {
+    height: 24px;
+    min-height: 24px;
+    border-radius: 8px;
+    padding: 0 13px;
+    font-size: 11.5px;
+    font-weight: 850;
+  }
+
+  .previewDevice {
+    --preview-card-scale: 0.8;
+    width: calc(100% + 4px);
+    height: calc(100% + 2px);
+    min-height: 0;
+    max-height: none;
+    margin: -2px -2px 0;
+    border-radius: 0;
+    background: transparent;
+    background-color: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .previewFixedTemplateBg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .previewFixedTemplateBg::before,
+  .previewFixedTemplateBg::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(170, 120, 200, 0.12) 0 14%, transparent 15%),
+      radial-gradient(circle at 50% 12%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%),
+      radial-gradient(circle at 88% 50%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%),
+      radial-gradient(circle at 50% 88%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%),
+      radial-gradient(circle at 12% 50%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%);
+    filter: blur(1px);
+    animation: floatBg 12s ease-in-out infinite;
+  }
+
+  .previewFixedTemplateBg::before {
+    left: -44px;
+    bottom: 40px;
+    transform: rotate(-25deg);
+  }
+
+  .previewFixedTemplateBg::after {
+    right: -44px;
+    top: 160px;
+    transform: rotate(25deg);
+    animation-delay: 2.5s;
+  }
+
+  .previewFixedTemplateBg .floatingFlowers {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    pointer-events: none;
+  }
+
+  .previewDevice--mobile {
+    --preview-card-scale: 0.78;
+  }
+
+  .previewDevice--desktop {
+    --preview-card-scale: 0.68;
+  }
+
+  .previewDevice::before {
+    content: none;
+  }
+
+  .previewDevice::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    box-shadow: inset 0 -10px 0 0 rgba(255, 255, 255, 0.78);
+  }
+
+  .previewViewport {
+    inset: 0;
+    z-index: 1;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .previewViewport::before {
+    content: none;
+  }
+
+  .previewScaleFrame {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    margin: 0 auto;
+  }
+
+  .previewScaleFrame .pastelWeddingPage {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    min-height: 100%;
+    padding: 36px 12px 42px;
+    background: transparent;
+    overflow: hidden;
+    transform: none;
+  }
+
+  .previewScaleFrame .weddingCardWrapper {
+    width: 440px;
+    max-width: min(100%, 440px);
+    zoom: var(--preview-card-scale);
+  }
+
+  .previewScaleFrame .weddingCard {
+    padding: 36px 28px 64px;
+    border-radius: 28px;
+  }
+
+  .previewDevice--mobile .previewScaleFrame .weddingCardWrapper {
+    width: 390px;
+    max-width: min(100%, 390px);
+  }
+
+  .previewViewport .pastelWeddingPage::before,
+  .previewViewport .pastelWeddingPage::after,
+  .previewViewport .floatingFlowers {
+    display: none;
+  }
+
+  .previewDevice .previewScrollFade {
+    bottom: 0;
+    height: 54px;
+  }
+
+  .previewDevice .templatePreviewScrollCue {
+    bottom: 34px;
+  }
+
+  .builderCanvasControls {
+    position: absolute;
+    z-index: 10;
+    min-height: 48px;
+    border: 1px solid rgba(36, 28, 48, 0.07);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.88);
+    color: #21172f;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 14px 34px rgba(53, 42, 65, 0.09);
+    backdrop-filter: blur(18px);
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .builderCanvasControls {
+    left: 456px;
+    transform: none;
+    bottom: 22px;
+    min-height: 50px;
+    padding: 6px;
+    gap: 6px;
+    transition: left 0.16s ease;
+  }
+
+  .builderWorkspace.editorCollapsed .builderCanvasControls {
+    left: 76px;
+  }
+
+  .builderCanvasControls button {
+    width: 44px;
+    min-height: 38px;
+    border: 0;
+    border-radius: 10px;
+    padding: 0;
+    background: transparent;
+    color: #5d5668;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+  }
+
+  .builderCanvasControls button.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, #7c3aed, #b44ad8);
+    box-shadow: 0 8px 18px rgba(124, 58, 237, 0.22);
+  }
 }
 
 .builderLoadingShell {
@@ -9498,52 +10055,100 @@ p {
   }
 
   .builderTopbar {
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    column-gap: 10px;
-    min-height: 62px;
-    padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+    grid-template-columns: minmax(86px, 0.68fr) minmax(120px, 1fr) minmax(86px, 0.68fr);
+    column-gap: 8px;
+    box-sizing: border-box;
+    height: 76px;
+    min-height: 76px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.94);
     border-bottom: 1px solid rgba(23, 23, 23, 0.07);
-    box-shadow: 0 12px 34px rgba(60, 35, 55, 0.08);
+    box-shadow: 0 10px 28px rgba(60, 35, 55, 0.07);
   }
 
-  .builderBack,
-  .builderPreviewBtn {
-    width: 44px;
-    min-height: 44px;
-    justify-content: center;
-    border-radius: 999px;
+  .builderTopbar.analyticsHeader {
+    box-sizing: border-box;
+    height: 76px;
+    min-height: 76px;
+    padding: 8px 14px;
+  }
+
+  .builderBack {
+    width: auto;
+    min-height: 40px;
+    justify-content: flex-start;
+    gap: 8px;
+    border-radius: 0;
     padding: 0;
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid rgba(20, 20, 20, 0.06);
+    background: transparent;
+    border: 0;
     color: #171717;
-    box-shadow: 0 12px 28px rgba(60, 35, 55, 0.1);
+    box-shadow: none;
+    font-size: 14px;
+    font-weight: 900;
   }
 
-  .builderBack span,
-  .builderPreviewBtn span {
+  .builderBack span {
+    display: inline;
+  }
+
+  .builderHeaderActions {
     display: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    min-width: 0;
   }
 
-  .builderPreviewBtn {
-    justify-self: end;
-    background: #171717;
-    color: white;
-    border-color: #171717;
+  .builderPreviewAction,
+  .builderPublishAction {
+    min-height: 40px;
+    border-radius: 12px;
+    padding: 0 12px;
+    border: 1px solid rgba(36, 28, 48, 0.08);
+    background: #ffffff;
+    color: #151424;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: 0 10px 22px rgba(38, 28, 50, 0.08);
   }
 
-  .builderTitle span {
-    display: block;
-    font-size: 10px;
+  .builderPublishAction {
+    background: linear-gradient(135deg, #7c3aed 0%, #b44ad8 100%);
+    border-color: rgba(124, 58, 237, 0.18);
+    color: #ffffff;
+    box-shadow: 0 12px 26px rgba(124, 58, 237, 0.22);
+  }
+
+  .builderTitle.analyticsHeaderText {
+    gap: 4px;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .builderTitle.analyticsHeaderText h1 {
+    max-width: 100%;
+    color: #080a16;
+    font-size: 16px;
+    line-height: 1.08;
+    font-weight: 950;
+  }
+
+  .builderTitle.analyticsHeaderText p {
+    color: #7c3aed;
+    font-size: 11px;
     line-height: 1;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
+    font-weight: 950;
   }
 
-  .builderTitle strong {
-    max-width: 100%;
-    display: block;
-    line-height: 1.12;
-    font-size: 15px;
+  .builderPreviewBtn {
+    display: none;
   }
 
   .builderWorkspace {
@@ -9552,7 +10157,7 @@ p {
     height: 100svh;
     min-height: 0;
     display: flex;
-    padding: calc(74px + env(safe-area-inset-top)) 10px calc(132px + env(safe-area-inset-bottom));
+    padding: 76px 0 0;
     overflow: hidden;
   }
 
@@ -9561,14 +10166,22 @@ p {
   }
 
   .builderCanvas {
+    --public-invite-bg:
+      radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
+      linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%);
     flex: 1 1 auto;
     height: 100%;
     min-height: 0;
-    border-radius: 22px;
-    padding: 10px 0 12px;
+    border-radius: 0;
+    padding: 0;
+    background: var(--public-invite-bg);
+    background-color: #ecdcf7;
     overflow: hidden;
     display: grid;
     place-items: start center;
+    border: 0;
+    box-shadow: none;
   }
 
   .builderCanvas::before {
@@ -9580,64 +10193,169 @@ p {
     height: 100%;
     min-height: 0;
     align-self: stretch;
-    gap: 8px;
+    gap: 0;
     margin-top: 0;
     grid-template-rows: auto minmax(0, 1fr);
   }
 
   .previewLabel {
-    width: min(100%, 330px);
-    padding: 0 2px;
-    font-size: 12px;
+    width: 100%;
+    min-height: 50px;
+    padding: 7px 14px;
+    border-radius: 0;
+    background:
+      radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.2) 0%, transparent 45%),
+      linear-gradient(135deg, rgba(245, 234, 255, 0.76), rgba(255, 232, 242, 0.68));
+    border: 0;
+    box-shadow: none;
+    display: flex;
+    font-size: 14px;
     gap: 10px;
   }
 
+  .previewLabel > span {
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 900;
+  }
+
   .previewScreenToggle {
-    height: 34px;
+    height: 36px;
     padding: 4px;
     gap: 3px;
-    border-radius: 9px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.52);
+    border: 0;
+    box-shadow: none;
   }
 
   .previewScreenToggle button {
-    height: 26px;
-    min-height: 26px;
-    border-radius: 6px;
-    padding: 0 10px;
-    font-size: 11.5px;
-    font-weight: 850;
+    height: 28px;
+    min-height: 28px;
+    border-radius: 8px;
+    padding: 0 13px;
+    font-size: 13px;
+    font-weight: 900;
   }
 
   .previewDevice {
-    --preview-scale: 0.795;
-    width: min(calc(100vw - 48px), 330px);
-    height: min(100%, calc(var(--preview-source-height) * var(--preview-scale) + 20px));
+    --preview-card-scale: 0.92;
+    --public-invite-bg:
+      radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
+      linear-gradient(135deg, #f5eaff 0%, #ecdcf7 35%, #fce8f0 70%, #e8f4ff 100%);
+    width: 100%;
+    height: 100%;
     min-height: 0;
-    max-height: calc(var(--preview-source-height) * var(--preview-scale) + 20px);
-    border-radius: 28px;
-    box-shadow:
-      0 16px 42px rgba(95, 55, 90, 0.18),
-      inset 0 0 0 7px rgba(255, 255, 255, 0.68);
+    max-height: none;
+    border-radius: 0;
+    background: var(--public-invite-bg);
+    background-color: #ecdcf7;
+    border: 0;
+    box-shadow: none;
   }
 
-  .previewDevice::before {
-    top: 9px;
-    width: 48px;
-    height: 4px;
+  .previewFixedTemplateBg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    overflow: hidden;
+    pointer-events: none;
   }
 
+  .previewFixedTemplateBg::before,
+  .previewFixedTemplateBg::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(170, 120, 200, 0.12) 0 14%, transparent 15%),
+      radial-gradient(circle at 50% 12%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%),
+      radial-gradient(circle at 88% 50%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%),
+      radial-gradient(circle at 50% 88%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%),
+      radial-gradient(circle at 12% 50%, rgba(170, 120, 200, 0.15) 0 18%, transparent 19%);
+    filter: blur(1px);
+    animation: floatBg 12s ease-in-out infinite;
+  }
+
+  .previewFixedTemplateBg::before {
+    left: -44px;
+    bottom: 40px;
+    transform: rotate(-25deg);
+  }
+
+  .previewFixedTemplateBg::after {
+    right: -44px;
+    top: 160px;
+    transform: rotate(25deg);
+    animation-delay: 2.5s;
+  }
+
+  .previewFixedTemplateBg .floatingFlowers {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    pointer-events: none;
+  }
+
+  .previewDevice::before,
   .previewDevice::after {
-    box-shadow:
-      inset 0 0 0 8px rgba(255, 255, 255, 0.6),
-      inset 0 0 0 1px rgba(82, 55, 88, 0.14);
+    content: none;
   }
 
-  .previewScaleFrame .pastelWeddingPage {
-    padding: 26px 12px 22px;
+  .previewViewport {
+    inset: 0;
+    z-index: 1;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .previewViewport::before {
+    content: none;
   }
 
   .previewScaleFrame {
-    margin-bottom: 8px;
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    margin: 0 auto;
+  }
+
+  .previewScaleFrame .pastelWeddingPage {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    min-height: 100%;
+    padding: 24px 4px 90px;
+    background: transparent;
+    overflow: hidden;
+    transform: none;
+  }
+
+  .previewScaleFrame .weddingCardWrapper {
+    width: 390px;
+    max-width: min(calc(100% - 8px), 390px);
+    zoom: var(--preview-card-scale);
+  }
+
+  .previewScaleFrame .weddingCard {
+    padding: 36px 28px 64px;
+    border-radius: 28px;
+  }
+
+  .previewViewport .pastelWeddingPage::before,
+  .previewViewport .pastelWeddingPage::after,
+  .previewViewport .floatingFlowers {
+    display: none;
+  }
+
+  .builderCanvasControls {
+    display: none;
   }
 
   .editorPanel {
@@ -9697,15 +10415,16 @@ p {
   }
 
   .mobileEditorTrigger {
-    display: inline-flex;
+    display: none;
     align-items: center;
     justify-content: center;
     gap: 7px;
     position: fixed;
-    left: 50%;
-    bottom: calc(76px + env(safe-area-inset-bottom));
-    z-index: 105;
-    transform: translateX(-50%);
+    right: 12px;
+    left: auto;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    z-index: 170;
+    transform: none;
     min-height: 40px;
     border: 1px solid rgba(126, 91, 213, 0.24);
     border-radius: 12px;
@@ -9716,6 +10435,10 @@ p {
     font-size: 13px;
     font-weight: 950;
     text-transform: capitalize;
+  }
+
+  .mobileEditorTrigger.hidden {
+    display: none;
   }
 
   .mobileSheetHeader {
@@ -9733,13 +10456,6 @@ p {
     letter-spacing: 0.08em;
     line-height: 1;
     text-transform: uppercase;
-  }
-
-  .mobileSheetHeader h2 {
-    margin-top: 3px;
-    font-size: 22px;
-    line-height: 1;
-    text-transform: capitalize;
   }
 
   .mobileSheetHeader button {
@@ -9777,6 +10493,8 @@ p {
     margin: 0 12px 14px;
     z-index: 2;
     background: #f4f1f3;
+    border: 0;
+    border-radius: 12px;
   }
 
   .mobileBuilderSheet .editorTabs button {
@@ -9854,24 +10572,58 @@ p {
   }
 
   .builderBottomBar {
-    width: min(calc(100vw - 26px), 356px);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(calc(100vw - 20px), 394px);
     min-height: 58px;
     padding: 7px;
     gap: 6px;
     bottom: max(8px, env(safe-area-inset-bottom));
+    border-radius: 18px;
+  }
+
+  .previewDevice .previewScrollFade {
+    bottom: 74px;
+    height: 70px;
+  }
+
+  .previewDevice .templatePreviewScrollCue {
+    bottom: 88px;
   }
 
   .builderBottomBar button,
   .builderBottomBar a {
     min-height: 44px;
-    gap: 7px;
-    font-size: 13.5px;
-    border-radius: 18px;
+    gap: 6px;
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1;
   }
 
   .builderBottomBar svg {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
+  }
+}
+
+@media (max-width: 899px) and (min-height: 820px) {
+  .previewScaleFrame .pastelWeddingPage {
+    padding-bottom: 58px;
+  }
+
+  .previewDevice .previewScrollFade {
+    bottom: 66px;
+    height: 58px;
+  }
+
+  .previewDevice .templatePreviewScrollCue {
+    bottom: 78px;
+  }
+}
+
+@media (max-width: 390px) {
+  .previewDevice {
+    --preview-card-scale: 0.88;
   }
 }
 
@@ -9891,15 +10643,15 @@ p {
   }
 
   .previewDevice {
-    --preview-scale: 0.615;
-    width: min(calc(100vw - 28px), 260px);
-    height: min(100%, calc(var(--preview-source-height) * var(--preview-scale) + 20px));
+    --preview-card-scale: 0.82;
+    width: 100%;
+    height: 100%;
     min-height: 0;
-    max-height: calc(var(--preview-source-height) * var(--preview-scale) + 20px);
+    max-height: none;
   }
 
   .previewLabel {
-    width: min(100%, 260px);
+    width: 100%;
   }
 
   .mobileBuilderSheet .editorTabs {
@@ -11218,8 +11970,8 @@ p {
   }
 
   .templateDetailHero {
-    grid-template-columns: minmax(640px, 760px) minmax(420px, 560px);
-    justify-content: center;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    justify-content: stretch;
     align-items: stretch;
   }
 }
@@ -12550,6 +13302,13 @@ body:has(.invitePreviewShell) {
   z-index: 120;
 }
 
+/* In the public invite shell, promote the celebration overlay to its own GPU
+ * compositor layer so the scroll-nudge's 1px layout scroll cannot shift petals
+ * for a frame. Scoped to invitePreviewShell only — no effect on Builder/Preview. */
+.invitePreviewShell .celebrationLayer {
+  will-change: transform;
+}
+
 .floatingFlowers {
   z-index: 1;
 }
@@ -12577,7 +13336,20 @@ body:has(.invitePreviewShell) {
   position: absolute;
   top: -30px;
   pointer-events: none;
-  animation: fall linear forwards;
+  /*
+   * fill-mode: backwards — applies the 0% keyframe (opacity:0) immediately from
+   * mount, covering the animation-delay window. Without this, petals render at
+   * their unanomated style (opacity: 1) during the delay, and a WebKit forced
+   * repaint during the delay can cause the animation to be dropped entirely,
+   * making the petal permanently invisible. "both" also keeps the last keyframe
+   * after the animation completes (petal stays hidden at opacity:0).
+   *
+   * will-change: transform — promotes each petal to an independent GPU compositor
+   * tile, making the fall animation immune to scroll-nudge forced repaints.
+   * Petals have no backdrop-filter, so there is no compositing risk.
+   */
+  animation: fall linear both;
+  will-change: transform;
 }
 
 .sparkleParticle {
@@ -12612,7 +13384,14 @@ body:has(.invitePreviewShell) {
   0% { transform: translateY(0) rotate(0deg); opacity: 0; }
   15% { opacity: 1; }
   85% { opacity: 1; }
-  100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
+  /*
+   * 110lvh instead of 110vh: lvh (large viewport height) is the viewport height
+   * with all browser chrome hidden — a stable value that never recalculates when
+   * Safari's address bar shows or hides. Using `vh` caused WebKit to re-evaluate
+   * this keyframe mid-animation when the scroll nudge triggered chrome movement,
+   * which reset the animation from the start and made petals vanish mid-fall.
+   */
+  100% { transform: translateY(110lvh) rotate(540deg); opacity: 0; }
 }
 
 @keyframes sparkleExplode {
@@ -17030,9 +17809,9 @@ body:has(.invitePreviewShell) {
 
 .templateDetailsPage {
   width: 100%;
-  max-width: none;
-  padding: 88px clamp(20px, 3vw, 44px)
-    calc(36px + env(safe-area-inset-bottom));
+  max-width: 1460px;
+  margin: 0 auto;
+  padding: 72px 24px calc(32px + env(safe-area-inset-bottom));
 }
 
 @media (max-width: 767px) {

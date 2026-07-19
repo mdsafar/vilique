@@ -628,7 +628,12 @@ async function buildPublishPatch({
         throw new Error("Invitation is completed and locked.");
     }
 
-    if (invite.status === "published" && invite.first_published_at) {
+    if (
+        invite.status === "published" &&
+        invite.lifecycle_status === "published" &&
+        invite.event_status === "published" &&
+        invite.first_published_at
+    ) {
         return {
             slug: invite.slug,
             status: "published",

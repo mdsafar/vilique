@@ -9,7 +9,7 @@ import { getInvitationLifecycle } from "@/lib/lifecycle";
 const INVITATION_LIMIT_DEFAULT = 10;
 const INVITATION_LIMIT_MAX = 30;
 const invitationSorts = {
-    updated_desc: { field: "updated_at", ascending: false },
+    updated_desc: { field: "created_at", ascending: false },
     newest: { field: "created_at", ascending: false },
     oldest: { field: "created_at", ascending: true },
     event_soonest: { field: "event_date", ascending: true },
@@ -67,10 +67,14 @@ export async function GET(request: Request) {
     const items = pageItemsWithRows.map(({ item }) => item);
     const lastRow = pageItemsWithRows[pageItemsWithRows.length - 1]?.row as Record<string, unknown> | undefined;
     const hasMore = items.length === limit && cursorFilteredItemsWithRows.length > limit;
-    const [counts, stats] = await Promise.all([
-        getInvitationCounts(user.id, search, paidInvitationIdsForUser),
-        getInvitationStats(pageItemsWithRows.map(({ row }) => row.id)),
-    ]);
+    const filterStatuses: InvitationStatusFilter[] = ["all", "upcoming", "completed", "draft", "offline"];
+    const counts = Object.fromEntries(
+        filterStatuses.map((s) => [
+            s,
+            itemsWithRows.filter(({ item }) => isInvitationVisibleForStatus(item, s)).length,
+        ])
+    );
+    const stats = await getInvitationStats(pageItemsWithRows.map(({ row }) => row.id));
 
     return NextResponse.json({
         items,
@@ -206,27 +210,6 @@ function applyCursorToItems<T extends { row: Record<string, unknown> }>(
     });
 }
 
-async function getInvitationCounts(userId: string, search: string, paidInvitationIds: string[]) {
-    const supabase = await createClient();
-    const statuses: InvitationStatusFilter[] = ["all", "upcoming", "completed", "draft", "offline"];
-    let query = supabase
-        .from("invitations")
-        .select("*, invitation_templates(template_key, default_music_url, default_tick_sound_url)")
-        .eq("user_id", userId)
-        .range(0, 999);
-
-    query = applyInvitationSearch(query, search);
-    const { data } = await query;
-    const items = ((data || []) as InvitationRowWithTemplate[]).map((row) => {
-        const item = mapInvitationRow(row);
-        return paidInvitationIds.includes(row.id) ? { ...item, paymentStatus: "paid" as const } : item;
-    });
-
-    return Object.fromEntries(statuses.map((status) => [
-        status,
-        items.filter((item) => isInvitationVisibleForStatus(item, status)).length,
-    ]));
-}
 
 async function getInvitationStats(invitationIds: string[]) {
     if (!invitationIds.length) return {};

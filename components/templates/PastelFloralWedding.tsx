@@ -749,7 +749,7 @@ function TimeBox({ value, label }: { value: string; label: string }) {
     );
 }
 
-function FloatingFlowers() {
+export function FloatingFlowers() {
     return (
         <div className="floatingFlowers" aria-hidden="true">
             {Array.from({ length: 18 }).map((_, index) => (

@@ -47,9 +47,10 @@ export async function POST(_request: Request, { params }: Context) {
     const { data, error } = await supabase
         .from("invitations")
         .update({
-            status: invite.first_published_at || invite.published_at ? "published" : "draft",
+            status: "published",
             lifecycle_status: "unpublished",
             event_status: "unpublished",
+            first_published_at: invite.first_published_at || invite.published_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
         })
         .eq("id", id)

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { mapInvitationRow } from "@/features/invitations/mappers";
-import { invitationUpdateSchema } from "@/features/invitations/validation";
+import { invitationUpdateSchema, validateInvitationFields } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isInvitationCompleted } from "@/lib/lifecycle";
@@ -49,7 +49,7 @@ export async function PATCH(request: Request, { params }: Context) {
     const supabaseAdmin = createAdminClient();
     const { data: currentInvite, error: currentInviteError } = await supabaseAdmin
         .from("invitations")
-        .select("id, user_id, status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
+        .select("id, user_id, status, title, primary_name, secondary_name, event_date, event_time, venue_name, venue_address, map_link, phone, secondary_phone, message, music_url, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
         .eq("id", id)
         .eq("user_id", user.id)
         .single();
@@ -61,6 +61,30 @@ export async function PATCH(request: Request, { params }: Context) {
     if (isCompletedInvitationRow(currentInvite)) {
         return completedLockedResponse();
     }
+
+    const mergedForValidation = {
+        title: parsed.data.title ?? currentInvite.title,
+        primaryName: parsed.data.primaryName ?? currentInvite.primary_name,
+        secondaryName: parsed.data.secondaryName ?? currentInvite.secondary_name,
+        eventDate: parsed.data.eventDate ?? currentInvite.event_date,
+        eventTime: parsed.data.eventTime ?? currentInvite.event_time,
+        venueName: parsed.data.venueName ?? currentInvite.venue_name,
+        venueAddress: parsed.data.venueAddress ?? currentInvite.venue_address,
+        mapLink: parsed.data.mapLink ?? currentInvite.map_link,
+        phone: parsed.data.phone ?? currentInvite.phone,
+        secondaryPhone: parsed.data.secondaryPhone ?? currentInvite.secondary_phone,
+        message: parsed.data.message ?? currentInvite.message,
+        musicUrl: parsed.data.musicUrl ?? currentInvite.music_url,
+    };
+    const validationErrors = validateInvitationFields(mergedForValidation);
+    if (Object.keys(validationErrors).length > 0) {
+        return NextResponse.json({
+            code: "REQUIRED_FIELDS_MISSING",
+            error: "Please fix the highlighted fields before continuing.",
+            fields: validationErrors,
+        }, { status: 400 });
+    }
+
 
     const { data, error } = await supabaseAdmin.rpc("update_invitation_with_identity_check", {
         p_invitation_id: id,

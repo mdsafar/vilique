@@ -8,6 +8,9 @@ import { getPublicInvitationUrl } from "@/lib/config/site";
 import { useRazorpay } from "@/hooks/useRazorpay";
 import { formatPaiseToCurrency } from "@/lib/currency";
 import type { InvitationData } from "@/types/invitation";
+import { notifyProfileDataChanged } from "@/lib/events";
+import { useSWRConfig } from "swr";
+import { mutateInvitationState } from "@/lib/invitationCache";
 
 type Props = {
     invitation: InvitationData;
@@ -89,6 +92,7 @@ const DEFAULT_PAYMENT_FAILURE_LINES = [
 ];
 
 export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess }: Props) {
+    const { mutate: globalMutate } = useSWRConfig();
     const [slug, setSlug] = useState(invitation.slug);
     const [status, setStatus] = useState<SlugStatus>("idle");
     const [isPublishing, setIsPublishing] = useState(false);
@@ -344,7 +348,18 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             setPaymentProcessingState("paymentSuccess");
                             setIsPublished(true);
                             setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
-                            notifyProfileDataChanged();
+                            mutateInvitationState(
+                                globalMutate,
+                                {
+                                    ...invitation,
+                                    status: "published",
+                                    publishedAt: verifyData.published_at || new Date().toISOString(),
+                                    slug: verifyData.slug || slug.toLowerCase().trim(),
+                                    updatedAt: new Date().toISOString(),
+                                    lifecycleStatus: "published",
+                                },
+                                invitation
+                            );
                             onPublishSuccess({
                                 slug: verifyData.slug,
                                 status: "published",
@@ -450,7 +465,18 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             }
 
             setIsPublished(true);
-            notifyProfileDataChanged();
+            mutateInvitationState(
+                globalMutate,
+                {
+                    ...invitation,
+                    status: "published",
+                    publishedAt: data.published_at || new Date().toISOString(),
+                    slug: data.slug || slug.toLowerCase().trim(),
+                    updatedAt: new Date().toISOString(),
+                    lifecycleStatus: "published",
+                },
+                invitation
+            );
             onPublishSuccess(data);
         } catch {
             setPublishError("An error occurred during publishing");
@@ -804,8 +830,4 @@ function getPaymentFailureLines(message: string) {
 
 function isTooManyRequestsError(message: string) {
     return message.toLowerCase().includes("too many requests");
-}
-
-function notifyProfileDataChanged() {
-    window.dispatchEvent(new Event("vilique:profile-data-changed"));
 }

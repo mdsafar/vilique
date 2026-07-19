@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, type UIEvent } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, type UIEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
@@ -43,36 +43,29 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
-
-interface DashboardData {
-    profile: {
-        email: string;
-        name: string;
-        avatarUrl: string | null;
-    } | null;
-    invitations: InvitationData[];
-    published: number;
-    drafts: number;
-    views: number;
-    rsvps: number;
-    invitationStats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
-    totalSpent: number;
-}
+import { ProfileDataChangedDetail } from "@/lib/events";
+import {
+    InvitationsPageResponse,
+    DashboardData,
+    updateInvitationInPages,
+    removeInvitationFromPages,
+    mutateInvitationState,
+    getInvitationFilterBucket,
+    adjustInvitationCounts,
+    applyInvitationMutationsToPages,
+    getPendingItemMutations,
+    clearConfirmedPendingMutations,
+    isInvitationVisibleInFilter,
+    getFilterFromSWRKey,
+    getSortFromSWRKey,
+    type PendingMutation,
+} from "@/lib/invitationCache";
 
 interface ProfileInvitationsListProps {
     initialInvitations?: InvitationData[];
     invitationStats?: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
     showAuthModalOnUnauthorized?: boolean;
 }
-
-type InvitationsPageResponse = {
-    items: InvitationData[];
-    nextCursor: string | null;
-    hasMore: boolean;
-    totalCount: number;
-    counts: Record<string, number>;
-    stats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
-};
 
 export default function ProfileInvitationsList({
     initialInvitations = [],
@@ -90,29 +83,28 @@ export default function ProfileInvitationsList({
 
     const { mutate: globalMutate } = useSWRConfig();
     const refreshInvitationLists = useCallback(() => globalMutate(
-        (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
-        undefined,
-        { revalidate: true }
+        (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations"))
     ), [globalMutate]);
 
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
+    const [optimisticMutations, setOptimisticMutations] = useState<PendingMutation[]>([]);
     const [isMobileTitleCollapsed, setIsMobileTitleCollapsed] = useState(false);
     const lastListScrollTopRef = useRef(0);
-    const savedSize = listSizes["invitations"] ?? 1;
+    const tabSizeKey = `invitations_${statusFilter}${debouncedSearch ? `_${debouncedSearch}` : ""}`;
+    const savedSize = listSizes[tabSizeKey] ?? 1;
 
     const prevStatusFilterRef = useRef(statusFilter);
     const prevDebouncedSearchRef = useRef(debouncedSearch);
 
-    const getFirstPageKey = (status: string, search: string) => {
-        const params = new URLSearchParams({
-            status,
-            sort: "updated_desc",
-            limit: "10",
-        });
-        if (search) params.set("search", search);
-        return `/api/invitations?${params.toString()}`;
-    };
+    const updateCountsState = useCallback((newCounts: Record<string, number>) => {
+        setCachedCounts(newCounts);
+        try {
+            sessionStorage.setItem("invitations_cached_counts", JSON.stringify(newCounts));
+        } catch {
+            // Ignore storage quota error
+        }
+    }, []);
 
     const {
         data,
@@ -139,18 +131,51 @@ export default function ProfileInvitationsList({
         revalidateOnMount: true,
         revalidateIfStale: true,
         initialSize: savedSize,
-        onSuccess: (invitationPages, key) => {
-            const currentActiveKey = getFirstPageKey(statusFilter, debouncedSearch);
-            if (key && key.includes(currentActiveKey)) {
-                const nextCounts = invitationPages?.[0]?.counts;
-                if (nextCounts) setCachedCounts(nextCounts);
+        onSuccess: (invitationPages) => {
+            clearConfirmedPendingMutations(invitationPages, statusFilter);
+            const nextCounts = invitationPages?.[0]?.counts;
+            if (nextCounts) updateCountsState(nextCounts);
+
+            if (invitationPages) {
+                const serverItemsMap = new Map<string, InvitationData>();
+                invitationPages.forEach((p) => p.items?.forEach((i) => serverItemsMap.set(i.id, i)));
+                setOptimisticMutations((prev) =>
+                    prev.filter((m) => {
+                        const serverItem = serverItemsMap.get(m.id);
+                        if (!serverItem || !m.invitation) return true;
+                        const serverBucket = getInvitationFilterBucket(serverItem);
+                        const mutationBucket = getInvitationFilterBucket(m.invitation);
+                        return serverBucket !== mutationBucket;
+                    })
+                );
             }
         },
     });
 
-    const pages = data || [];
-    const rawInvitations = pages.flatMap((page) => page.items);
-    const invitations = deduplicateItems(rawInvitations, "id");
+    const rawPages = useMemo(() => data || [], [data]);
+    const itemMutations = useMemo(() => {
+        const storeMutations = getPendingItemMutations();
+        const mutationMap = new Map<string, PendingMutation>();
+        for (const mutation of [...storeMutations, ...optimisticMutations]) {
+            const existing = mutationMap.get(mutation.id);
+            if (!existing || mutation.timestamp >= existing.timestamp) {
+                mutationMap.set(mutation.id, mutation);
+            }
+        }
+        return Array.from(mutationMap.values());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [optimisticMutations, statusFilter, rawPages]);
+    const pages = useMemo(
+        () => applyInvitationMutationsToPages(rawPages, itemMutations, statusFilter) || rawPages,
+        [rawPages, itemMutations, statusFilter]
+    );
+
+    const invitations = useMemo(() => {
+        const rawInvitations = pages.flatMap((page) => page.items || []);
+        const deduped = deduplicateItems(rawInvitations, "id");
+        if (statusFilter === "all") return deduped;
+        return deduped.filter((item) => isInvitationVisibleInFilter(item, statusFilter));
+    }, [pages, statusFilter]);
     const firstPage = pages[0];
     const fallbackCounts = {
         all: initialInvitations.length,
@@ -160,15 +185,38 @@ export default function ProfileInvitationsList({
         offline: 0,
     };
     const latestCounts = firstPage?.counts;
-    const counts = latestCounts || cachedCounts || fallbackCounts;
-    const mergedStats = pages.reduce((acc, page) => ({ ...acc, ...page.stats }), invitationStats);
+    const counts = cachedCounts || latestCounts || fallbackCounts;
     const hasMore = Boolean(pages[pages.length - 1]?.hasMore);
+    const mergedStats = pages.reduce((acc: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>, page: InvitationsPageResponse) => ({ ...acc, ...page.stats }), invitationStats);
     const shouldShowEndState = pages.length > 1 && !hasMore;
     const isSearching = searchTerm !== debouncedSearch;
     const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
     const isLoadingInitialTabs = isLoading && !pages.length && !cachedCounts;
     const isLoadingNextPage = isValidating && pages.length > 0 && hasMore && size > pages.length;
     const hasActiveFilters = Boolean(searchTerm) || statusFilter !== "all";
+
+    useEffect(() => {
+        if (process.env.NODE_ENV !== "production") {
+            console.log(`[InvitationsCache] ProfileInvitationsList rendered at ${Date.now()}`, {
+                statusFilter,
+                size,
+                rawPagesCount: rawPages.length,
+                isLoadingFirstPage,
+                hasCachedData: Boolean(data),
+            });
+        }
+    }, [statusFilter, size, rawPages.length, isLoadingFirstPage, data]);
+
+    useEffect(() => {
+        if (!itemMutations.length) return;
+
+        const timeout = window.setTimeout(() => {
+            setOptimisticMutations([]);
+        }, 5000);
+
+        return () => window.clearTimeout(timeout);
+    }, [itemMutations]);
+
     const statusLabels: Record<string, string> = {
         all: "All",
         upcoming: "Upcoming",
@@ -184,7 +232,7 @@ export default function ProfileInvitationsList({
     const handleLoadMore = () => {
         setSize((current) => {
             const next = current + 1;
-            setListSize("invitations", next);
+            setListSize(tabSizeKey, next);
             return next;
         });
     };
@@ -201,31 +249,54 @@ export default function ProfileInvitationsList({
         if (hasFilterChanged) {
             prevStatusFilterRef.current = statusFilter;
             prevDebouncedSearchRef.current = debouncedSearch;
-            setSize(1);
-            setListSize("invitations", 1);
+            const restoredSize = listSizes[tabSizeKey] ?? 1;
+            setSize(restoredSize);
         }
-    }, [statusFilter, debouncedSearch, setSize, setListSize]);
+    }, [statusFilter, debouncedSearch, setSize, listSizes, tabSizeKey]);
 
     useEffect(() => {
-        function handleProfileDataChanged() {
-            setListSize("invitations", 1);
-            void setSize(1);
+        function handleProfileDataChanged(event?: Event) {
+            const detail = (event as CustomEvent<ProfileDataChangedDetail> | undefined)?.detail;
+            if (detail?.invitation) {
+                const updated = detail.invitation;
+                const prev = detail.previous;
+                void globalMutate(
+                    (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
+                    (currentPages: InvitationsPageResponse[] | undefined, key?: string) => {
+                        const filter = typeof key === "string" ? getFilterFromSWRKey(key) : "all";
+                        const sort = typeof key === "string" ? getSortFromSWRKey(key) : "updated_desc";
+                        return updateInvitationInPages(currentPages, updated, prev, filter, sort);
+                    },
+                    { revalidate: false }
+                );
+            } else if (detail?.deletedInvitation) {
+                const deleted = detail.deletedInvitation;
+                void globalMutate(
+                    (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
+                    (currentPages: InvitationsPageResponse[] | undefined) =>
+                        removeInvitationFromPages(currentPages, deleted),
+                    { revalidate: false }
+                );
+            }
             void refreshInvitationLists();
         }
 
+        // Always refresh on mount to ensure cards reflect any recent builder edits
+        void refreshInvitationLists();
+
         window.addEventListener("vilique:profile-data-changed", handleProfileDataChanged);
         return () => window.removeEventListener("vilique:profile-data-changed", handleProfileDataChanged);
-    }, [setSize, setListSize, refreshInvitationLists]);
+    }, [globalMutate, statusFilter, refreshInvitationLists]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
         const params = new URLSearchParams(window.location.search);
         if (params.get("reset") === "1") {
-            setListSize("invitations", 1);
-            void setSize(1);
+            const nextUrl = window.location.pathname + window.location.search.replace(/[?&]reset=1/, "").replace(/^&/, "?");
+            window.history.replaceState(null, "", nextUrl || window.location.pathname);
             void refreshInvitationLists();
         }
-    }, [setSize, setListSize, refreshInvitationLists]);
+    }, [refreshInvitationLists]);
 
     useEffect(() => {
         if (window.location.pathname !== "/invitations") return;
@@ -360,16 +431,45 @@ export default function ProfileInvitationsList({
                     {invitations.map((invitation) => (
                         <InvitationRow
                             invitation={invitation}
+                            statusFilter={statusFilter}
                             key={invitation.id}
                             stats={mergedStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
                             onInvitationDeleted={(deletedInvitation) => {
+                                const prevBucket = getInvitationFilterBucket(deletedInvitation);
+                                const updatedCounts = adjustInvitationCounts(counts, prevBucket, null);
+                                updateCountsState(updatedCounts);
+                                setOptimisticMutations((current) => [
+                                    ...current.filter((mutation) => mutation.id !== deletedInvitation.id),
+                                    {
+                                        id: deletedInvitation.id,
+                                        deletedInvitation,
+                                        timestamp: Date.now(),
+                                    },
+                                ]);
+
                                 mutate((currentPages) => removeInvitationFromPages(currentPages, deletedInvitation), { revalidate: false });
+                                mutateInvitationState(globalMutate, undefined, undefined, deletedInvitation);
                             }}
                             onInvitationUpdated={(updatedInvitation, previousInvitation) => {
+                                const prevBucket = previousInvitation ? getInvitationFilterBucket(previousInvitation) : null;
+                                const nextBucket = getInvitationFilterBucket(updatedInvitation);
+                                const updatedCounts = adjustInvitationCounts(counts, prevBucket, nextBucket);
+                                updateCountsState(updatedCounts);
+                                setOptimisticMutations((current) => [
+                                    ...current.filter((mutation) => mutation.id !== updatedInvitation.id),
+                                    {
+                                        id: updatedInvitation.id,
+                                        invitation: updatedInvitation,
+                                        previous: previousInvitation,
+                                        timestamp: Date.now(),
+                                    },
+                                ]);
+
                                 mutate(
                                     (currentPages) => updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, statusFilter),
                                     { revalidate: false }
                                 );
+                                mutateInvitationState(globalMutate, updatedInvitation, previousInvitation);
                             }}
                         />
                     ))}
@@ -449,82 +549,7 @@ export function ProfileInvitationsSkeleton() {
     );
 }
 
-function removeInvitationFromPages(
-    pages: InvitationsPageResponse[] | undefined,
-    invitation: InvitationData
-) {
-    if (!pages) return pages;
-    const bucket = getInvitationFilterBucket(invitation);
-    return pages.map((page) => ({
-        ...page,
-        items: page.items.filter((item) => item.id !== invitation.id),
-        totalCount: Math.max(0, page.totalCount - 1),
-        counts: adjustInvitationCounts(page.counts, bucket, null),
-        stats: omitInvitationStat(page.stats, invitation.id),
-    }));
-}
 
-function updateInvitationInPages(
-    pages: InvitationsPageResponse[] | undefined,
-    updatedInvitation: InvitationData,
-    previousInvitation: InvitationData,
-    activeFilter: string
-) {
-    if (!pages) return pages;
-    const previousBucket = getInvitationFilterBucket(previousInvitation);
-    const nextBucket = getInvitationFilterBucket(updatedInvitation);
-    const shouldKeepInCurrentFilter = isInvitationVisibleInFilter(updatedInvitation, activeFilter);
-
-    return pages.map((page) => ({
-        ...page,
-        items: page.items
-            .map((item) => item.id === updatedInvitation.id ? updatedInvitation : item)
-            .filter((item) => item.id !== updatedInvitation.id || shouldKeepInCurrentFilter),
-        totalCount: page.totalCount + (shouldKeepInCurrentFilter ? 0 : -1),
-        counts: adjustInvitationCounts(page.counts, previousBucket, nextBucket),
-    }));
-}
-
-function getInvitationFilterBucket(invitation: InvitationData) {
-    const lifecycleStatus = getVisibleLifecycleStatus(invitation);
-    if (lifecycleStatus === "draft") return "draft";
-    if (lifecycleStatus === "offline") return "offline";
-    if (lifecycleStatus === "completed") return "completed";
-    return "upcoming";
-}
-
-function getVisibleLifecycleStatus(invitation: InvitationData): DashboardLifecycleStatus {
-    const isPaidPublishFailed = invitation.paymentStatus === "paid" &&
-        !invitation.firstPublishedAt &&
-        invitation.status !== "published";
-    return isPaidPublishFailed ? "offline" : getInvitationLifecycleStatus(invitation);
-}
-
-function isInvitationVisibleInFilter(invitation: InvitationData, activeFilter: string) {
-    if (activeFilter === "all") return true;
-    return getInvitationFilterBucket(invitation) === activeFilter;
-}
-
-function adjustInvitationCounts(
-    counts: Record<string, number>,
-    previousBucket: string | null,
-    nextBucket: string | null
-) {
-    const nextCounts = { ...counts };
-    if (previousBucket) nextCounts[previousBucket] = Math.max(0, (nextCounts[previousBucket] || 0) - 1);
-    if (nextBucket) nextCounts[nextBucket] = (nextCounts[nextBucket] || 0) + 1;
-    if (!nextBucket) nextCounts.all = Math.max(0, (nextCounts.all || 0) - 1);
-    return nextCounts;
-}
-
-function omitInvitationStat(
-    stats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>,
-    invitationId: string
-) {
-    const nextStats = { ...stats };
-    delete nextStats[invitationId];
-    return nextStats;
-}
 
 function InvitationAppendSkeleton() {
     return (
@@ -582,10 +607,12 @@ function InvitationSkeletonCard() {
 
 function InvitationRow({
     invitation,
+    statusFilter,
     onInvitationDeleted,
     onInvitationUpdated,
 }: {
     invitation: InvitationData;
+    statusFilter: string;
     stats: { rsvps: number; views: number; acceptsRsvps?: boolean };
     onInvitationDeleted: (invitation: InvitationData) => void;
     onInvitationUpdated: (updatedInvitation: InvitationData, previousInvitation: InvitationData) => void;
@@ -609,9 +636,7 @@ function InvitationRow({
         return state?.data;
     };
     const refreshInvitationLists = () => mutate(
-        (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
-        undefined,
-        { revalidate: true }
+        (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations"))
     );
 
     const isPaidPublishFailed = invitation.paymentStatus === "paid" &&
@@ -626,7 +651,8 @@ function InvitationRow({
     const isPublic = isUpcoming || isLiveToday || isCompleted;
     const hasAnalyticsAccess = Boolean(invitation.firstPublishedAt || invitation.publishedAt);
     const isSample = invitation.id.startsWith("sample-");
-    const editHref = isSample ? "/" : `/builder?id=${invitation.id}&from=invitations`;
+    const returnToUrl = `/invitations?status=${statusFilter}`;
+    const editHref = isSample ? "/" : `/builder?id=${invitation.id}&returnTo=${encodeURIComponent(returnToUrl)}`;
     const analyticsHref = `/invitations/${invitation.id}/analytics`;
     const previewHref = isSample
         ? "/"
@@ -711,28 +737,6 @@ function InvitationRow({
     async function handleTakeOfflineConfirm() {
         if (isTakingOffline) return;
         setIsTakingOffline(true);
-        const originalData = getCachedDashboard();
-
-        mutate("/api/profile/dashboard", (current?: DashboardData) => {
-            if (!current) return current;
-            const updatedInvitations = current.invitations.map((item) => {
-                if (item.id === invitation.id) {
-                    return {
-                        ...item,
-                        status: "published" as const,
-                        lifecycleStatus: "unpublished" as const,
-                        eventStatus: "unpublished" as const,
-                    };
-                }
-                return item;
-            });
-            return {
-                ...current,
-                invitations: updatedInvitations,
-                published: current.published,
-                drafts: current.drafts,
-            };
-        }, { revalidate: false });
 
         try {
             const response = await fetch(`/api/invitations/${invitation.id}/unpublish`, {
@@ -741,22 +745,20 @@ function InvitationRow({
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
                 showToast(result.error || "Unable to take invitation offline.", "error");
-                mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
-            onInvitationUpdated({
+            const updatedInvitation: InvitationData = {
                 ...invitation,
                 status: "published",
                 lifecycleStatus: "unpublished",
                 eventStatus: "unpublished",
                 updatedAt: new Date().toISOString(),
-            }, invitation);
+            };
+            onInvitationUpdated(updatedInvitation, invitation);
             showToast("Invitation taken offline.", "success");
-            mutate("/api/profile/dashboard");
             void refreshInvitationLists();
         } catch {
             showToast("Unable to take invitation offline.", "error");
-            mutate("/api/profile/dashboard", originalData, { revalidate: false });
         } finally {
             setIsTakingOffline(false);
             setIsOfflineOpen(false);
@@ -771,28 +773,6 @@ function InvitationRow({
     async function handleMakeOnlineConfirm() {
         if (isMakingOnline) return;
         setIsMakingOnline(true);
-        const originalData = getCachedDashboard();
-
-        mutate("/api/profile/dashboard", (current?: DashboardData) => {
-            if (!current) return current;
-            const updatedInvitations = current.invitations.map((item) => {
-                if (item.id === invitation.id) {
-                    return {
-                        ...item,
-                        status: "published" as const,
-                        lifecycleStatus: "published" as const,
-                        eventStatus: "published" as const,
-                    };
-                }
-                return item;
-            });
-            return {
-                ...current,
-                invitations: updatedInvitations,
-                published: current.published,
-                drafts: current.drafts,
-            };
-        }, { revalidate: false });
 
         try {
             const response = await fetch(`/api/invitations/${invitation.id}/restore`, {
@@ -801,10 +781,9 @@ function InvitationRow({
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
                 showToast(result.error || "Unable to make invitation online.", "error");
-                mutate("/api/profile/dashboard", originalData, { revalidate: false });
                 return;
             }
-            onInvitationUpdated({
+            const confirmedUpdated: InvitationData = {
                 ...invitation,
                 slug: result.slug || invitation.slug,
                 status: "published",
@@ -814,13 +793,12 @@ function InvitationRow({
                 publishedAt: result.published_at || invitation.publishedAt || new Date().toISOString(),
                 firstPublishedAt: invitation.firstPublishedAt || result.published_at || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-            }, invitation);
+            };
+            onInvitationUpdated(confirmedUpdated, invitation);
             showToast("Invitation is online again.", "success");
-            mutate("/api/profile/dashboard");
             void refreshInvitationLists();
         } catch {
             showToast("Unable to make invitation online.", "error");
-            mutate("/api/profile/dashboard", originalData, { revalidate: false });
         } finally {
             setIsMakingOnline(false);
             setIsOnlineOpen(false);

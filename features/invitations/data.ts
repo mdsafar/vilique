@@ -1,6 +1,5 @@
 import { unstable_cache } from "next/cache";
 import { templates } from "@/data/templates";
-import { createDefaultInvitation } from "@/lib/defaultInvitation";
 import { createPublicServerClient } from "@/lib/supabase/public-server";
 import { createClient } from "@/lib/supabase/server";
 import { getDefaultRatingSummary } from "@/lib/templateRatingFormat";
@@ -68,7 +67,6 @@ export async function getPublishedInvitationBySlug(slug: string) {
 export async function getBuilderInvitation(options: {
     id?: string;
     slug?: string;
-    template?: string;
 }) {
     const supabase = await createClient();
     const {
@@ -84,48 +82,11 @@ export async function getBuilderInvitation(options: {
         if (data) return mapInvitationRow(data);
     }
 
-    const templateKey = options.template || "pastel-floral-wedding";
-    const { data: template } = await supabase
-        .from("invitation_templates")
-        .select("id, template_key, category, accent_color")
-        .eq("template_key", templateKey)
-        .single();
-
-    const fallback = createDefaultInvitation();
-    const slug = `${fallback.primaryName}-${fallback.secondaryName || "invite"}-${crypto.randomUUID().slice(0, 8)}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-
-    const { data } = await supabase
-        .from("invitations")
-        .insert({
-            user_id: user.id,
-            template_id: template?.id || null,
-            slug,
-            category: template?.category || fallback.category,
-            title: fallback.title,
-            primary_name: fallback.primaryName,
-            secondary_name: fallback.secondaryName,
-            event_date: fallback.eventDate,
-            event_time: fallback.eventTime,
-            venue_name: fallback.venueName,
-            venue_address: fallback.venueAddress,
-            map_link: fallback.mapLink,
-            phone: fallback.phone,
-            secondary_phone: fallback.secondaryPhone,
-            message: fallback.message,
-            theme: {
-                ...fallback.theme,
-                primaryColor: template?.accent_color || fallback.theme.primaryColor,
-            },
-            status: "draft",
-        })
-        .select("*")
-        .single();
-
-    return data ? mapInvitationRow(data) : fallback;
+    // No matching invitation found — do not auto-create a draft.
+    // Draft creation is handled exclusively via POST /api/invitations in the builder.
+    return null;
 }
+
 
 export async function getDashboardData() {
     const supabase = await createClient();
