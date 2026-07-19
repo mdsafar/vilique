@@ -11755,6 +11755,16 @@ body:has(.invitePreviewShell) {
 
 .pastelWeddingPage.stateAccepted .thanksCard {
   animation: flipIn3D 0.55s cubic-bezier(0.25, 1, 0.5, 1) both;
+  /*
+   * iPhone/WebKit flicker fix: promote .thanksCard to a stable GPU compositing
+   * layer for the duration of the entry animation. Without this, WebKit
+   * invalidates the compositor tile when the visual-viewport scroll nudge fires
+   * scrollTo(0,1) → scrollTo(0,0) mid-animation, causing a visible flash.
+   * will-change: transform is only active while .stateAccepted is present,
+   * so it is automatically released after the screen transition completes.
+   * This has no effect on Android, desktop, Builder, or Preview contexts.
+   */
+  will-change: transform;
 }
 
 .pastelWeddingPage.stateAccepted .thanksCard > :where(
