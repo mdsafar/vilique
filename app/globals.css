@@ -11537,7 +11537,20 @@ p {
   color: var(--wedding-text);
   font-family: "Montserrat", sans-serif;
   background: var(--wedding-bg);
-  perspective: 1200px;
+  /*
+   * NOTE: perspective is intentionally omitted here. Every animation and
+   * transform used by this template (flipIn3D, slideUpFade, floatBg, etc.)
+   * uses only 2D CSS functions — no rotateX/Y/Z, translateZ, or perspective()
+   * is ever applied to any child. Setting `perspective` on this element would
+   * create a CSS 3D rendering context (perspective container) that forces all
+   * descendants into the same compositor layer tree, preventing WebKit from
+   * promoting animating children (InviteCard, ThanksCard) to independent GPU
+   * layers. Independent layers are required for the `will-change: transform`
+   * hints below to take effect and shield the entry animations from being
+   * invalidated by the visual-viewport scroll nudge mid-frame.
+   * Builder, Preview, and public-invite-wrapper contexts already explicitly
+   * override `perspective: none` — this brings the base rule in line.
+   */
 }
 
 .pastelWeddingPage::before,
@@ -11751,18 +11764,28 @@ body:has(.invitePreviewShell) {
 .inviteScreen.active {
   display: block;
   animation: slideUpFade 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /*
+   * iPhone/WebKit: promote InviteCard to an independent GPU compositing layer
+   * for the duration of its entry animation (Thanks → Invite transition).
+   * Requires perspective to be absent from .pastelWeddingPage (see above) so
+   * WebKit can actually create the independent layer. Released automatically
+   * once the animation ends and the `.active` class semantics are no longer
+   * driving a transition. No effect on Builder (.previewScaleFrame overrides
+   * `animation: none` on this selector) or desktop/Android.
+   */
+  will-change: transform;
 }
 
 .pastelWeddingPage.stateAccepted .thanksCard {
   animation: flipIn3D 0.55s cubic-bezier(0.25, 1, 0.5, 1) both;
   /*
-   * iPhone/WebKit flicker fix: promote .thanksCard to a stable GPU compositing
-   * layer for the duration of the entry animation. Without this, WebKit
-   * invalidates the compositor tile when the visual-viewport scroll nudge fires
-   * scrollTo(0,1) → scrollTo(0,0) mid-animation, causing a visible flash.
-   * will-change: transform is only active while .stateAccepted is present,
-   * so it is automatically released after the screen transition completes.
-   * This has no effect on Android, desktop, Builder, or Preview contexts.
+   * iPhone/WebKit: promote ThanksCard to an independent GPU compositing layer
+   * for the duration of its entry animation (Invite → Thanks transition).
+   * The primary fix is the removal of `perspective` from .pastelWeddingPage
+   * (see above) — without that, this will-change hint was silently blocked by
+   * WebKit's perspective-container compositing rules and had no effect.
+   * Released automatically when .stateAccepted is removed from the page.
+   * No effect on Android, desktop, Builder, or Preview contexts.
    */
   will-change: transform;
 }
