@@ -15,8 +15,17 @@ type Props = {
 
 export default function BottomNav({ initialUser }: Props) {
     const pathname = usePathname();
+    const [prevInitialUser, setPrevInitialUser] = useState(initialUser);
     const [user, setUser] = useState<NavUser | null>(initialUser);
     const [authChecked, setAuthChecked] = useState(Boolean(initialUser));
+
+    if (initialUser !== prevInitialUser) {
+        setPrevInitialUser(initialUser);
+        setUser(initialUser);
+        if (initialUser) {
+            setAuthChecked(true);
+        }
+    }
 
     useEffect(() => {
         let active = true;

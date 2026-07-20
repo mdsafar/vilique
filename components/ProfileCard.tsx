@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { HelpCircle, LogOut, AlertTriangle } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
+import { createClient } from "@/lib/supabase/client";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
 
@@ -31,6 +32,12 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
     const handleLogoutConfirm = async () => {
         setIsPending(true);
         showToast("Signing out...", "info");
+        try {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+        } catch {
+            // Ignore client signout error; server action will proceed
+        }
         await signOut();
     };
 
@@ -67,11 +74,11 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
                     <button
                         className="profileLogoutButton"
                         onClick={() => setIsConfirmOpen(true)}
-                        title="Log out"
+                        title="Sign out"
                         type="button"
                     >
                         <LogOut size={14} />
-                        <span>Log out</span>
+                        <span>Sign out</span>
                     </button>
                 </div>
             )}
