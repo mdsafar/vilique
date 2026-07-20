@@ -446,7 +446,20 @@ export async function restorePublishedInvitationFromOffline({
             firstPaymentId: invitation.first_payment_id,
         });
     const restoreBlocker = getOfflineRestoreBlocker(invitation, { isFreeTemplate, entitlement });
-    if (restoreBlocker) throw new Error(restoreBlocker);
+    if (restoreBlocker) {
+        if (restoreBlocker === "Invitation is completed and locked.") {
+            await supabase
+                .from("invitations")
+                .update({
+                    lifecycle_status: "completed",
+                    event_status: "completed",
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", invitationId)
+                .eq("user_id", userId);
+        }
+        throw new Error(restoreBlocker);
+    }
 
     if (
         invitation.status === "published" &&

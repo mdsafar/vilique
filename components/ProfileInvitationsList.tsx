@@ -33,7 +33,7 @@ import { deleteInvitation } from "@/app/(app)/profile/actions";
 import ListState from "@/components/ListState";
 import { InvitationData } from "@/types/invitation";
 import { getPublicInvitationUrl } from "@/lib/config/site";
-import { getInvitationLifecycle, InvitationLifecycleStatus } from "@/lib/lifecycle";
+import { getInvitationLifecycle, isInvitationCompleted, InvitationLifecycleStatus } from "@/lib/lifecycle";
 import ConfirmModal from "./ConfirmModal";
 import { useToast } from "./Toast";
 import { useNavigationState } from "./NavigationStateProvider";
@@ -772,6 +772,20 @@ function InvitationRow({
 
     async function handleMakeOnlineConfirm() {
         if (isMakingOnline) return;
+
+        if (isInvitationCompleted(invitation)) {
+            const completedInvitation: InvitationData = {
+                ...invitation,
+                lifecycleStatus: "completed",
+                eventStatus: "completed",
+                updatedAt: new Date().toISOString(),
+            };
+            onInvitationUpdated(completedInvitation, invitation);
+            showToast("This invitation is completed and cannot be reactivated.", "info");
+            setIsOnlineOpen(false);
+            return;
+        }
+
         setIsMakingOnline(true);
 
         try {
@@ -780,6 +794,15 @@ function InvitationRow({
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
+                if (result.code === "INVITATION_COMPLETED_LOCKED" || result.error === "This invitation is completed and can no longer be restored.") {
+                    const completedInvitation: InvitationData = {
+                        ...invitation,
+                        lifecycleStatus: "completed",
+                        eventStatus: "completed",
+                        updatedAt: new Date().toISOString(),
+                    };
+                    onInvitationUpdated(completedInvitation, invitation);
+                }
                 showToast(result.error || "Unable to make invitation online.", "error");
                 return;
             }

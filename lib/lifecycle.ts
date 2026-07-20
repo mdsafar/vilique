@@ -54,9 +54,9 @@ function getNormalizedStatusFields(invitation: EventLifecycleInput) {
 
 export function isInvitationCompleted(invitation: EventLifecycleInput, now: Date = new Date()): boolean {
     const { status, lifecycleStatus, eventStatus } = getNormalizedStatusFields(invitation);
-    if (isExplicitDraft(invitation)) return false;
-    if (!hasEverBeenPublished(invitation)) return false;
-    if (lifecycleStatus === "unpublished" || eventStatus === "unpublished" || status !== "published") return false;
+    if (isExplicitDraft(invitation) || !hasEverBeenPublished(invitation) || status === "draft" || lifecycleStatus === "draft" || eventStatus === "draft") {
+        return false;
+    }
     if (lifecycleStatus === "completed" || eventStatus === "completed") return true;
     return isEventCompleted(invitation, 0, now);
 }
@@ -67,6 +67,10 @@ export function getInvitationLifecycle(
 ): InvitationLifecycleStatus {
     const { status, lifecycleStatus, eventStatus } = getNormalizedStatusFields(invitation);
 
+    if (isExplicitDraft(invitation) || !hasEverBeenPublished(invitation) || status === "draft" || lifecycleStatus === "draft" || eventStatus === "draft") {
+        return "draft";
+    }
+
     const isOfflineState =
         lifecycleStatus === "unpublished" ||
         lifecycleStatus === "offline" ||
@@ -75,15 +79,10 @@ export function getInvitationLifecycle(
         status === "unpublished" ||
         status === "offline";
     if (isOfflineState) {
+        if (isInvitationCompleted(invitation, now)) {
+            return "completed";
+        }
         return "offline";
-    }
-
-    if (isExplicitDraft(invitation)) {
-        return "draft";
-    }
-
-    if (!hasEverBeenPublished(invitation)) {
-        return "draft";
     }
 
     if (status !== "published") {
