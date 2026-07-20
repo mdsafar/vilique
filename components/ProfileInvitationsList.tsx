@@ -648,7 +648,12 @@ function InvitationRow({
     const isLiveToday = lifecycleStatus === "live_today";
     const isCompleted = lifecycleStatus === "completed";
     const isOffline = lifecycleStatus === "offline";
+    const isOfflineRecord =
+        invitation.lifecycleStatus === "unpublished" ||
+        invitation.eventStatus === "unpublished" ||
+        isOffline;
     const isPublic = isUpcoming || isLiveToday || isCompleted;
+    const isPublicLinkAvailable = isPublic && !isOfflineRecord;
     const hasAnalyticsAccess = Boolean(invitation.firstPublishedAt || invitation.publishedAt);
     const isSample = invitation.id.startsWith("sample-");
     const returnToUrl = `/invitations?status=${statusFilter}`;
@@ -656,7 +661,7 @@ function InvitationRow({
     const analyticsHref = `/invitations/${invitation.id}/analytics`;
     const previewHref = isSample
         ? "/"
-        : isPublic
+        : isPublicLinkAvailable
             ? `/i/${invitation.slug}`
             : `/builder/preview?id=${invitation.id}&from=invitations`;
     const publicUrl = getPublicInvitationUrl(invitation.slug);
@@ -829,6 +834,7 @@ function InvitationRow({
     }
 
     function handleCopyPublicLink() {
+        if (!isPublicLinkAvailable) return;
         navigator.clipboard.writeText(publicUrl).then(() => {
             setIsCopied(true);
             showToast("Invitation link copied.", "success");
@@ -884,7 +890,7 @@ function InvitationRow({
                 </div>
             </div>
 
-            {isPublic && !isSample ? (
+            {isPublicLinkAvailable && !isSample ? (
                 <div className="profilePublicLinkWrap">
                     <a className="profilePublicLink" href={previewHref} target="_blank" rel="noreferrer">
                         <ExternalLink size={13} aria-hidden="true" />
@@ -899,14 +905,14 @@ function InvitationRow({
                         {isCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                     </button>
                 </div>
-            ) : isDraft || isOffline ? (
+            ) : isDraft || isOfflineRecord ? (
                 <div className="profilePublicLinkWrap profilePublicLinkWrap--empty">
                     <span className="profilePublicLinkPlaceholder">
                         <Lock size={14} aria-hidden="true" />
-                        {isOffline
+                        {isOfflineRecord
                             ? isPaidPublishFailed
                                 ? "Paid, but not live yet. Edit and publish again."
-                                : "Offline. Public link disabled."
+                                : "Public link unavailable while this invitation is offline."
                             : "Not published yet. Preview or edit to continue."}
                     </span>
                 </div>
@@ -1104,14 +1110,30 @@ function InvitationRow({
                     </>
 	                ) : (
 	                    <>
-	                        <a href={previewHref} target="_blank" rel="noreferrer" className="profileActionBtn profileActionBtn--primary">
-	                            <Eye size={14} aria-hidden="true" />
-	                            <span>View</span>
-	                        </a>
-	                        <Link href={analyticsHref} className="profileActionBtn">
-	                            <BarChart3 size={14} aria-hidden="true" />
-	                            <span>Analytics</span>
+	                        <Link
+	                            href={previewHref}
+	                            target={isPublicLinkAvailable ? "_blank" : undefined}
+	                            rel={isPublicLinkAvailable ? "noreferrer" : undefined}
+	                            className="profileActionBtn profileActionBtn--primary"
+	                        >
+	                            {isPublicLinkAvailable ? (
+	                                <>
+	                                    <ExternalLink size={14} aria-hidden="true" />
+	                                    <span>Open</span>
+	                                </>
+	                            ) : (
+	                                <>
+	                                    <Eye size={14} aria-hidden="true" />
+	                                    <span>Preview</span>
+	                                </>
+	                            )}
 	                        </Link>
+	                        {hasAnalyticsAccess ? (
+	                            <Link href={analyticsHref} className="profileActionBtn">
+	                                <BarChart3 size={14} aria-hidden="true" />
+	                                <span>Analytics</span>
+	                            </Link>
+	                        ) : null}
 	                    </>
 	                )}
             </div>
