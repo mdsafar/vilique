@@ -30,6 +30,11 @@ function getInitialAuthState(): AuthState {
     return hasAuthCookie() ? "checking" : "guest";
 }
 
+function isSigningOut(): boolean {
+    if (typeof window === "undefined") return false;
+    return Boolean((window as unknown as { __isSigningOut?: boolean }).__isSigningOut);
+}
+
 export default function ProtectedRoute({ children, next, className, fallback }: Props) {
     const [authState, setAuthState] = useState<AuthState>(getInitialAuthState);
     const shellClassName = ["protectedRouteShell", className].filter(Boolean).join(" ");
@@ -62,6 +67,9 @@ export default function ProtectedRoute({ children, next, className, fallback }: 
     }
 
     if (authState === "guest") {
+        if (isSigningOut()) {
+            return fallback || <main className={shellClassName} aria-hidden="true" />;
+        }
         return (
             <main className={shellClassName}>
                 <AuthRequiredModal next={next} forceOpen />

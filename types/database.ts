@@ -302,6 +302,9 @@ export type Database = {
                         | "rsvp_submit";
                     metadata: Json;
                     created_at: string;
+                    dedupe_key?: string | null;
+                    visitor_token_hash?: string | null;
+                    time_bucket?: string | null;
                 };
                 Insert: {
                     id?: string;
@@ -309,6 +312,9 @@ export type Database = {
                     event_type: Database["public"]["Tables"]["invitation_events"]["Row"]["event_type"];
                     metadata?: Json;
                     created_at?: string;
+                    dedupe_key?: string | null;
+                    visitor_token_hash?: string | null;
+                    time_bucket?: string | null;
                 };
                 Update: Partial<Database["public"]["Tables"]["invitation_events"]["Insert"]>;
                 Relationships: [

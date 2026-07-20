@@ -6,6 +6,7 @@ type AnalyticsEventRow = {
     event_type: string;
     metadata: Json;
     created_at: string;
+    visitor_token_hash?: string | null;
 };
 type RsvpAnalyticsRow = {
     id: string;
@@ -71,7 +72,7 @@ export async function getInvitationAnalytics(invitationId: string) {
     const [eventsResult, rsvpsResult, wishesResult] = await Promise.all([
         supabase
             .from("invitation_events")
-            .select("event_type, metadata, created_at")
+            .select("event_type, metadata, created_at, visitor_token_hash")
             .eq("invitation_id", invitationId)
             .order("created_at", { ascending: true }),
         supabase
@@ -136,13 +137,32 @@ function mapRsvpAnalyticsRow(rsvp: RsvpAnalyticsRow): RecentRsvpAnalyticsItem {
     };
 }
 
+function extractVisitorKey(event: AnalyticsEventRow): string {
+    if (typeof event.visitor_token_hash === "string" && event.visitor_token_hash.trim()) {
+        return event.visitor_token_hash.trim();
+    }
+    const metadata = getMetadataRecord(event.metadata);
+    return getFirstString(metadata, [
+        "visitorHash",
+        "visitor_token_hash",
+        "visitorId",
+        "sessionId",
+        "fingerprint",
+        "guestToken",
+        "ipHash",
+    ]);
+}
+
 function countUniqueVisitors(events: AnalyticsEventRow[]) {
     const keys = new Set<string>();
 
     for (const event of events) {
-        const metadata = getMetadataRecord(event.metadata);
-        const visitorKey = getFirstString(metadata, ["visitorId", "sessionId", "fingerprint"]);
-        keys.add(visitorKey || `${event.created_at}:${JSON.stringify(metadata)}`);
+        const key = extractVisitorKey(event);
+        if (key) {
+            keys.add(key);
+        } else {
+            keys.add(`${event.created_at}:${JSON.stringify(event.metadata)}`);
+        }
     }
 
     return keys.size;
@@ -175,10 +195,7 @@ function summarizeTraffic(events: AnalyticsEventRow[]) {
 }
 
 function getVisitorKeys(events: AnalyticsEventRow[]) {
-    return Array.from(new Set(events.map((event) => {
-        const metadata = getMetadataRecord(event.metadata);
-        return getFirstString(metadata, ["visitorId", "sessionId", "fingerprint"]);
-    }).filter(Boolean)));
+    return Array.from(new Set(events.map(extractVisitorKey).filter(Boolean)));
 }
 
 function getMetadataRecord(metadata: Json): Record<string, unknown> {

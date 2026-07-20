@@ -30,6 +30,7 @@ type AnalyticsEventRow = {
     event_type?: string;
     metadata?: Json;
     created_at?: string;
+    visitor_token_hash?: string | null;
 };
 
 type RsvpRealtimeRow = {
@@ -271,7 +272,8 @@ function applyEventInsert(current: InvitationAnalyticsData, raw: unknown): Invit
 
     if (eventType === "view") {
         const metadata = getMetadataRecord(event.metadata);
-        const visitorKey = getFirstString(metadata, ["visitorId", "sessionId", "fingerprint"]);
+        const visitorKey = (typeof event.visitor_token_hash === "string" && event.visitor_token_hash.trim())
+            || getFirstString(metadata, ["visitorHash", "visitor_token_hash", "visitorId", "sessionId", "fingerprint", "guestToken"]);
         const visitorKeys = visitorKey && !current.visitorKeys.includes(visitorKey)
             ? [...current.visitorKeys, visitorKey]
             : current.visitorKeys;

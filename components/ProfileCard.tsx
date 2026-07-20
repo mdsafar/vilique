@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { HelpCircle, LogOut, AlertTriangle } from "lucide-react";
@@ -31,31 +31,37 @@ export default function ProfileCard({ profile, activePublishedCount, totalSpent,
     const displayName = profile?.name || "Guest";
     const email = profile?.email || "Sign in to save your invitations";
 
+    useEffect(() => {
+        return () => {
+            if (typeof window !== "undefined") {
+                delete (window as unknown as { __isSigningOut?: boolean }).__isSigningOut;
+            }
+        };
+    }, []);
+
     const handleLogoutConfirm = async () => {
         setIsPending(true);
+        if (typeof window !== "undefined") {
+            (window as unknown as { __isSigningOut?: boolean }).__isSigningOut = true;
+        }
         showToast("Signing out...", "info");
 
-        // 1. Complete server sign-out while inline loader is visible in modal
-        try {
-            await signOut();
-        } catch {
-            // Ignore server action redirect error
-        }
-
-        // 2. Close modal and reset pending state
-        setIsConfirmOpen(false);
-        setIsPending(false);
-
-        // 3. Immediately replace route to '/' via App Router
-        router.replace("/");
-
-        // 4. Clear client session after starting navigation to public route
         try {
             const supabase = createClient();
             await supabase.auth.signOut();
         } catch {
             // Ignore client signout error
         }
+
+        try {
+            await signOut();
+        } catch {
+            // Ignore server action error
+        }
+
+        router.replace("/");
+        setIsConfirmOpen(false);
+        setIsPending(false);
     };
 
     return (

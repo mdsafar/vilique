@@ -10592,12 +10592,12 @@ p {
   }
 
   .previewDevice .previewScrollFade {
-    bottom: 74px;
-    height: 70px;
+    bottom: max(60px, calc(env(safe-area-inset-bottom) + 52px));
+    height: 56px;
   }
 
   .previewDevice .templatePreviewScrollCue {
-    bottom: 88px;
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
   }
 
   .builderBottomBar button,
@@ -10615,18 +10615,29 @@ p {
   }
 }
 
+@media (max-width: 899px) and (max-height: 740px) {
+  .previewDevice .previewScrollFade {
+    bottom: max(54px, calc(env(safe-area-inset-bottom) + 46px));
+    height: 48px;
+  }
+
+  .previewDevice .templatePreviewScrollCue {
+    bottom: max(66px, calc(env(safe-area-inset-bottom) + 58px));
+  }
+}
+
 @media (max-width: 899px) and (min-height: 820px) {
   .previewScaleFrame .pastelWeddingPage {
     padding-bottom: 58px;
   }
 
   .previewDevice .previewScrollFade {
-    bottom: 66px;
-    height: 58px;
+    bottom: max(62px, calc(env(safe-area-inset-bottom) + 54px));
+    height: 56px;
   }
 
   .previewDevice .templatePreviewScrollCue {
-    bottom: 78px;
+    bottom: max(74px, calc(env(safe-area-inset-bottom) + 66px));
   }
 }
 

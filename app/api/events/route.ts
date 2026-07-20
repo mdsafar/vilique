@@ -35,6 +35,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, ignored: true }, { status: 202 });
     }
 
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data: invite } = await supabase
+        .from("invitations")
+        .select("id, user_id, status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
+        .eq("id", parsed.data.invitationId)
+        .single();
+
+    if (user && invite && user.id === invite.user_id) {
+        return NextResponse.json({ ok: true, ignored: true, reason: "owner_view" }, { status: 202 });
+    }
+
     const visitorKey = getVisitorKey(request, typeof metadata.guestToken === "string" ? metadata.guestToken : null);
     const ipHash = hashValue(getClientIp(request));
     const bucket = parsed.data.eventType === "view"
@@ -53,12 +67,6 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.eventType === "rsvp_submit") {
-        const { data: invite } = await supabase
-            .from("invitations")
-            .select("status, event_date, event_time, event_timezone, lifecycle_status, event_status, first_published_at, published_at")
-            .eq("id", parsed.data.invitationId)
-            .single();
-
         if (invite && isInvitationCompleted({
             eventDate: invite.event_date,
             eventTime: invite.event_time,
