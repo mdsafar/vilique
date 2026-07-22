@@ -559,7 +559,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        onClick={onClose}
+                        onClick={isPaymentProcessing ? undefined : onClose}
                     />
 
                     <motion.div
@@ -590,9 +590,11 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                                     </p>
                                 </div>
                             </div>
-                            <button className="publishModalClose" onClick={onClose} aria-label="Close" disabled={isBusy}>
-                                <X size={18} />
-                            </button>
+                            {!isPaymentProcessing && (
+                                <button className="publishModalClose" onClick={onClose} aria-label="Close" disabled={isBusy}>
+                                    <X size={18} />
+                                </button>
+                            )}
                         </div>
 
                         {/* Body */}
