@@ -10,6 +10,7 @@ import { buildInvitationSlug, getInvitationReadableName, isSlugAvailable, slugif
 import crypto from "crypto";
 import { looseSupabase } from "@/lib/supabase/loose";
 import { getClientIp, rateLimit, rateLimitResponse } from "@/lib/security/requestGuard";
+import { editorLockConflictResponse, validateEditorLock } from "@/features/builder/server/validateEditorLock";
 
 const orderInputSchema = z.object({
     invitationId: z.string().uuid(),
@@ -59,6 +60,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Invalid invitation ID" }, { status: 400 });
         }
         const { invitationId, slug: customSlug } = validation.data;
+        const editorLock = await validateEditorLock(request, invitationId, user.id);
+        if (!editorLock.ok) return editorLockConflictResponse(editorLock.code);
 
         // 3-6. Fetch invitation and confirm ownership
         const { data: invite, error: inviteError } = await supabase

@@ -7,6 +7,7 @@ import {
     CloudOff,
     Eye,
     Loader2,
+    LockKeyhole,
     Rocket,
 } from "lucide-react";
 import type { SaveStatus } from "@/features/builder/types";
@@ -33,6 +34,8 @@ function renderStatusIcon(status?: SaveStatus) {
             return <Loader2 size={13} className="builderStatusIcon statusSaving spinner" aria-hidden="true" />;
         case "error":
             return <AlertCircle size={13} className="builderStatusIcon statusError" aria-hidden="true" />;
+        case "readonly":
+            return <LockKeyhole size={13} className="builderStatusIcon statusReadonly" aria-hidden="true" />;
         case "saved":
         default:
             return <Check size={13} className="builderStatusIcon statusSaved" aria-hidden="true" />;

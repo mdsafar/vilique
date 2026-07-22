@@ -41,6 +41,7 @@ type EditorFormProps = {
         file: File | null,
     ) => void;
     isUploadingMusic: boolean;
+    isReadOnly: boolean;
 };
 
 const weddingTemplateTitleOptions = [
@@ -78,6 +79,7 @@ export default function EditorForm({
     updateTheme,
     updateMusicFile,
     isUploadingMusic,
+    isReadOnly,
 }: EditorFormProps) {
     const { startTime, endTime } = builderTimeUtils.parseTimeRange(invitation.eventTime);
     const [activePicker, setActivePicker] = useState<"date" | "startTime" | "endTime" | null>(null);
@@ -138,32 +140,33 @@ export default function EditorForm({
                             value={selectedWeddingTitle}
                             onChange={(e) => updateField("title", e.target.value)}
                             aria-invalid={!!errors.title}
+                            disabled={isReadOnly}
                         >
                             {weddingTemplateTitleOptions.map((option) => (
                                 <option value={option} key={option}>{option}</option>
                             ))}
                         </select>
                     ) : (
-                        <input data-field-key="title" value={invitation.title} onChange={(e) => updateField("title", e.target.value)} maxLength={45} aria-invalid={!!errors.title} />
+                        <input data-field-key="title" value={invitation.title} onChange={(e) => updateField("title", e.target.value)} maxLength={45} aria-invalid={!!errors.title} disabled={isReadOnly} />
                     )}
                     {errors.title ? <small className="fieldError">{errors.title}</small> : null}
                 </label>
 
                 <label className={errors.primaryName ? "hasError" : ""}>
                     <span>Primary Name</span>
-                    <input data-field-key="primaryName" value={invitation.primaryName} onChange={(e) => updateField("primaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.primaryName} />
+                    <input data-field-key="primaryName" value={invitation.primaryName} onChange={(e) => updateField("primaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.primaryName} disabled={isReadOnly} />
                     {errors.primaryName ? <small className="fieldError">{errors.primaryName}</small> : null}
                 </label>
 
                 <label className={errors.secondaryName ? "hasError" : ""}>
                     <span>Secondary Name</span>
-                    <input data-field-key="secondaryName" value={invitation.secondaryName || ""} onChange={(e) => updateField("secondaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.secondaryName} />
+                    <input data-field-key="secondaryName" value={invitation.secondaryName || ""} onChange={(e) => updateField("secondaryName", e.target.value)} maxLength={25} aria-invalid={!!errors.secondaryName} disabled={isReadOnly} />
                     {errors.secondaryName ? <small className="fieldError">{errors.secondaryName}</small> : null}
                 </label>
 
                 <label className={errors.message ? "hasError" : ""}>
                     <span>Message</span>
-                    <textarea data-field-key="message" value={invitation.message} onChange={(e) => updateField("message", e.target.value)} maxLength={200} aria-invalid={!!errors.message} />
+                    <textarea data-field-key="message" value={invitation.message} onChange={(e) => updateField("message", e.target.value)} maxLength={200} aria-invalid={!!errors.message} disabled={isReadOnly} />
                     {errors.message ? <small className="fieldError">{errors.message}</small> : null}
                 </label>
             </div>
@@ -181,6 +184,7 @@ export default function EditorForm({
                             onChange={(value) => updateField("eventDate", value)}
                             isOpen={activePicker === "date"}
                             onToggle={(open) => setActivePicker(open ? "date" : null)}
+                            disabled={isReadOnly}
                         />
                     </div>
                     {errors.eventDate ? <small className="fieldError">{errors.eventDate}</small> : null}
@@ -196,6 +200,7 @@ export default function EditorForm({
                             maxTimeMinutes={maxStartTimeMinutes}
                             isOpen={activePicker === "startTime"}
                             onToggle={(open) => setActivePicker(open ? "startTime" : null)}
+                            disabled={isReadOnly}
                         />
                     </div>
                     {errors.eventTime ? <small className="fieldError">{errors.eventTime}</small> : null}
@@ -210,18 +215,19 @@ export default function EditorForm({
                         maxTimeMinutes={null}
                         isOpen={activePicker === "endTime"}
                         onToggle={(open) => setActivePicker(open ? "endTime" : null)}
+                        disabled={isReadOnly}
                     />
                 </label>
 
                 <label className={errors.venueName ? "hasError" : ""}>
                     <span>Venue Name</span>
-                    <input data-field-key="venueName" value={invitation.venueName} onChange={(e) => updateField("venueName", e.target.value)} maxLength={45} aria-invalid={!!errors.venueName} />
+                    <input data-field-key="venueName" value={invitation.venueName} onChange={(e) => updateField("venueName", e.target.value)} maxLength={45} aria-invalid={!!errors.venueName} disabled={isReadOnly} />
                     {errors.venueName ? <small className="fieldError">{errors.venueName}</small> : null}
                 </label>
 
                 <label className={errors.venueAddress ? "hasError" : ""}>
                     <span>Venue Address</span>
-                    <textarea data-field-key="venueAddress" value={invitation.venueAddress} onChange={(e) => updateField("venueAddress", e.target.value)} maxLength={120} aria-invalid={!!errors.venueAddress} />
+                    <textarea data-field-key="venueAddress" value={invitation.venueAddress} onChange={(e) => updateField("venueAddress", e.target.value)} maxLength={120} aria-invalid={!!errors.venueAddress} disabled={isReadOnly} />
                     {errors.venueAddress ? <small className="fieldError">{errors.venueAddress}</small> : null}
                 </label>
             </div>
@@ -242,6 +248,7 @@ export default function EditorForm({
                         onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
                         maxLength={10}
                         aria-invalid={!!errors.phone}
+                        disabled={isReadOnly}
                     />
                     {errors.phone ? <small className="fieldError">{errors.phone}</small> : null}
                 </label>
@@ -257,6 +264,7 @@ export default function EditorForm({
                         onChange={(e) => updateField("secondaryPhone", e.target.value.replace(/\D/g, "").slice(0, 10))}
                         maxLength={10}
                         aria-invalid={!!errors.secondaryPhone}
+                        disabled={isReadOnly}
                     />
                     {errors.secondaryPhone ? <small className="fieldError">{errors.secondaryPhone}</small> : null}
                 </label>
@@ -271,6 +279,7 @@ export default function EditorForm({
                         onChange={(e) => updateField("mapLink", e.target.value)}
                         maxLength={250}
                         aria-invalid={!!errors.mapLink}
+                        disabled={isReadOnly}
                     />
                     {errors.mapLink ? <small className="fieldError">{errors.mapLink}</small> : null}
                 </label>
@@ -307,6 +316,7 @@ export default function EditorForm({
                         onUpload={(file) => updateMusicFile(file)}
                         isUploading={isUploadingMusic}
                         uploadId="musicUploadInput"
+                        isReadOnly={isReadOnly}
                     />
                 </div>
                 {errors.musicUrl ? <small className="fieldError">{errors.musicUrl}</small> : null}
@@ -320,6 +330,7 @@ export default function EditorForm({
                     subtitle={formatAudioFilename(defaultTickUrl, "No tick sound configured")}
                     url={defaultTickUrl || undefined}
                     badge="default"
+                    isReadOnly={isReadOnly}
                 />
                 <p className="soundHelperText" style={{
                     fontSize: "var(--sound-helper-font, 10px)",
@@ -342,6 +353,7 @@ export default function EditorForm({
                                 key={opt.value}
                                 type="button"
                                 onClick={() => updateTheme("musicDuration", opt.value)}
+                                disabled={isReadOnly}
                                 style={{
                                     flex: 1,
                                     minHeight: "38px",

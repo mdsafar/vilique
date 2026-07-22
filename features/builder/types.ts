@@ -26,6 +26,7 @@ export type SaveStatus =
     | "dirty"
     | "saving"
     | "saved"
+    | "readonly"
     | "error";
 
 export type PublishSuccessDetails = {

@@ -13,6 +13,7 @@ type TimePickerFieldProps = {
     maxTimeMinutes: number | null;
     isOpen: boolean;
     onToggle: (open: boolean) => void;
+    disabled?: boolean;
 };
 
 export default function TimePickerField({
@@ -22,6 +23,7 @@ export default function TimePickerField({
     maxTimeMinutes,
     isOpen,
     onToggle,
+    disabled = false,
 }: TimePickerFieldProps) {
     const parsed = builderTimeUtils.parseTimeInputParts(value);
 
@@ -37,6 +39,7 @@ export default function TimePickerField({
                 className="customPickerTrigger"
                 type="button"
                 onClick={() => onToggle(!isOpen)}
+                disabled={disabled}
             >
                 <span>{value ? builderTimeUtils.fromTimeInputValue(value) : "Select time"}</span>
                 <Clock3 size={18} aria-hidden="true" />

@@ -25,6 +25,9 @@ export function getBuilderSaveStatusLabel({
                 ? "Published"
                 : "Saved";
 
+        case "readonly":
+            return "View only";
+
         case "error":
             return "Save failed";
 

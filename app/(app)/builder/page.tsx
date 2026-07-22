@@ -63,6 +63,9 @@ import BuilderAuthRequiredState from "@/features/builder/components/BuilderAuthR
 import {
     createFreshBuilderInvitation,
 } from "@/features/builder/lib/builderInvitationUtils";
+import { builderLockHeaders, isBuilderConflictCode } from "@/features/builder/lib/builderLock";
+import { useInvitationEditorLock } from "@/features/builder/hooks/useInvitationEditorLock";
+import BuilderLockBanner from "@/features/builder/components/BuilderLockBanner";
 
 
 export default function BuilderPage() {
@@ -90,7 +93,7 @@ function BuilderContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { showToast } = useToast();
-    const { mutate: globalMutate } = useSWRConfig();
+    const { cache, mutate: globalMutate } = useSWRConfig();
 
     const existingId = searchParams.get("id");
     const templateKey = searchParams.get("template") || "pastel-floral-wedding";
@@ -103,6 +106,10 @@ function BuilderContent() {
         () => readBuilderPreviewSnapshot(templateKey, existingId),
         [existingId, templateKey],
     );
+    const isBrowserReload = useMemo(() => {
+        if (typeof performance === "undefined") return false;
+        return (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type === "reload";
+    }, []);
 
     const initialInvitation = useMemo(
         () =>
@@ -146,6 +153,12 @@ function BuilderContent() {
     const [showRecoveryModal, setShowRecoveryModal] = useState(false);
     const [recoveredDraftId, setRecoveredDraftId] = useState<string | null>(null);
     const [recoveredDraftTimestamp, setRecoveredDraftTimestamp] = useState<number | string | null>(null);
+    const [lockOverlayDismissed, setLockOverlayDismissed] = useState(false);
+    const [isEnteringViewOnly, setIsEnteringViewOnly] = useState(false);
+    const [isTakingOverLock, setIsTakingOverLock] = useState(false);
+    const [lockInvitationId, setLockInvitationId] = useState<string | null>(
+        initialPreviewSnapshot?.invitationId ?? existingId,
+    );
 
     // Lifecycle & Save State
     const [builderMode, setBuilderMode] = useState<BuilderMode>(
@@ -214,6 +227,53 @@ function BuilderContent() {
     const isSessionFinalizedRef = useRef(false);
     const navigationCommittedRef = useRef(false);
     const saveRequestRevisionRef = useRef(0);
+
+    const cancelPendingEditsForLockLoss = useCallback(() => {
+        saveRequestRevisionRef.current += 1;
+        pendingSaveController.current?.abort();
+        pendingSaveController.current = null;
+        if (saveTimerRef.current !== null) {
+            window.clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+        setSaveStatus("readonly");
+        setMobileEditorOpen(false);
+        setIsPublishModalOpen(false);
+    }, []);
+
+    const refreshCanonicalInvitation = useCallback(async (): Promise<number | null> => {
+        const id = lockInvitationId ?? existingId ?? latestDraftId.current;
+        if (!id) return 0;
+        try {
+            const response = await fetch(`/api/invitations/${id}`, { cache: "no-store" });
+            if (!response.ok) return null;
+            const draft = await response.json();
+            const normalized = builderDateUtils.normalizeInvitationDate(draft);
+            invitationRef.current = normalized;
+            setInvitation(normalized);
+            latestDraftId.current = normalized.id;
+            setLockInvitationId(normalized.id);
+            const payload = buildSavePayload(normalized);
+            baselinePayloadRef.current = payload;
+            baselineComparablePayloadRef.current = buildComparablePayload(normalized);
+            lastPersistedPayloadRef.current = payload;
+            hasUserEditedRef.current = false;
+            setHasUserEditedState(false);
+            requiresExitDecisionRef.current = false;
+            setSaveStatus("idle");
+            return Number.isSafeInteger(normalized.revision) ? Number(normalized.revision) : 0;
+        } catch {
+            return null;
+        }
+    }, [existingId, lockInvitationId]);
+
+    const editorLock = useInvitationEditorLock({
+        invitationId: lockInvitationId,
+        onRefreshCanonical: refreshCanonicalInvitation,
+        onLostOwnership: cancelPendingEditsForLockLoss,
+        preserveLocalOnResume: Boolean(initialPreviewSnapshot) && !isBrowserReload,
+        resumeRevision: initialPreviewSnapshot?.invitation.revision ?? null,
+    });
 
     // Sync ref to always hold latest invitation without triggering stale closures
     useEffect(() => {
@@ -363,6 +423,7 @@ function BuilderContent() {
                     invitationRef.current = normalized;
                     setInvitation(normalized);
                     latestDraftId.current = normalized.id;
+                    setLockInvitationId(normalized.id);
                     setBuilderMode(normalized.status === "published" ? "published-edit" : "draft-edit");
 
                     const payload = buildSavePayload(normalized);
@@ -388,6 +449,7 @@ function BuilderContent() {
                     const parsed = JSON.parse(recoveryData);
                     if (parsed.draftId) {
                         setRecoveredDraftId(parsed.draftId);
+                        setLockInvitationId(parsed.draftId);
                         setRecoveredDraftTimestamp(parsed.timestamp || null);
                         setShowRecoveryModal(true);
                     }
@@ -444,6 +506,7 @@ function BuilderContent() {
     // 2. Main Coordinator: Save and Sync
     const flushSave = useCallback(async (requestedInvitation = invitationRef.current, force = false): Promise<boolean> => {
         if (isSessionFinalizedRef.current) return false;
+        if (latestDraftId.current && !editorLock.credentials) return false;
 
         if (saveTimerRef.current !== null) {
             window.clearTimeout(saveTimerRef.current);
@@ -489,7 +552,10 @@ function BuilderContent() {
             try {
                 const response = await fetch(isNew ? "/api/invitations" : `/api/invitations/${targetId}`, {
                     method: isNew ? "POST" : "PATCH",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(!isNew && editorLock.credentials ? builderLockHeaders(editorLock.credentials) : {}),
+                    },
                     body: currentPayload,
                     signal: controller.signal,
                 });
@@ -505,6 +571,11 @@ function BuilderContent() {
                 const result = await response.json();
 
                 if (!response.ok) {
+                    if (response.status === 409 && isBuilderConflictCode(result.code)) {
+                        cancelPendingEditsForLockLoss();
+                        await editorLock.revalidate();
+                        return false;
+                    }
                     setSaveStatus("error");
                     showToast(formatSaveError(result.error), "error");
                     return false;
@@ -516,6 +587,7 @@ function BuilderContent() {
 
                 if (isNew) {
                     latestDraftId.current = result.id;
+                    setLockInvitationId(result.id);
 
                     const nextInvitation = {
                         ...invitationRef.current,
@@ -572,6 +644,13 @@ function BuilderContent() {
 
                 lastPersistedPayloadRef.current =
                     persistedPayload;
+                if (Number.isSafeInteger(result.revision)) {
+                    const revision = Number(result.revision);
+                    editorLock.updateRevision(revision);
+                    const revisionedInvitation = { ...invitationRef.current, revision };
+                    invitationRef.current = revisionedInvitation;
+                    setInvitation(revisionedInvitation);
+                }
 
                 // Finish the complete cache update before
                 // navigating back to Invitations.
@@ -579,6 +658,9 @@ function BuilderContent() {
                     globalMutate,
                     savedInvitationForCache,
                     undefined,
+                    undefined,
+                    false,
+                    cache,
                 );
 
                 if (currentPayload !== latestClientPayload) {
@@ -614,10 +696,11 @@ function BuilderContent() {
                 activeSaveIsCreateRef.current = false;
             }
         }
-    }, [builderMode, globalMutate, scopedRecoveryKey, showToast]);
+    }, [builderMode, cache, cancelPendingEditsForLockLoss, editorLock, globalMutate, scopedRecoveryKey, showToast]);
 
     useEffect(() => {
         if (!isInitialized) return;
+        if (editorLock.isReadOnly) return;
         if (!hasUserEditedRef.current) return;
         if (saveStatus !== "dirty") return;
 
@@ -630,10 +713,11 @@ function BuilderContent() {
         return () => {
             if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
         };
-    }, [saveStatus, flushSave, isInitialized]);
+    }, [editorLock.isReadOnly, saveStatus, flushSave, isInitialized]);
 
     // 3. User Input Methods
     const updateField = useCallback((key: string, value: string, source: BuilderUpdateSource = "user") => {
+        if (editorLock.isReadOnly) return;
         const previous = invitationRef.current;
         const previousValue = (previous as unknown as Record<string, unknown>)[key];
         if (previousValue === value) return;
@@ -663,12 +747,13 @@ function BuilderContent() {
             const nextPayload = buildSavePayload(next);
             setSaveStatus(nextPayload === lastPersistedPayloadRef.current ? "saved" : "dirty");
         }
-    }, [setHasUserEdited]);
+    }, [editorLock.isReadOnly, setHasUserEdited]);
 
     const updateTheme = useCallback((
         key: keyof InvitationData["theme"],
         value: InvitationData["theme"][keyof InvitationData["theme"]],
     ) => {
+        if (editorLock.isReadOnly) return;
         const previous = invitationRef.current;
         if (previous.theme[key] === value) return;
 
@@ -684,9 +769,10 @@ function BuilderContent() {
 
         const nextPayload = buildSavePayload(next);
         setSaveStatus(nextPayload === lastPersistedPayloadRef.current ? "saved" : "dirty");
-    }, [setHasUserEdited]);
+    }, [editorLock.isReadOnly, setHasUserEdited]);
 
     async function updateMusicFile(file: File | null) {
+        if (editorLock.isReadOnly || !editorLock.credentials) return;
         if (!file) {
             updateField("musicUrl", "");
             return;
@@ -698,6 +784,9 @@ function BuilderContent() {
             formData.set("invitationId", latestDraftId.current || invitationRef.current.id);
             formData.set("kind", "music");
             formData.set("file", file);
+            formData.set("editorSessionId", editorLock.credentials.editorSessionId);
+            formData.set("lockGeneration", String(editorLock.credentials.lockGeneration));
+            formData.set("revision", String(editorLock.credentials.revision));
 
             const response = await fetch("/api/media", { method: "POST", body: formData });
             const result = await response.json();
@@ -714,15 +803,18 @@ function BuilderContent() {
     }
 
     // 4. Session Teardown
-    const finalizeSession = useCallback(() => {
+    const finalizeSession = useCallback((options?: { preserveRecovery?: boolean }) => {
         if (isSessionFinalizedRef.current) return;
 
         isSessionFinalizedRef.current = true;
         isIntentionalNavigationRef.current = true;
         requiresExitDecisionRef.current = false;
         saveRequestRevisionRef.current += 1;
+        editorLock.release();
 
-        localStorage.removeItem(scopedRecoveryKey);
+        if (!options?.preserveRecovery) {
+            localStorage.removeItem(scopedRecoveryKey);
+        }
         sessionStorage.removeItem(scopedPreviewKey);
         sessionStorage.removeItem(builderLocalPreviewKey);
         sessionStorage.removeItem(`vilique-builder:preview:${templateKey}`);
@@ -739,13 +831,16 @@ function BuilderContent() {
             window.clearTimeout(saveTimerRef.current);
             saveTimerRef.current = null;
         }
-    }, [scopedRecoveryKey, scopedPreviewKey, templateKey]);
+    }, [editorLock, scopedRecoveryKey, scopedPreviewKey, templateKey]);
 
-    const navigateOut = useCallback((destination: string) => {
+    const navigateOut = useCallback((
+        destination: string,
+        options?: { preserveRecovery?: boolean },
+    ) => {
         if (navigationCommittedRef.current) return;
         navigationCommittedRef.current = true;
 
-        finalizeSession();
+        finalizeSession(options);
         router.replace(destination);
     }, [finalizeSession, router]);
 
@@ -783,8 +878,21 @@ function BuilderContent() {
 
         const currentId = latestDraftId.current;
 
+        // View-only sessions must never mutate a draft still owned by another
+        // editor. Keep the recovery marker for temporary drafts so the user can
+        // return after the active lease is released or expires.
+        if (currentId && (!editorLock.credentials || editorLock.isReadOnly)) {
+            navigateOut(destination, {
+                preserveRecovery: builderMode === "new",
+            });
+            return;
+        }
+
         if (builderMode === "new" && currentId && currentId !== "default-draft-placeholder-id") {
-            const response = await fetch(`/api/invitations/${currentId}`, { method: "DELETE" });
+            const response = await fetch(`/api/invitations/${currentId}`, {
+                method: "DELETE",
+                headers: editorLock.credentials ? builderLockHeaders(editorLock.credentials) : {},
+            });
             if (!response.ok && response.status !== 404) {
                 throw new Error("Could not discard the temporary draft.");
             }
@@ -804,6 +912,7 @@ function BuilderContent() {
                     headers: {
                         "Content-Type":
                             "application/json",
+                        ...(editorLock.credentials ? builderLockHeaders(editorLock.credentials) : {}),
                     },
                     body: baselinePayloadRef.current,
                 },
@@ -864,6 +973,7 @@ function BuilderContent() {
                 discardedEditedInvitation,
                 undefined,
                 true,
+                cache,
             );
         }
 
@@ -871,6 +981,9 @@ function BuilderContent() {
     }, [
         builderBackTarget,
         builderMode,
+        cache,
+        editorLock.credentials,
+        editorLock.isReadOnly,
         globalMutate,
         navigateOut,
     ]);
@@ -1082,7 +1195,7 @@ function BuilderContent() {
     // 8. Publish Actions
     async function handlePublishInvitation() {
         if (
-            !canPublishOrUpdate ||
+            !canPublishOrUpdate || editorLock.isReadOnly ||
             isPublishing ||
             isPreviewing
         ) {
@@ -1127,6 +1240,7 @@ function BuilderContent() {
     async function handleUpdateInvitation() {
         if (
             builderMode !== "published-edit" ||
+            editorLock.isReadOnly ||
             !canPublishOrUpdate ||
             isPublishing ||
             isPreviewing
@@ -1213,11 +1327,11 @@ function BuilderContent() {
         buildComparablePayload(invitation) !==
         baselineComparablePayloadState;
 
-    const canPublishOrUpdate = isPublishedEdit
+    const canPublishOrUpdate = !editorLock.isReadOnly && (isPublishedEdit
         ? hasMeaningfulEdits
         : isFreshNewBuilder
         ? hasMeaningfulEdits
-        : true;
+        : true);
 
     // 9. Recovery Handlers
     async function handleRecoveryContinue() {
@@ -1232,6 +1346,7 @@ function BuilderContent() {
                 invitationRef.current = normalized;
                 setInvitation(normalized);
                 latestDraftId.current = normalized.id;
+                setLockInvitationId(normalized.id);
 
                 const payload = buildSavePayload(normalized);
                 baselinePayloadRef.current = payload;
@@ -1260,6 +1375,7 @@ function BuilderContent() {
                     `/api/invitations/${recoveredDraftId}`,
                     {
                         method: "DELETE",
+                        headers: editorLock.credentials ? builderLockHeaders(editorLock.credentials) : {},
                     },
                 );
 
@@ -1300,6 +1416,7 @@ function BuilderContent() {
         invitationRef.current = freshInvitation;
         setInvitation(freshInvitation);
         latestDraftId.current = null;
+        setLockInvitationId(null);
         baselinePayloadRef.current = payload;
         baselineComparablePayloadRef.current = buildComparablePayload(freshInvitation);
         lastPersistedPayloadRef.current = payload;
@@ -1328,6 +1445,11 @@ function BuilderContent() {
     function handlePublishSuccess(
         updatedInvitation: PublishModalSuccessPayload,
     ) {
+        editorLock.release();
+        editorLock.markPublished();
+        saveRequestRevisionRef.current += 1;
+        pendingSaveController.current?.abort();
+        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
         const previousDraft: InvitationData = publishPreviousInvitationRef.current || {
             ...invitationRef.current,
             status: "draft" as const,
@@ -1379,6 +1501,7 @@ function BuilderContent() {
             previousDraft,
             undefined,
             true,
+            cache,
         );
 
         publishedInvitationForNavigationRef.current = publishedInvitation;
@@ -1406,6 +1529,26 @@ function BuilderContent() {
 
     return (
         <main className="builderShell">
+            {((editorLock.mode === "readonly" || editorLock.mode === "lost") && !lockOverlayDismissed || isTakingOverLock) && (
+                <BuilderLockBanner
+                    lost={editorLock.mode === "lost"}
+                    viewOnlyBusy={isEnteringViewOnly}
+                    takeOverBusy={isTakingOverLock}
+                    onRefresh={() => {
+                        setIsEnteringViewOnly(true);
+                        void editorLock.refresh()
+                            .then((revision) => {
+                                if (revision !== null) setLockOverlayDismissed(true);
+                            })
+                            .finally(() => setIsEnteringViewOnly(false));
+                    }}
+                    onTakeOver={() => {
+                        setLockOverlayDismissed(false);
+                        setIsTakingOverLock(true);
+                        void editorLock.takeOver().finally(() => setIsTakingOverLock(false));
+                    }}
+                />
+            )}
             <BuilderTopbar
                 title={
                     selectedTemplate?.name ||
@@ -1436,6 +1579,7 @@ function BuilderContent() {
                         isUploadingMusic
                     }
                     isCollapsed={editorCollapsed}
+                    isReadOnly={editorLock.isReadOnly}
                     onTabChange={(tab) => {
                         setActiveTab(tab);
                         setEditorCollapsed(false);
@@ -1490,6 +1634,7 @@ function BuilderContent() {
                 isUploadingMusic={
                     isUploadingMusic
                 }
+                isReadOnly={editorLock.isReadOnly}
                 setActiveTab={setActiveTab}
                 updateField={updateField}
                 updateTheme={updateTheme}
@@ -1508,9 +1653,7 @@ function BuilderContent() {
                 onEdit={() =>
                     setMobileEditorOpen(true)
                 }
-                isPublishDisabled={
-                    !canPublishOrUpdate
-                }
+                isPublishDisabled={!canPublishOrUpdate}
                 onPreview={saveAndPreview}
                 onPublish={
                     isPublishedEdit
@@ -1530,6 +1673,7 @@ function BuilderContent() {
             <BuilderModals
                 builderMode={builderMode}
                 invitation={invitation}
+                editorLock={editorLock.credentials}
                 leaveModalOpen={
                     leaveModalOpen
                 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { publishInvitationAfterPayment } from "@/features/invitations/publish";
 import { reportError } from "@/lib/observability";
+import { isBuilderConflictCode, parseBuilderLockHeaders } from "@/features/builder/lib/builderLock";
 
 type Context = {
     params: Promise<{ id: string }>;
@@ -19,6 +20,11 @@ export async function POST(request: Request, { params }: Context) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const editorLock = parseBuilderLockHeaders(request);
+        if (!editorLock) {
+            return NextResponse.json({ code: "LOCK_NOT_OWNED", error: "A valid editor lock is required." }, { status: 409 });
+        }
+
         // Get input (custom slug if provided)
         const body = await request.json().catch(() => ({})) as { slug?: string };
         const customSlug = body.slug?.toLowerCase().trim() || "";
@@ -27,6 +33,7 @@ export async function POST(request: Request, { params }: Context) {
             userId: user.id,
             invitationId: id,
             customSlug,
+            editorLock,
         });
 
         return NextResponse.json({
@@ -37,6 +44,9 @@ export async function POST(request: Request, { params }: Context) {
             publicUrl: result.publicUrl,
         });
     } catch (err: unknown) {
+        if (err instanceof Error && isBuilderConflictCode(err.message)) {
+            return NextResponse.json({ code: err.message, error: "Editing ownership changed. Reload the latest version." }, { status: 409 });
+        }
         console.error("Error publishing invitation:", err);
         if (err instanceof Error && err.message === "Invitation is completed and locked.") {
             return NextResponse.json({

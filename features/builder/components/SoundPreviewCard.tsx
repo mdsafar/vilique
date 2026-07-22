@@ -20,6 +20,7 @@ type SoundPreviewCardProps = {
     onUpload?: (file: File) => void;
     isUploading?: boolean;
     uploadId?: string;
+    isReadOnly?: boolean;
 };
 
 export default function SoundPreviewCard({
@@ -32,6 +33,7 @@ export default function SoundPreviewCard({
     onUpload,
     isUploading = false,
     uploadId,
+    isReadOnly = false,
 }: SoundPreviewCardProps) {
     const { playing, toggle } = useAudioPreview(url);
 
@@ -136,7 +138,7 @@ export default function SoundPreviewCard({
                                 stopActiveSoundPreview();
                                 onRemove();
                             }}
-                            disabled={isUploading}
+                            disabled={isUploading || isReadOnly}
                             style={{
                                 height: "30px",
                                 minHeight: "30px",
@@ -147,8 +149,8 @@ export default function SoundPreviewCard({
                                 fontSize: "var(--sound-remove-font, 9.5px)",
                                 fontWeight: 800,
                                 border: "none",
-                                cursor: isUploading ? "not-allowed" : "pointer",
-                                opacity: isUploading ? 0.55 : 1,
+                                cursor: isUploading || isReadOnly ? "not-allowed" : "pointer",
+                                opacity: isUploading || isReadOnly ? 0.55 : 1,
                                 flexShrink: 0,
                             }}
                         >
@@ -158,34 +160,36 @@ export default function SoundPreviewCard({
                 </div>
             </div>
             {onUpload && uploadId && (
-                <div className="soundUploadRow" style={{
+                <div className={`soundUploadRow${isReadOnly ? " isReadOnly" : ""}`} style={{
                     borderTop: "1px dashed rgba(126, 91, 213, 0.12)",
                     padding: "10px 13px",
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    cursor: isUploading ? "wait" : "pointer",
-                    opacity: isUploading ? 0.88 : 1,
+                    cursor: isReadOnly ? "not-allowed" : isUploading ? "wait" : "pointer",
+                    opacity: isReadOnly ? 0.58 : isUploading ? 0.88 : 1,
                 }}
                     onClick={() => {
-                        if (isUploading) return;
+                        if (isUploading || isReadOnly) return;
                         stopActiveSoundPreview();
                         document.getElementById(uploadId)?.click();
                     }}
                 >
-                    {isUploading ? (
+                    {isReadOnly ? (
+                        <span className="soundUploadIcon" aria-hidden="true">🔒</span>
+                    ) : isUploading ? (
                         <Loader2 size={14} className="spinner" style={{ color: "#7e5bd5", flex: "0 0 auto" }} />
                     ) : (
                         <span className="soundUploadIcon" style={{ fontSize: "var(--sound-upload-icon-font, 12px)", flex: "0 0 auto" }}>📤</span>
                     )}
                     <span className="soundUploadText" style={{ fontSize: "var(--sound-upload-font, 11.5px)", color: "#7e5bd5", fontWeight: 750, letterSpacing: "0.015em" }}>
-                        {isUploading ? "Uploading song..." : "Upload custom song to replace"}
+                        {isReadOnly ? "Upload locked in view-only mode" : isUploading ? "Uploading song..." : "Upload custom song to replace"}
                     </span>
                     <input
                         id={uploadId}
                         type="file"
                         accept="audio/*"
-                        disabled={isUploading}
+                        disabled={isUploading || isReadOnly}
                         style={{ display: "none" }}
                         onChange={(e) => {
                             const file = e.target.files?.[0];

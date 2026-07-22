@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isInvitationCompleted } from "@/lib/lifecycle";
 import { Json } from "@/types/database";
 import { reportError } from "@/lib/observability";
+import { parseBuilderLockHeaders } from "@/features/builder/lib/builderLock";
+import { looseSupabase } from "@/lib/supabase/loose";
 
 type Context = {
     params: Promise<{ id: string }>;
@@ -28,6 +30,8 @@ type IdentityCheckedUpdateResult = {
     riskLevel?: string | null;
     score?: number;
     warning?: string | null;
+    conflict?: boolean;
+    revision?: number;
 };
 
 export async function PATCH(request: Request, { params }: Context) {
@@ -39,6 +43,11 @@ export async function PATCH(request: Request, { params }: Context) {
 
     if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const lock = parseBuilderLockHeaders(request);
+    if (!lock) {
+        return NextResponse.json({ code: "LOCK_NOT_OWNED", error: "A valid editor lock is required." }, { status: 409 });
     }
 
     const parsed = invitationUpdateSchema.safeParse(await request.json().catch(() => ({})));
@@ -86,10 +95,13 @@ export async function PATCH(request: Request, { params }: Context) {
     }
 
 
-    const { data, error } = await supabaseAdmin.rpc("update_invitation_with_identity_check", {
+    const { data, error } = await looseSupabase(supabaseAdmin).rpc("update_invitation_with_editor_lock", {
         p_invitation_id: id,
         p_patch: stripUndefined(parsed.data) as Json,
         p_user_id: user.id,
+        p_editor_session_id: lock.editorSessionId,
+        p_lock_generation: lock.lockGeneration,
+        p_expected_revision: lock.revision,
     });
 
     if (error) {
@@ -113,6 +125,14 @@ export async function PATCH(request: Request, { params }: Context) {
     const result = data as IdentityCheckedUpdateResult | null;
     if (!result) {
         return NextResponse.json({ error: "Unable to save invitation changes." }, { status: 400 });
+    }
+
+    if (result.conflict) {
+        return NextResponse.json({
+            code: result.code || "LOCK_NOT_OWNED",
+            error: "This editor no longer owns the latest invitation version.",
+            revision: result.revision,
+        }, { status: 409 });
     }
 
     if (result.validationError) {
@@ -165,10 +185,12 @@ export async function GET(_request: Request, { params }: Context) {
         return completedLockedResponse();
     }
 
-    return NextResponse.json(mapInvitationRow(data));
+    return NextResponse.json(mapInvitationRow(data), {
+        headers: { "Cache-Control": "private, no-store, max-age=0" },
+    });
 }
 
-export async function DELETE(_request: Request, { params }: Context) {
+export async function DELETE(request: Request, { params }: Context) {
     const { id } = await params;
     const supabase = await createClient();
     const {
@@ -177,6 +199,20 @@ export async function DELETE(_request: Request, { params }: Context) {
 
     if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const lock = parseBuilderLockHeaders(request);
+    if (!lock) {
+        return NextResponse.json({ code: "LOCK_NOT_OWNED", error: "A valid editor lock is required." }, { status: 409 });
+    }
+    const { data: lockData, error: lockError } = await looseSupabase(createAdminClient()).rpc("check_invitation_editor_lock", {
+        p_invitation_id: id,
+        p_user_id: user.id,
+        p_editor_session_id: lock.editorSessionId,
+    });
+    const currentLock = (lockData || {}) as { owned?: boolean; lockGeneration?: number; revision?: number; available?: boolean };
+    if (lockError || !currentLock.owned || currentLock.lockGeneration !== lock.lockGeneration || currentLock.revision !== lock.revision) {
+        const code = currentLock.revision !== lock.revision ? "STALE_REVISION" : currentLock.available ? "LOCK_EXPIRED" : "LOCK_TAKEN_OVER";
+        return NextResponse.json({ code, error: "Editing ownership changed. Reload the latest version." }, { status: 409 });
     }
 
     const { data: invite, error: inviteError } = await supabase

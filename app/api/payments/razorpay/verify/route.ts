@@ -6,6 +6,7 @@ import { verifyRazorpaySignature, razorpay } from "@/lib/razorpay";
 import { finalizePaidInvitationPublish } from "@/features/invitations/publish";
 import { getPublicInvitationUrl } from "@/lib/config/site";
 import { logEvent, reportError } from "@/lib/observability";
+import { editorLockConflictResponse, validateEditorLock } from "@/features/builder/server/validateEditorLock";
 
 const verifyInputSchema = z.object({
     invitationId: z.string().uuid(),
@@ -41,6 +42,9 @@ export async function POST(request: Request) {
             razorpay_signature: signature,
             slug: customSlug,
         } = validation.data;
+
+        const editorLock = await validateEditorLock(request, invitationId, user.id);
+        if (!editorLock.ok) return editorLockConflictResponse(editorLock.code);
 
         // 3-4. Fetch the local payment by provider_order_id and confirm details
         const supabaseAdmin = createAdminClient();

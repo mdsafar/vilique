@@ -22,6 +22,7 @@ type MobileEditorSheetProps = {
     invitation: InvitationData;
     errors: BuilderValidationErrors;
     isUploadingMusic: boolean;
+    isReadOnly: boolean;
 
     setActiveTab: (
         tab: EditorTab,
@@ -53,6 +54,7 @@ export default function MobileEditorSheet({
     invitation,
     errors,
     isUploadingMusic,
+    isReadOnly,
     setActiveTab,
     updateField,
     updateTheme,
@@ -109,19 +111,18 @@ export default function MobileEditorSheet({
                             setActiveTab={setActiveTab}
                         />
 
-                        <EditorForm
-                            activeTab={activeTab}
-                            invitation={invitation}
-                            errors={errors}
-                            updateField={updateField}
-                            updateTheme={updateTheme}
-                            updateMusicFile={
-                                updateMusicFile
-                            }
-                            isUploadingMusic={
-                                isUploadingMusic
-                            }
-                        />
+                        <div className={`builderReadOnlyFieldset${isReadOnly ? " isReadOnly" : ""}`} aria-label={isReadOnly ? "Invitation editor is view only" : undefined}>
+                            <EditorForm
+                                activeTab={activeTab}
+                                invitation={invitation}
+                                errors={errors}
+                                updateField={updateField}
+                                updateTheme={updateTheme}
+                                updateMusicFile={updateMusicFile}
+                                isUploadingMusic={isUploadingMusic}
+                                isReadOnly={isReadOnly}
+                            />
+                        </div>
                     </motion.section>
                 </>
             )}

@@ -3,6 +3,8 @@ import { mediaUploadSchema } from "@/features/invitations/validation";
 import { createClient } from "@/lib/supabase/server";
 import { isInvitationCompleted } from "@/lib/lifecycle";
 import { reportError } from "@/lib/observability";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { looseSupabase } from "@/lib/supabase/loose";
 
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const musicTypes = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg"]);
@@ -42,6 +44,23 @@ export async function POST(request: Request) {
 
     if (!parsed.success || !(file instanceof File)) {
         return NextResponse.json({ error: "Invalid upload." }, { status: 400 });
+    }
+
+    const editorSessionId = String(formData.get("editorSessionId") || "");
+    const lockGeneration = Number(formData.get("lockGeneration"));
+    const expectedRevision = Number(formData.get("revision"));
+    if (!isUuid(editorSessionId) || !Number.isSafeInteger(lockGeneration) || !Number.isSafeInteger(expectedRevision)) {
+        return NextResponse.json({ code: "LOCK_NOT_OWNED", error: "A valid editor lock is required." }, { status: 409 });
+    }
+    const { data: lockData, error: lockError } = await looseSupabase(createAdminClient()).rpc("check_invitation_editor_lock", {
+        p_invitation_id: parsed.data.invitationId,
+        p_user_id: user.id,
+        p_editor_session_id: editorSessionId,
+    });
+    const lock = (lockData || {}) as { owned?: boolean; lockGeneration?: number; revision?: number; available?: boolean };
+    if (lockError || !lock.owned || lock.lockGeneration !== lockGeneration || lock.revision !== expectedRevision) {
+        const code = lock.revision !== expectedRevision ? "STALE_REVISION" : lock.available ? "LOCK_EXPIRED" : "LOCK_TAKEN_OVER";
+        return NextResponse.json({ code, error: "Editing ownership changed. Reload the latest version." }, { status: 409 });
     }
 
     const { data: invitation } = await supabase
@@ -192,6 +211,10 @@ function hasAllowedSignature(bytes: Uint8Array, mime: string) {
 
 function ascii(bytes: Uint8Array, start: number, end: number) {
     return String.fromCharCode(...bytes.slice(start, end));
+}
+
+function isUuid(value: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function getImageDimensions(bytes: Uint8Array, mime: string) {

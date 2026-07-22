@@ -164,6 +164,7 @@ export type Database = {
                     first_payment_id: string | null;
                     publish_version: number;
                     first_publish_version: number | null;
+                    revision: number;
                 };
                 Insert: {
                     id?: string;
@@ -212,6 +213,7 @@ export type Database = {
                     first_payment_id?: string | null;
                     publish_version?: number;
                     first_publish_version?: number | null;
+                    revision?: number;
                 };
                 Update: Partial<Database["public"]["Tables"]["invitations"]["Insert"]>;
                 Relationships: [
@@ -718,6 +720,15 @@ export type Database = {
                     template_key: string;
                     average_rating: number | null;
                     rating_count: number;
+                }[];
+            };
+            get_template_usage_summaries: {
+                Args: {
+                    p_template_keys: string[];
+                };
+                Returns: {
+                    template_key: string;
+                    usage_count: number;
                 }[];
             };
             get_public_rsvp: {

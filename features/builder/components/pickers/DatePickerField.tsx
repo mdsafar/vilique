@@ -18,6 +18,7 @@ type DatePickerFieldProps = {
     onChange: (value: string) => void;
     isOpen: boolean;
     onToggle: (open: boolean) => void;
+    disabled?: boolean;
 };
 
 export default function DatePickerField({
@@ -25,6 +26,7 @@ export default function DatePickerField({
     onChange,
     isOpen,
     onToggle,
+    disabled = false,
 }: DatePickerFieldProps) {
     const now = useMinuteNow(isOpen);
     const minDate = useMemo(() => builderDateUtils.getMinimumEventDate(now), [now]);
@@ -56,6 +58,7 @@ export default function DatePickerField({
     }
 
     function toggleOpen(open: boolean) {
+        if (disabled) return;
         if (open && builderDateUtils.startOfMonth(visibleMonth).getTime() < minVisibleMonth.getTime()) {
             setVisibleMonth(minVisibleMonth);
         }
@@ -68,6 +71,7 @@ export default function DatePickerField({
                 className="customPickerTrigger"
                 type="button"
                 onClick={() => toggleOpen(!isOpen)}
+                disabled={disabled}
             >
                 <span>{builderDateUtils.formatDisplayDate(selectedDate)}</span>
                 <CalendarDays size={18} aria-hidden="true" />

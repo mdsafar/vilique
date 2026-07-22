@@ -86,6 +86,7 @@ export function mapInvitationRow(row: InvitationRowWithTemplate): InvitationData
         eventStatus: row.event_status,
         eventChangeScore: row.event_change_score,
         publishVersion: row.publish_version,
+        revision: row.revision,
     };
 }
 

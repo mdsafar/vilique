@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { Search, Star } from "lucide-react";
+import {
+    Search,
+    Sparkles,
+    Star,
+    Users,
+} from "lucide-react";
 import useSWRInfinite from "swr/infinite";
 import AppLogo from "@/components/AppLogo";
 import ListState from "@/components/ListState";
@@ -29,6 +34,7 @@ type TemplateItem = {
     palette: string[];
     ratingAverage?: number | null;
     ratingCount?: number;
+    usageCount?: number;
 };
 
 type TemplatesResponse = {
@@ -286,8 +292,6 @@ export default function TemplatesCatalog() {
             ) : templates.length ? (
                 <section className="templateGrid">
                     {templates.map((template) => {
-                        const details = [template.popularity, categoryLabels[template.category]];
-                        const featureChips = template.features.slice(0, 3);
                         const ratingLabel = formatTemplateRating({
                             average: template.ratingAverage ?? null,
                             count: template.ratingCount ?? 0,
@@ -308,34 +312,49 @@ export default function TemplatesCatalog() {
                                         >
                                             <div className="templateReferenceCard">
                                                 <small>WEDDING INVITATION</small>
-                                                <strong>Name 1 & Name 2</strong>
+                                                <strong>
+                                                    <span>Name 1</span>
+                                                    <span>&amp; Name 2</span>
+                                                </strong>
                                                 <span>{todayLabel} · 05:30 PM</span>
                                             </div>
                                             <i className="templateFlower flowerOne" />
                                             <i className="templateFlower flowerTwo" />
-                                            <span className="templateAggregateRating">
-                                                {ratingLabel === "New" ? (
-                                                    "New"
-                                                ) : (
-                                                    <>
-                                                        <span>{ratingLabel}</span>
-                                                        <Star size={13} fill="currentColor" aria-hidden="true" />
-                                                    </>
-                                                )}
-                                            </span>
                                         </div>
                                     </div>
 
                                     <div className="templateInfo">
                                         <div className="templateText">
-                                            <p className="templatePopularity">{details.join(" · ")}</p>
-                                            <h2>{template.name}</h2>
-                                            <span className="templateMood">{template.mood}</span>
-                                            <div className="templateFeatureChips" aria-label={`${template.name} features`}>
-                                                {featureChips.map((feature) => (
-                                                    <span key={feature}>{feature}</span>
-                                                ))}
+                                            <p className="templateCardKicker">
+                                                <Sparkles size={11} aria-hidden="true" />
+                                                <span>{categoryLabels[template.category]}</span>
+                                                <i aria-hidden="true" />
+                                                <span>{template.badge}</span>
+                                            </p>
+                                            <div className="templateCardTitleRow">
+                                                <h2>{template.name}</h2>
                                             </div>
+                                            <div className="templateCardMeta">
+                                                <span className="templateRatingMeta">
+                                                    <Star size={14} fill="currentColor" aria-hidden="true" />
+                                                    {ratingLabel}
+                                                </span>
+                                                <span className="templateUsageMeta">
+                                                    <Users size={14} aria-hidden="true" />
+                                                    {template.usageCount ?? 0} uses
+                                                </span>
+                                            </div>
+                                            <p className="templateCardSummary">{template.description}</p>
+                                            {template.features.length > 0 && (
+                                                <div className="templateCardIncluded">
+                                                    <span className="templateCardIncludedLabel">What&apos;s included</span>
+                                                    <div className="templateCardFeatures" aria-label="Included features">
+                                                        {template.features.slice(0, 4).map((feature) => (
+                                                            <span key={feature}>{feature}</span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </Link>
@@ -372,6 +391,7 @@ export default function TemplatesCatalog() {
                     variant="filtered"
                 />
             )}
+
         </>
     );
 }

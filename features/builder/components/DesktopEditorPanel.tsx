@@ -22,6 +22,7 @@ type DesktopEditorPanelProps = {
     errors: BuilderValidationErrors;
     isUploadingMusic: boolean;
     isCollapsed: boolean;
+    isReadOnly: boolean;
 
     onTabChange: (
         tab: EditorTab,
@@ -53,6 +54,7 @@ export default function DesktopEditorPanel({
     errors,
     isUploadingMusic,
     isCollapsed,
+    isReadOnly,
     onTabChange,
     updateField,
     updateTheme,
@@ -79,19 +81,18 @@ export default function DesktopEditorPanel({
                     setActiveTab={onTabChange}
                 />
 
-                <EditorForm
-                    activeTab={activeTab}
-                    invitation={invitation}
-                    errors={errors}
-                    updateField={updateField}
-                    updateTheme={updateTheme}
-                    updateMusicFile={
-                        updateMusicFile
-                    }
-                    isUploadingMusic={
-                        isUploadingMusic
-                    }
-                />
+                <div className={`builderReadOnlyFieldset${isReadOnly ? " isReadOnly" : ""}`} aria-label={isReadOnly ? "Invitation editor is view only" : undefined}>
+                    <EditorForm
+                        activeTab={activeTab}
+                        invitation={invitation}
+                        errors={errors}
+                        updateField={updateField}
+                        updateTheme={updateTheme}
+                        updateMusicFile={updateMusicFile}
+                        isUploadingMusic={isUploadingMusic}
+                        isReadOnly={isReadOnly}
+                    />
+                </div>
             </aside>
 
             <button

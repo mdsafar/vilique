@@ -68,4 +68,5 @@ export interface InvitationData {
     eventStatus?: "draft" | "published" | "completed" | "archived" | "unpublished";
     eventChangeScore?: number;
     publishVersion?: number;
+    revision?: number;
 }

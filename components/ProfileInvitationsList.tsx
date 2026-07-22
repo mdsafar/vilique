@@ -44,12 +44,9 @@ import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { useLineLoader } from "./TopLineLoader";
 import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
-import { ProfileDataChangedDetail } from "@/lib/events";
 import {
     InvitationsPageResponse,
     DashboardData,
-    updateInvitationInPages,
-    removeInvitationFromPages,
     mutateInvitationState,
     getInvitationFilterBucket,
     adjustInvitationCounts,
@@ -57,8 +54,8 @@ import {
     getPendingItemMutations,
     clearConfirmedPendingMutations,
     isInvitationVisibleInFilter,
-    getFilterFromSWRKey,
-    getSortFromSWRKey,
+    deriveInvitationFilterCacheState,
+    reconcileInvitationCounts,
     type PendingMutation,
 } from "@/lib/invitationCache";
 
@@ -66,6 +63,26 @@ interface ProfileInvitationsListProps {
     initialInvitations?: InvitationData[];
     invitationStats?: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
     showAuthModalOnUnauthorized?: boolean;
+}
+
+async function fetchInvitationPage(url: string): Promise<InvitationsPageResponse> {
+    const clientRequestStartedAt = Date.now();
+    const response = await fetch(url);
+    if (!response.ok) {
+        const error = new Error("An error occurred while fetching invitations.") as Error & {
+            status?: number;
+            info?: unknown;
+        };
+        error.status = response.status;
+        error.info = await response.json().catch(() => ({}));
+        throw error;
+    }
+    const result = await response.json() as InvitationsPageResponse;
+    return {
+        ...result,
+        clientRequestStartedAt,
+        clientReceivedAt: Date.now(),
+    };
 }
 
 export default function ProfileInvitationsList({
@@ -82,7 +99,7 @@ export default function ProfileInvitationsList({
         setListSize,
     } = useNavigationState();
 
-    const { mutate: globalMutate } = useSWRConfig();
+    const { cache, mutate: globalMutate } = useSWRConfig();
     const refreshInvitationLists = useCallback(() => globalMutate(
         (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations"))
     ), [globalMutate]);
@@ -112,7 +129,6 @@ export default function ProfileInvitationsList({
         error,
         size,
         setSize,
-        isLoading,
         isValidating,
         mutate,
     } = useSWRInfinite<InvitationsPageResponse>((pageIndex, previousPageData) => {
@@ -125,7 +141,7 @@ export default function ProfileInvitationsList({
         if (debouncedSearch) params.set("search", debouncedSearch);
         if (pageIndex && previousPageData?.nextCursor) params.set("cursor", previousPageData.nextCursor);
         return `/api/invitations?${params.toString()}`;
-    }, null, {
+    }, fetchInvitationPage, {
         suspense: false,
         keepPreviousData: false,
         revalidateFirstPage: true,
@@ -133,21 +149,17 @@ export default function ProfileInvitationsList({
         revalidateIfStale: true,
         initialSize: savedSize,
         onSuccess: (invitationPages) => {
-            clearConfirmedPendingMutations(invitationPages, statusFilter);
+            const pendingMutations = getPendingItemMutations();
             const nextCounts = invitationPages?.[0]?.counts;
-            if (nextCounts) updateCountsState(nextCounts);
+            const requestStartedAt = invitationPages?.[0]?.clientRequestStartedAt || 0;
+            if (nextCounts) {
+                updateCountsState(reconcileInvitationCounts(nextCounts, pendingMutations, requestStartedAt));
+            }
+            clearConfirmedPendingMutations(invitationPages, statusFilter);
 
             if (invitationPages) {
-                const serverItemsMap = new Map<string, InvitationData>();
-                invitationPages.forEach((p) => p.items?.forEach((i) => serverItemsMap.set(i.id, i)));
                 setOptimisticMutations((prev) =>
-                    prev.filter((m) => {
-                        const serverItem = serverItemsMap.get(m.id);
-                        if (!serverItem || !m.invitation) return true;
-                        const serverBucket = getInvitationFilterBucket(serverItem);
-                        const mutationBucket = getInvitationFilterBucket(m.invitation);
-                        return serverBucket !== mutationBucket;
-                    })
+                    prev.filter((mutation) => mutation.timestamp > requestStartedAt)
                 );
             }
         },
@@ -170,6 +182,12 @@ export default function ProfileInvitationsList({
         () => applyInvitationMutationsToPages(rawPages, itemMutations, statusFilter) || rawPages,
         [rawPages, itemMutations, statusFilter]
     );
+    const cacheState = useMemo(() => deriveInvitationFilterCacheState({
+        pages,
+        isValidating,
+        error,
+        pendingMutations: itemMutations,
+    }), [error, isValidating, itemMutations, pages]);
 
     const invitations = useMemo(() => {
         const rawInvitations = pages.flatMap((page) => page.items || []);
@@ -187,13 +205,13 @@ export default function ProfileInvitationsList({
     };
     const latestCounts = firstPage?.counts;
     const counts = cachedCounts || latestCounts || fallbackCounts;
-    const hasMore = Boolean(pages[pages.length - 1]?.hasMore);
+    const hasMore = cacheState.hasMore;
     const mergedStats = pages.reduce((acc: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>, page: InvitationsPageResponse) => ({ ...acc, ...page.stats }), invitationStats);
     const shouldShowEndState = pages.length > 1 && !hasMore;
     const isSearching = searchTerm !== debouncedSearch;
-    const isLoadingFirstPage = (isLoading && !pages.length) || isSearching;
-    const isLoadingInitialTabs = isLoading && !pages.length && !cachedCounts;
-    const isLoadingNextPage = isValidating && pages.length > 0 && hasMore && size > pages.length;
+    const isLoadingFirstPage = cacheState.isInitialLoading || isSearching;
+    const isLoadingInitialTabs = cacheState.isInitialLoading && !cachedCounts;
+    const isLoadingNextPage = isValidating && cacheState.hasLoadedInitialPage && hasMore && size > pages.length;
     const hasActiveFilters = Boolean(searchTerm) || statusFilter !== "all";
 
     useEffect(() => {
@@ -207,16 +225,6 @@ export default function ProfileInvitationsList({
             });
         }
     }, [statusFilter, size, rawPages.length, isLoadingFirstPage, data]);
-
-    useEffect(() => {
-        if (!itemMutations.length) return;
-
-        const timeout = window.setTimeout(() => {
-            setOptimisticMutations([]);
-        }, 5000);
-
-        return () => window.clearTimeout(timeout);
-    }, [itemMutations]);
 
     const statusLabels: Record<string, string> = {
         all: "All",
@@ -256,29 +264,9 @@ export default function ProfileInvitationsList({
     }, [statusFilter, debouncedSearch, setSize, listSizes, tabSizeKey]);
 
     useEffect(() => {
-        function handleProfileDataChanged(event?: Event) {
-            const detail = (event as CustomEvent<ProfileDataChangedDetail> | undefined)?.detail;
-            if (detail?.invitation) {
-                const updated = detail.invitation;
-                const prev = detail.previous;
-                void globalMutate(
-                    (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
-                    (currentPages: InvitationsPageResponse[] | undefined, key?: string) => {
-                        const filter = typeof key === "string" ? getFilterFromSWRKey(key) : "all";
-                        const sort = typeof key === "string" ? getSortFromSWRKey(key) : "updated_desc";
-                        return updateInvitationInPages(currentPages, updated, prev, filter, sort);
-                    },
-                    { revalidate: false }
-                );
-            } else if (detail?.deletedInvitation) {
-                const deleted = detail.deletedInvitation;
-                void globalMutate(
-                    (key) => typeof key === "string" && (key.startsWith("/api/invitations") || key.startsWith("$inf$/api/invitations")),
-                    (currentPages: InvitationsPageResponse[] | undefined) =>
-                        removeInvitationFromPages(currentPages, deleted),
-                    { revalidate: false }
-                );
-            }
+        function handleProfileDataChanged() {
+            // Detailed cache reconciliation is performed once by
+            // mutateInvitationState. The event only triggers canonical refreshes.
             void refreshInvitationLists();
         }
 
@@ -448,8 +436,7 @@ export default function ProfileInvitationsList({
                                         },
                                     ]);
 
-                                    mutate((currentPages) => removeInvitationFromPages(currentPages, deletedInvitation), { revalidate: false });
-                                    mutateInvitationState(globalMutate, undefined, undefined, deletedInvitation);
+                                    mutateInvitationState(globalMutate, undefined, undefined, deletedInvitation, false, cache);
                                 }}
                                 onInvitationUpdated={(updatedInvitation, previousInvitation) => {
                                     const prevBucket = previousInvitation ? getInvitationFilterBucket(previousInvitation) : null;
@@ -466,11 +453,7 @@ export default function ProfileInvitationsList({
                                         },
                                     ]);
 
-                                    mutate(
-                                        (currentPages) => updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, statusFilter),
-                                        { revalidate: false }
-                                    );
-                                    mutateInvitationState(globalMutate, updatedInvitation, previousInvitation);
+                                    mutateInvitationState(globalMutate, updatedInvitation, previousInvitation, undefined, false, cache);
                                 }}
                             />
                         ))}

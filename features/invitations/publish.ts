@@ -159,10 +159,12 @@ export async function publishInvitationAfterPayment({
     userId,
     invitationId,
     customSlug,
+    editorLock,
 }: {
     userId: string;
     invitationId: string;
     customSlug?: string;
+    editorLock: { editorSessionId: string; lockGeneration: number; revision: number };
 }) {
     const supabase = createAdminClient();
 
@@ -370,24 +372,16 @@ export async function publishInvitationAfterPayment({
             publishUpdate.slug = finalSlug;
         }
 
-        const updateResult = await supabase.rpc("publish_invitation_with_identity_check", {
+        const updateResult = await looseSupabase(supabase).rpc("publish_invitation_with_editor_lock", {
             p_invitation_id: invitationId,
             p_user_id: userId,
             p_patch: publishUpdate,
+            p_editor_session_id: editorLock.editorSessionId,
+            p_lock_generation: editorLock.lockGeneration,
+            p_expected_revision: editorLock.revision,
         });
         updatedInvite = updateResult.data as PublishedInvitationRow | null;
         updateError = updateResult.error;
-
-        if (isSchemaCacheColumnError(updateError)) {
-            const retry = await supabase
-                .from("invitations")
-                .update(stripNewEntitlementColumns(publishUpdate))
-                .eq("id", invitationId)
-                .select("id, slug, status, published_at")
-                .single();
-            updatedInvite = retry.data;
-            updateError = retry.error;
-        }
 
         if (!isUniqueSlugViolation(updateError)) {
             break;
@@ -765,10 +759,6 @@ async function buildPublishPatch({
     };
 }
 
-function isSchemaCacheColumnError(error: { code?: string; message?: string } | null) {
-    return error?.code === "PGRST204" || !!error?.message?.includes("schema cache");
-}
-
 function isUniqueSlugViolation(error: { code?: string; message?: string } | null) {
     return error?.code === "23505" && (error.message || "").toLowerCase().includes("slug");
 }
@@ -782,15 +772,4 @@ function getReadableSlugOverride(customSlug: string | undefined, existingSlug: s
         throw new Error("Invalid slug format");
     }
     return readableSlug;
-}
-
-function stripNewEntitlementColumns<T extends Record<string, unknown>>(value: T) {
-    const legacyValue = { ...value };
-    delete legacyValue.event_status;
-    delete legacyValue.event_snapshot;
-    delete legacyValue.event_change_score;
-    delete legacyValue.first_payment_id;
-    delete legacyValue.publish_version;
-    delete legacyValue.first_publish_version;
-    return legacyValue;
 }

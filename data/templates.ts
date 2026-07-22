@@ -15,6 +15,7 @@ export interface InvitationTemplate {
     previewSections: string[];
     ratingAverage?: number | null;
     ratingCount?: number;
+    usageCount?: number;
 }
 
 export const templates: InvitationTemplate[] = [

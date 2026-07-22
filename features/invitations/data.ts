@@ -4,6 +4,7 @@ import { createPublicServerClient } from "@/lib/supabase/public-server";
 import { createClient } from "@/lib/supabase/server";
 import { getDefaultRatingSummary } from "@/lib/templateRatingFormat";
 import { getTemplateRatingSummaryMap } from "@/lib/templateRatings";
+import { getTemplateUsageSummaryMap } from "@/lib/templateUsage";
 import { mapInvitationRow, mapTemplateRow } from "@/features/invitations/mappers";
 import { reportError } from "@/lib/observability";
 import { getInvitationLifecycle } from "@/lib/lifecycle";
@@ -23,7 +24,11 @@ const getCachedActiveTemplates = unstable_cache(
         const implementedRows = data.filter((row) => implementedTemplateIds.has(row.template_key));
 
         const mappedTemplates = implementedRows.length ? implementedRows.map(mapTemplateRow) : templates;
-        const ratingSummaries = await getTemplateRatingSummaryMap(mappedTemplates.map((template) => template.id));
+        const templateKeys = mappedTemplates.map((template) => template.id);
+        const [ratingSummaries, usageSummaries] = await Promise.all([
+            getTemplateRatingSummaryMap(templateKeys),
+            getTemplateUsageSummaryMap(templateKeys),
+        ]);
 
         return mappedTemplates.map((template) => {
             const summary = ratingSummaries.get(template.id) || getDefaultRatingSummary();
@@ -31,6 +36,7 @@ const getCachedActiveTemplates = unstable_cache(
                 ...template,
                 ratingAverage: summary.average,
                 ratingCount: summary.count,
+                usageCount: usageSummaries.get(template.id) || 0,
             };
         });
     },

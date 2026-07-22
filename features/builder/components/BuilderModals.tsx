@@ -10,6 +10,7 @@ import type {
     PublishSuccessDetails,
 } from "@/features/builder/types";
 import type { InvitationData } from "@/types/invitation";
+import type { BuilderLockCredentials } from "@/features/builder/lib/builderLock";
 
 export type PublishModalSuccessPayload =
     Parameters<
@@ -23,6 +24,7 @@ export type PublishModalSuccessPayload =
 type BuilderModalsProps = {
     builderMode: BuilderMode;
     invitation: InvitationData;
+    editorLock: BuilderLockCredentials | null;
 
     leaveModalOpen: boolean;
     isSavingDraftAndLeaving: boolean;
@@ -55,6 +57,7 @@ type BuilderModalsProps = {
 export default function BuilderModals({
     builderMode,
     invitation,
+    editorLock,
     leaveModalOpen,
     isSavingDraftAndLeaving,
     isPublishModalOpen,
@@ -81,6 +84,7 @@ export default function BuilderModals({
 
             <PublishModal
                 invitation={invitation}
+                editorLock={editorLock}
                 isOpen={isPublishModalOpen}
                 onClose={onPublishClose}
                 onPublishSuccess={

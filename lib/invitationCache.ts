@@ -9,6 +9,22 @@ export type InvitationsPageResponse = {
     totalCount: number;
     counts: Record<string, number>;
     stats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>;
+    /** Client-only metadata. It is never sent by the invitations API. */
+    clientRequestStartedAt?: number;
+    clientReceivedAt?: number;
+    clientMutationVersions?: Record<string, number>;
+};
+
+export type InvitationFilterCacheState = {
+    items: InvitationData[];
+    hasLoadedInitialPage: boolean;
+    isInitialLoading: boolean;
+    isRefreshing: boolean;
+    hasMore: boolean;
+    nextPage: number | null;
+    lastFetchedAt: number | null;
+    error: unknown | null;
+    pendingMutationIds: string[];
 };
 
 export interface DashboardData {
@@ -34,7 +50,7 @@ export interface PendingMutation {
     timestamp: number;
 }
 
-const PENDING_ITEM_MUTATION_TTL_MS = 5000;
+const MAX_PENDING_ITEM_MUTATIONS = 100;
 
 let pendingItemMutationsStore: PendingMutation[] = [];
 const latestInvitationByIdStore = new Map<string, InvitationData>();
@@ -53,16 +69,15 @@ export function recordPendingItemMutation(mutation: Omit<PendingMutation, "times
         recordLatestInvitationState(mutation.invitation, force);
     }
     pendingItemMutationsStore = pendingItemMutationsStore.filter(
-        (item) => item.id !== mutation.id && now - item.timestamp < PENDING_ITEM_MUTATION_TTL_MS
+        (item) => item.id !== mutation.id
     );
-    pendingItemMutationsStore.push({ ...mutation, timestamp: now });
+    const recorded = { ...mutation, timestamp: now };
+    pendingItemMutationsStore.push(recorded);
+    pendingItemMutationsStore = pendingItemMutationsStore.slice(-MAX_PENDING_ITEM_MUTATIONS);
+    return recorded;
 }
 
 export function getPendingItemMutations() {
-    const now = Date.now();
-    pendingItemMutationsStore = pendingItemMutationsStore.filter(
-        (item) => now - item.timestamp < PENDING_ITEM_MUTATION_TTL_MS
-    );
     return pendingItemMutationsStore;
 }
 
@@ -89,6 +104,11 @@ export function clearConfirmedPendingMutations(pages: InvitationsPageResponse[] 
     }
 
     for (const mutation of pending) {
+        const requestStartedAt = pages[0]?.clientRequestStartedAt;
+        if (requestStartedAt !== undefined && requestStartedAt >= mutation.timestamp) {
+            removePendingItemMutation(mutation.id);
+            continue;
+        }
         const serverItem = serverItemsMap.get(mutation.id);
         if (serverItem && mutation.invitation) {
             const serverBucket = getInvitationFilterBucket(serverItem);
@@ -158,22 +178,64 @@ export function adjustInvitationCounts(
     return nextCounts;
 }
 
+export function deriveInvitationFilterCacheState({
+    pages,
+    isValidating,
+    error,
+    pendingMutations = [],
+}: {
+    pages: InvitationsPageResponse[] | undefined;
+    isValidating: boolean;
+    error?: unknown;
+    pendingMutations?: PendingMutation[];
+}): InvitationFilterCacheState {
+    const safePages = Array.isArray(pages) ? pages : [];
+    const hasLoadedInitialPage = safePages.length > 0 && Boolean(safePages[0]);
+    const items = hasLoadedInitialPage
+        ? safePages.flatMap((page) => Array.isArray(page.items) ? page.items : [])
+        : [];
+    const hasMore = hasLoadedInitialPage && Boolean(safePages[safePages.length - 1]?.hasMore);
+
+    return {
+        items,
+        hasLoadedInitialPage,
+        isInitialLoading: !hasLoadedInitialPage && !error,
+        isRefreshing: hasLoadedInitialPage && isValidating,
+        hasMore,
+        nextPage: hasMore ? safePages.length + 1 : null,
+        lastFetchedAt: hasLoadedInitialPage
+            ? safePages.reduce((latest, page) => Math.max(latest, page.clientReceivedAt || 0), 0) || null
+            : null,
+        error: error || null,
+        pendingMutationIds: pendingMutations.map((mutation) => mutation.id),
+    };
+}
+
 export function removeInvitationFromPages(
     pages: InvitationsPageResponse[] | undefined,
-    invitation: InvitationData
+    invitation: InvitationData,
+    activeFilter: string = "all",
+    mutationTimestamp: number = Date.now(),
 ) {
-    if (!pages || !Array.isArray(pages)) return pages;
+    if (!pages || !Array.isArray(pages) || pages.length === 0) return pages;
+    if (getAppliedMutationVersion(pages, invitation.id) >= mutationTimestamp) return pages;
     const bucket = getInvitationFilterBucket(invitation);
     const nextCounts = pages[0]?.counts
         ? adjustInvitationCounts(pages[0].counts, bucket, null)
         : undefined;
+    const affectsCurrentFilter = isInvitationVisibleInFilter(invitation, activeFilter);
+    const existsInPages = pages.some((page) => page.items?.some((item) => item.id === invitation.id));
 
     return pages.map((page) => ({
         ...page,
         items: Array.isArray(page?.items) ? page.items.filter((item) => item.id !== invitation.id) : [],
-        totalCount: Math.max(0, page.totalCount - 1),
+        totalCount: Math.max(0, page.totalCount - (affectsCurrentFilter || existsInPages ? 1 : 0)),
         counts: nextCounts || page.counts,
         stats: omitInvitationStat(page.stats, invitation.id),
+        clientMutationVersions: {
+            ...page.clientMutationVersions,
+            [invitation.id]: mutationTimestamp,
+        },
     }));
 }
 
@@ -192,192 +254,126 @@ export function getSortFromSWRKey(key: string): string {
 
 function getSortCompareFn(sortKey: string = "updated_desc") {
     return (a: InvitationData, b: InvitationData) => {
+        let result: number;
         if (sortKey === "newest") {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        }
-        if (sortKey === "oldest") {
-            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        }
-        if (sortKey === "event_soonest") {
+            result = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        } else if (sortKey === "oldest") {
+            result = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        } else if (sortKey === "event_soonest") {
             const dateA = a.eventDate ? new Date(a.eventDate).getTime() : Infinity;
             const dateB = b.eventDate ? new Date(b.eventDate).getTime() : Infinity;
-            return dateA - dateB;
+            result = dateA - dateB;
+        } else {
+            // The API's updated_desc key intentionally sorts by created_at DESC.
+            result = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (result !== 0) return result;
+        return sortKey === "oldest" || sortKey === "event_soonest"
+            ? a.id.localeCompare(b.id)
+            : b.id.localeCompare(a.id);
     };
 }
 
 export function updateInvitationInPages(
     pages: InvitationsPageResponse[] | undefined,
     updatedInvitation: InvitationData,
-    _previousInvitation?: InvitationData | null,
+    previousInvitation?: InvitationData | null,
     activeFilter: string = "all",
-    sortKey: string = "updated_desc"
+    sortKey: string = "updated_desc",
+    mutationTimestamp: number = Date.now(),
 ): InvitationsPageResponse[] | undefined {
     if (!pages || !Array.isArray(pages) || pages.length === 0) return pages;
+    if (getAppliedMutationVersion(pages, updatedInvitation.id) >= mutationTimestamp) return pages;
 
     const shouldKeepInCurrentFilter = isInvitationVisibleInFilter(updatedInvitation, activeFilter);
-    const existingServerItem = pages.flatMap((page) => page.items || []).find((item) => item.id === updatedInvitation.id);
-    const prevItem = _previousInvitation || existingServerItem;
+    const originalPageSizes = pages.map((page) => page.items?.length || 0);
+    const originalItems = dedupeInvitations(pages.flatMap((page) => page.items || []));
+    const existingServerItem = originalItems.find((item) => item.id === updatedInvitation.id);
+    const prevItem = previousInvitation || existingServerItem;
     const prevBucket = prevItem ? getInvitationFilterBucket(prevItem) : null;
     const nextBucket = getInvitationFilterBucket(updatedInvitation);
     const nextCounts = pages[0]?.counts
         ? adjustInvitationCounts(pages[0].counts, prevBucket, nextBucket)
         : undefined;
+    const wasVisibleInCurrentFilter = previousInvitation
+        ? isInvitationVisibleInFilter(previousInvitation, activeFilter)
+        : Boolean(existingServerItem);
+    const totalCountDelta = Number(shouldKeepInCurrentFilter) - Number(wasVisibleInCurrentFilter);
+    const nextTotalCount = Math.max(0, (pages[0]?.totalCount || 0) + totalCountDelta);
 
-    const existsInPages = pages.some((page) => Array.isArray(page?.items) && page.items.some((item) => item.id === updatedInvitation.id));
-
-    if (existsInPages) {
-        return pages.map((page) => {
-            if (!Array.isArray(page?.items)) return page;
-            const hasItem = page.items.some((item) => item.id === updatedInvitation.id);
-            if (!hasItem) {
-                return {
-                    ...page,
-                    counts: nextCounts || page.counts,
-                };
-            }
-
-            let updatedItems: InvitationData[];
-            if (!shouldKeepInCurrentFilter) {
-                updatedItems = page.items.filter((item) => item.id !== updatedInvitation.id);
-            } else {
-                // REPLACE IN PLACE at exact same position!
-                updatedItems = page.items.map((item) =>
-                    item.id === updatedInvitation.id ? { ...item, ...updatedInvitation } : item
-                );
-            }
-
-            return {
-                ...page,
-                items: updatedItems,
-                totalCount: Math.max(0, page.totalCount + (shouldKeepInCurrentFilter ? 0 : -1)),
-                counts: nextCounts || page.counts,
-            };
-        });
+    let reconciledItems = originalItems.filter((item) => item.id !== updatedInvitation.id);
+    if (shouldKeepInCurrentFilter) {
+        reconciledItems.push(existingServerItem
+            ? { ...existingServerItem, ...updatedInvitation }
+            : updatedInvitation);
+        reconciledItems.sort(getSortCompareFn(sortKey));
     }
 
-    if (!shouldKeepInCurrentFilter) {
-        return pages.map((page) => ({
-            ...page,
-            counts: nextCounts || page.counts,
-        }));
-    }
+    const originalLoadedCount = originalPageSizes.reduce((sum, count) => sum + count, 0);
+    // Keep every already-fetched item when inserting. Dropping the previous
+    // boundary item would make the unchanged server cursor skip that item on
+    // the next infinite-scroll request. Revalidation restores canonical page
+    // sizes and cursors in the background.
+    const insertionRoom = shouldKeepInCurrentFilter && !wasVisibleInCurrentFilter ? 1 : 0;
+    reconciledItems = reconciledItems.slice(0, originalLoadedCount + insertionRoom);
 
-    const currentTotalItems = pages.reduce((sum, page) => sum + (Array.isArray(page?.items) ? page.items.length : 0), 0);
-    const targetCount = nextCounts?.[activeFilter] ?? pages[0]?.counts?.[activeFilter];
-
-    if (activeFilter !== "all" && targetCount !== undefined && currentTotalItems >= targetCount) {
-        return pages.map((page) => ({
-            ...page,
-            counts: nextCounts || page.counts,
-        }));
-    }
-
-    const compare = getSortCompareFn(sortKey);
-    let inserted = false;
-
-    const newPages = pages.map((page, index) => {
-        if (!Array.isArray(page?.items)) return page;
-        const filtered = page.items.filter((item) => item.id !== updatedInvitation.id);
-
-        if (!inserted) {
-            const insertIdx = filtered.findIndex((item) => compare(updatedInvitation, item) <= 0);
-            if (insertIdx !== -1) {
-                inserted = true;
-                const nextItems = [...filtered.slice(0, insertIdx), updatedInvitation, ...filtered.slice(insertIdx)];
-                return {
-                    ...page,
-                    items: nextItems,
-                    totalCount: page.totalCount + 1,
-                    counts: nextCounts || page.counts,
-                };
-            } else if (index === pages.length - 1) {
-                inserted = true;
-                return {
-                    ...page,
-                    items: [...filtered, updatedInvitation],
-                    totalCount: page.totalCount + 1,
-                    counts: nextCounts || page.counts,
-                };
-            }
-        }
-
+    let offset = 0;
+    return pages.map((page, index) => {
+        const isLastPage = index === pages.length - 1;
+        const targetSize = isLastPage
+            ? reconciledItems.length - offset
+            : Math.min(originalPageSizes[index], Math.max(0, reconciledItems.length - offset));
+        const items = reconciledItems.slice(offset, offset + targetSize);
+        offset += targetSize;
         return {
             ...page,
-            items: filtered,
+            items,
+            totalCount: nextTotalCount,
             counts: nextCounts || page.counts,
+            clientMutationVersions: {
+                ...page.clientMutationVersions,
+                [updatedInvitation.id]: mutationTimestamp,
+            },
         };
     });
-
-    if (!inserted && newPages.length > 0) {
-        const firstPage = newPages[0];
-        const filtered = (firstPage.items || []).filter((item) => item.id !== updatedInvitation.id);
-        newPages[0] = {
-            ...firstPage,
-            items: [updatedInvitation, ...filtered],
-            totalCount: firstPage.totalCount + 1,
-            counts: nextCounts || firstPage.counts,
-        };
-    }
-
-    return newPages;
 }
 
 export function applyInvitationMutationsToPages(
     pages: InvitationsPageResponse[] | undefined,
     mutations: PendingMutation[],
-    activeFilter: string
+    activeFilter: string,
+    sortKey: string = "updated_desc",
 ): InvitationsPageResponse[] | undefined {
-    if (!pages || !Array.isArray(pages)) return pages;
+    // A mutation is not an API page. An unvisited filter must remain
+    // uninitialized until its first-page request succeeds.
+    if (!pages || !Array.isArray(pages) || pages.length === 0) return pages;
 
     let resultPages = pages;
 
     if (mutations && mutations.length > 0) {
-        const hasPages = Array.isArray(pages) && pages.length > 0;
-
-        if (!hasPages) {
-            const syntheticMap = new Map<string, InvitationData>();
-            for (const m of mutations) {
-                if (m.deletedInvitation) {
-                    syntheticMap.delete(m.deletedInvitation.id);
-                } else if (m.invitation) {
-                    if (isInvitationVisibleInFilter(m.invitation, activeFilter)) {
-                        syntheticMap.set(m.invitation.id, m.invitation);
-                    } else {
-                        syntheticMap.delete(m.invitation.id);
-                    }
-                }
-            }
-
-            const syntheticItems = Array.from(syntheticMap.values());
-            if (syntheticItems.length === 0) return pages;
-
-            return [{
-                items: syntheticItems,
-                nextCursor: null,
-                hasMore: false,
-                totalCount: syntheticItems.length,
-                counts: {
-                    all: syntheticItems.length,
-                    upcoming: syntheticItems.filter((i) => getInvitationFilterBucket(i) === "upcoming").length,
-                    completed: syntheticItems.filter((i) => getInvitationFilterBucket(i) === "completed").length,
-                    draft: syntheticItems.filter((i) => getInvitationFilterBucket(i) === "draft").length,
-                    offline: syntheticItems.filter((i) => getInvitationFilterBucket(i) === "offline").length,
-                },
-                stats: {},
-            }];
-        }
-
         resultPages = mutations.reduce<InvitationsPageResponse[] | undefined>((currentPages, mutation) => {
             if (!currentPages) return currentPages;
+            const requestStartedAt = currentPages[0]?.clientRequestStartedAt || 0;
+            if (requestStartedAt >= mutation.timestamp) return currentPages;
 
             if (mutation.invitation) {
-                return updateInvitationInPages(currentPages, mutation.invitation, mutation.previous, activeFilter);
+                return updateInvitationInPages(
+                    currentPages,
+                    mutation.invitation,
+                    mutation.previous,
+                    activeFilter,
+                    sortKey,
+                    mutation.timestamp,
+                );
             }
 
             if (mutation.deletedInvitation) {
-                return removeInvitationFromPages(currentPages, mutation.deletedInvitation);
+                return removeInvitationFromPages(
+                    currentPages,
+                    mutation.deletedInvitation,
+                    activeFilter,
+                    mutation.timestamp,
+                );
             }
 
             return currentPages;
@@ -389,7 +385,7 @@ export function applyInvitationMutationsToPages(
         let itemsChanged = false;
         const updatedItems = page.items.map((item) => {
             const latest = latestInvitationByIdStore.get(item.id);
-            if (latest && latest !== item) {
+            if (latest && latest !== item && getInvitationUpdatedAt(latest) > getInvitationUpdatedAt(item)) {
                 itemsChanged = true;
                 return { ...item, ...latest };
             }
@@ -409,6 +405,53 @@ export function applyInvitationMutationsToPages(
     });
 }
 
+export function reconcileInvitationCounts(
+    serverCounts: Record<string, number>,
+    mutations: PendingMutation[],
+    requestStartedAt: number,
+) {
+    return mutations
+        .filter((mutation) => mutation.timestamp > requestStartedAt)
+        .reduce((counts, mutation) => {
+            if (mutation.invitation) {
+                const previousBucket = mutation.previous
+                    ? getInvitationFilterBucket(mutation.previous)
+                    : null;
+                return adjustInvitationCounts(
+                    counts,
+                    previousBucket,
+                    getInvitationFilterBucket(mutation.invitation),
+                );
+            }
+            if (mutation.deletedInvitation) {
+                return adjustInvitationCounts(
+                    counts,
+                    getInvitationFilterBucket(mutation.deletedInvitation),
+                    null,
+                );
+            }
+            return counts;
+        }, serverCounts);
+}
+
+function getAppliedMutationVersion(pages: InvitationsPageResponse[], invitationId: string) {
+    return pages.reduce(
+        (latest, page) => Math.max(latest, page.clientMutationVersions?.[invitationId] || 0),
+        0,
+    );
+}
+
+function dedupeInvitations(items: InvitationData[]) {
+    const byId = new Map<string, InvitationData>();
+    for (const item of items) byId.set(item.id, item);
+    return Array.from(byId.values());
+}
+
+function getInvitationUpdatedAt(invitation: InvitationData) {
+    const timestamp = new Date(invitation.updatedAt).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function omitInvitationStat(
     stats: Record<string, { rsvps: number; views: number; acceptsRsvps?: boolean }>,
     invitationId: string
@@ -424,20 +467,33 @@ export type GlobalMutateFn = (
     opts?: { revalidate?: boolean }
 ) => Promise<unknown>;
 
+export type InvitationCacheProvider = {
+    keys: () => IterableIterator<unknown>;
+};
+
+export function getInitializedInvitationListKeys(cache?: InvitationCacheProvider) {
+    if (!cache) return [];
+    return Array.from(cache.keys()).filter(
+        (key): key is string => typeof key === "string" && key.startsWith("$inf$/api/invitations?"),
+    );
+}
+
 export function mutateInvitationState(
     globalMutate: GlobalMutateFn,
     updatedInvitation?: InvitationData,
     previousInvitation?: InvitationData | null,
     deletedInvitation?: InvitationData,
-    force: boolean = false
+    force: boolean = false,
+    cache?: InvitationCacheProvider,
 ) {
-    const timestamp = Date.now();
+    let recordedMutation: PendingMutation | null = null;
     if (updatedInvitation) {
-        recordPendingItemMutation({ id: updatedInvitation.id, invitation: updatedInvitation, previous: previousInvitation }, force);
+        recordedMutation = recordPendingItemMutation({ id: updatedInvitation.id, invitation: updatedInvitation, previous: previousInvitation }, force);
     } else if (deletedInvitation) {
-        recordPendingItemMutation({ id: deletedInvitation.id, deletedInvitation }, force);
+        recordedMutation = recordPendingItemMutation({ id: deletedInvitation.id, deletedInvitation }, force);
         latestInvitationByIdStore.delete(deletedInvitation.id);
     }
+    const timestamp = recordedMutation?.timestamp || Date.now();
 
     if (process.env.NODE_ENV !== "production") {
         console.log(`[InvitationsCache] mutateInvitationState dispatched at ${timestamp}`, {
@@ -446,22 +502,24 @@ export function mutateInvitationState(
         });
     }
 
-    void globalMutate(
-        (key) => typeof key === "string" && key.includes("/api/invitations") && !key.includes("/api/invitations/"),
-        (currentPages: InvitationsPageResponse[] | undefined, key?: string) => {
+    for (const key of getInitializedInvitationListKeys(cache)) {
+        void globalMutate(
+            key,
+            (currentPages: InvitationsPageResponse[] | undefined) => {
             if (!currentPages || !Array.isArray(currentPages)) return currentPages;
-            const filter = typeof key === "string" ? getFilterFromSWRKey(key) : "all";
-            const sort = typeof key === "string" ? getSortFromSWRKey(key) : "updated_desc";
+            const filter = getFilterFromSWRKey(key);
+            const sort = getSortFromSWRKey(key);
             if (updatedInvitation) {
-                return updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, filter, sort);
+                return updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, filter, sort, timestamp);
             }
             if (deletedInvitation) {
-                return removeInvitationFromPages(currentPages, deletedInvitation);
+                return removeInvitationFromPages(currentPages, deletedInvitation, filter, timestamp);
             }
             return currentPages;
-        },
-        { revalidate: false }
-    );
+            },
+            { revalidate: false },
+        );
+    }
 
     if (updatedInvitation) {
         void globalMutate(`/api/invitations/${updatedInvitation.id}`, updatedInvitation, { revalidate: false });

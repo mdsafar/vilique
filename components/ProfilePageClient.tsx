@@ -517,7 +517,11 @@ function ProfileActivityTabs({
                                     onKeyDown={(event) => handleTabKeyDown(event, index)}
                                 >
                                     <span className="profileTabLabel">{tab.label}</span>
-                                    {tab.count !== null ? <span className="profileTabBadge">{tab.count}</span> : null}
+                                    {tab.count !== null ? (
+                                        <span className="profileTabBadge">
+                                            {tab.count >= 100 ? "99+" : tab.count}
+                                        </span>
+                                    ) : null}
                                     {activeTab === tab.id ? <span className="profileTabIndicator" /> : null}
                                 </button>
                             ))}

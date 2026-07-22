@@ -9,12 +9,14 @@ import { useRazorpay } from "@/hooks/useRazorpay";
 import { formatPaiseToCurrency } from "@/lib/currency";
 import type { InvitationData } from "@/types/invitation";
 import { notifyProfileDataChanged } from "@/lib/events";
+import { builderLockHeaders, type BuilderLockCredentials } from "@/features/builder/lib/builderLock";
 
 type Props = {
     invitation: InvitationData;
     isOpen: boolean;
     onClose: () => void;
     onPublishSuccess: (updatedInvitation: PublishedInvitationResult) => void;
+    editorLock: BuilderLockCredentials | null;
 };
 
 type PublishedInvitationResult = {
@@ -89,7 +91,7 @@ const DEFAULT_PAYMENT_FAILURE_LINES = [
     "Please try again or use another payment method.",
 ];
 
-export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess }: Props) {
+export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess, editorLock }: Props) {
     const [slug, setSlug] = useState(invitation.slug);
     const [status, setStatus] = useState<SlugStatus>("idle");
     const [isPublishing, setIsPublishing] = useState(false);
@@ -272,7 +274,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
 
     // Triggers Razorpay Checkout & verification
     async function handlePaymentAndPublish() {
-        if (!canPublishOrPay || !paymentInfo) return;
+        if (!canPublishOrPay || !paymentInfo || !editorLock) return;
         const attemptId = ++currentAttemptIdRef.current;
         paymentSuccessInProgressRef.current = false;
         isVerifyingRef.current = false;
@@ -292,7 +294,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
         try {
             const orderRes = await fetch("/api/payments/razorpay/order", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", ...builderLockHeaders(editorLock) },
                 body: JSON.stringify({
                     invitationId: invitation.id,
                     slug: slug.toLowerCase().trim(),
@@ -350,7 +352,7 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                     try {
                         const verifyRes = await fetch("/api/payments/razorpay/verify", {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
+                            headers: { "Content-Type": "application/json", ...builderLockHeaders(editorLock) },
                             body: JSON.stringify({
                                 invitationId: invitation.id,
                                 razorpay_order_id: response.razorpay_order_id,
@@ -468,14 +470,14 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
 
     // Traditional publishing for free templates or already-paid invitations
     async function handlePublish() {
-        if (!canPublishOrPay) return;
+        if (!canPublishOrPay || !editorLock) return;
         setIsPublishing(true);
         setPublishError("");
 
         try {
             const res = await fetch(`/api/invitations/${invitation.id}/publish`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", ...builderLockHeaders(editorLock) },
                 body: JSON.stringify({ slug: slug.toLowerCase().trim() }),
             });
 
