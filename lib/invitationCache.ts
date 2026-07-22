@@ -472,8 +472,8 @@ export function mutateInvitationState(
             if (!current) return current;
             const existing = current.invitations.find((item) => item.id === updatedInvitation.id);
             const isNew = !existing;
-            const wasDraft = previousInvitation ? previousInvitation.status === "draft" : existing?.status === "draft";
-            const isNowDraft = updatedInvitation.status === "draft";
+            const wasDraft = previousInvitation ? getInvitationLifecycle(previousInvitation) === "draft" : (existing ? getInvitationLifecycle(existing) === "draft" : false);
+            const isNowDraft = getInvitationLifecycle(updatedInvitation) === "draft";
 
             let publishedDelta = 0;
             let draftsDelta = 0;

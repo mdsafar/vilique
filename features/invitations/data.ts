@@ -6,6 +6,7 @@ import { getDefaultRatingSummary } from "@/lib/templateRatingFormat";
 import { getTemplateRatingSummaryMap } from "@/lib/templateRatings";
 import { mapInvitationRow, mapTemplateRow } from "@/features/invitations/mappers";
 import { reportError } from "@/lib/observability";
+import { getInvitationLifecycle } from "@/lib/lifecycle";
 
 const getCachedActiveTemplates = unstable_cache(
     async () => {
@@ -108,15 +109,15 @@ export async function getDashboardData() {
 
     const { data: invitationRows } = await supabase
         .from("invitations")
-        .select("id, status, template_id, invitation_templates(template_key)")
+        .select("*, invitation_templates(template_key)")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
-    const invitations = invitationRows || [];
-    const invitationIds = invitations.map((invitation) => invitation.id);
-    const rsvpEligibleInvitationIds = invitations
-        .filter((invitation) => templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation)))
-        .map((invitation) => invitation.id);
+    const invitationItems = (invitationRows || []).map(mapInvitationRow);
+    const invitationIds = invitationItems.map((invitation) => invitation.id);
+    const rsvpEligibleInvitationIds = invitationRows
+        ?.filter((invitation) => templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation)))
+        .map((invitation) => invitation.id) || [];
 
     const [rsvpRowsResult, viewResult, viewRowsResult, paymentsResult] = await Promise.all([
         invitationIds.length && rsvpEligibleInvitationIds.length
@@ -132,11 +133,11 @@ export async function getDashboardData() {
     ]);
 
     const invitationStats = Object.fromEntries(
-        invitations.map((invitation) => [
+        invitationItems.map((invitation) => [
             invitation.id,
             {
-                acceptsRsvps: templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation)),
-                rsvps: templateCollectsDetailedRsvps(getInvitationTemplateKey(invitation))
+                acceptsRsvps: templateCollectsDetailedRsvps(invitation.templateId || ""),
+                rsvps: templateCollectsDetailedRsvps(invitation.templateId || "")
                     ? (rsvpRowsResult.data || []).filter((row) => row.invitation_id === invitation.id).length
                     : 0,
                 views: (viewRowsResult.data || []).filter((row) => row.invitation_id === invitation.id).length,
@@ -157,8 +158,8 @@ export async function getDashboardData() {
             avatarUrl: getUserMetadataString(user.user_metadata, "avatar_url"),
         },
         invitations: [],
-        published: invitations.filter((item) => item.status === "published").length,
-        drafts: invitations.filter((item) => item.status === "draft").length,
+        published: invitationItems.filter((item) => item.status === "published" && getInvitationLifecycle(item) !== "offline").length,
+        drafts: invitationItems.filter((item) => getInvitationLifecycle(item) === "draft").length,
         views: viewResult.count || 0,
         rsvps: totalRsvps,
         invitationStats,

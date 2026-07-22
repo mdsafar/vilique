@@ -762,7 +762,7 @@ function InvitationRow({
             }
             const updatedInvitation: InvitationData = {
                 ...invitation,
-                status: "published",
+                status: (result.status as InvitationData["status"]) || "draft",
                 lifecycleStatus: "unpublished",
                 eventStatus: "unpublished",
                 updatedAt: new Date().toISOString(),
