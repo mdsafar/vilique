@@ -231,7 +231,7 @@ export default function TemplatesCatalog() {
                         <div className="marketHeaderTop">
                             <div className="templatesAppHeader" aria-label="Vilique">
                                 <Link href="/" className="templatesBrand">
-                                    <AppLogo size={36} />
+                                    <AppLogo showMark={false} />
                                 </Link>
                             </div>
 

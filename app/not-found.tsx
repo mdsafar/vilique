@@ -7,7 +7,7 @@ export default function NotFound() {
         <main className="notFoundPage">
             <section className="notFoundPanel" aria-labelledby="not-found-title">
                 <header className="notFoundHeader">
-                    <AppLogo size={34} />
+                    <AppLogo size={28} />
                     <span>404</span>
                 </header>
 

@@ -702,7 +702,7 @@ function EventInProgressMessage({ category }: { category: string }) {
 function WeddingBrandCredit() {
     return (
         <p className="weddingBrandCredit">
-            <Image src="/vilique-logo.png" alt="" aria-hidden="true" width={18} height={18} />
+            <Image src="/vilique-logo.png" alt="" aria-hidden="true" width={14} height={14} />
             <span>{siteConfig.creatorLabel}</span>
         </p>
     );

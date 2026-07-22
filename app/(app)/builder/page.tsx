@@ -1198,14 +1198,26 @@ function BuilderContent() {
             builderMode,
         });
 
+    const isPublishedEdit =
+        builderMode === "published-edit" ||
+        invitation.status === "published";
+
+    const isFreshNewBuilder =
+        builderMode === "new" &&
+        invitation.id === "default-draft-placeholder-id" &&
+        !hasUserEditedState &&
+        !initialPreviewSnapshot;
+
     const hasMeaningfulEdits =
         hasUserEditedState &&
         buildComparablePayload(invitation) !==
         baselineComparablePayloadState;
 
-    const canPublishOrUpdate =
-        builderMode === "draft-edit" ||
-        hasMeaningfulEdits;
+    const canPublishOrUpdate = isPublishedEdit
+        ? hasMeaningfulEdits
+        : isFreshNewBuilder
+        ? hasMeaningfulEdits
+        : true;
 
     // 9. Recovery Handlers
     async function handleRecoveryContinue() {
@@ -1403,16 +1415,14 @@ function BuilderContent() {
                 saveStatus={saveStatus}
                 isPreviewing={isPreviewing}
                 isPublishing={isPublishing}
-                isPublishedEdit={
-                    builderMode === "published-edit"
-                }
+                isPublishedEdit={isPublishedEdit}
                 isPublishDisabled={
                     !canPublishOrUpdate
                 }
                 onBack={requestBuilderLeave}
                 onPreview={saveAndPreview}
                 onPublish={
-                    builderMode === "published-edit"
+                    isPublishedEdit
                         ? handleUpdateInvitation
                         : handlePublishInvitation
                 }
@@ -1494,9 +1504,7 @@ function BuilderContent() {
             <BuilderBottomBar
                 isPreviewing={isPreviewing}
                 isPublishing={isPublishing}
-                isPublishedEdit={
-                    builderMode === "published-edit"
-                }
+                isPublishedEdit={isPublishedEdit}
                 onEdit={() =>
                     setMobileEditorOpen(true)
                 }
@@ -1505,7 +1513,7 @@ function BuilderContent() {
                 }
                 onPreview={saveAndPreview}
                 onPublish={
-                    builderMode === "published-edit"
+                    isPublishedEdit
                         ? handleUpdateInvitation
                         : handlePublishInvitation
                 }

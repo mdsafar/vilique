@@ -5,23 +5,27 @@ type AppLogoProps = {
   className?: string;
   size?: number;
   showText?: boolean;
+  showMark?: boolean;
 };
 
 export default function AppLogo({
   className = "",
-  size = 34,
+  size = 40,
   showText = true,
+  showMark = true,
 }: AppLogoProps) {
   return (
     <span className={`appLogo ${className}`.trim()}>
-      <Image
-        className="appLogoMark"
-        src="/vilique-logo.png"
-        alt=""
-        width={size}
-        height={size}
-        priority
-      />
+      {showMark ? (
+        <Image
+          className="appLogoMark"
+          src="/vilique-logo.png"
+          alt=""
+          width={size}
+          height={size}
+          priority
+        />
+      ) : null}
       {showText ? <span className="appLogoText">{siteConfig.name}</span> : null}
     </span>
   );

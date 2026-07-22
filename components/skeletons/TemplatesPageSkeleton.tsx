@@ -12,7 +12,7 @@ export default function TemplatesPageSkeleton() {
                         <div className="marketHeaderTop">
                             <div className="templatesAppHeader" aria-label="Vilique">
                                 <div className="templatesBrand" aria-hidden="true">
-                                    <AppLogo size={36} />
+                                    <AppLogo showMark={false} />
                                 </div>
                             </div>
 

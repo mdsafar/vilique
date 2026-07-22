@@ -501,24 +501,27 @@ function ProfileActivityTabs({
                     <div className="profileActivityHeader" ref={headerRef}>
                         {header}
                     </div>
-                    <div className="profileTabList" role="tablist" aria-label="Profile sections">
-                        {tabs.map((tab, index) => (
-                            <button
-                                type="button"
-                                id={`profile-tab-${tab.id}`}
-                                key={tab.id}
-                                className={activeTab === tab.id ? "active" : ""}
-                                role="tab"
-                                aria-selected={activeTab === tab.id}
-                                aria-controls={`profile-panel-${tab.id}`}
-                                tabIndex={activeTab === tab.id ? 0 : -1}
-                                onClick={() => onTabChange(tab.id)}
-                                onKeyDown={(event) => handleTabKeyDown(event, index)}
-                            >
-                                <span>{tab.label}</span>
-                                {tab.count !== null ? <b>{tab.count}</b> : null}
-                            </button>
-                        ))}
+                    <div className="profileTabListBar">
+                        <div className="profileTabList" role="tablist" aria-label="Profile sections">
+                            {tabs.map((tab, index) => (
+                                <button
+                                    type="button"
+                                    id={`profile-tab-${tab.id}`}
+                                    key={tab.id}
+                                    className={`profileTabItem ${activeTab === tab.id ? "active" : ""}`}
+                                    role="tab"
+                                    aria-selected={activeTab === tab.id}
+                                    aria-controls={`profile-panel-${tab.id}`}
+                                    tabIndex={activeTab === tab.id ? 0 : -1}
+                                    onClick={() => onTabChange(tab.id)}
+                                    onKeyDown={(event) => handleTabKeyDown(event, index)}
+                                >
+                                    <span className="profileTabLabel">{tab.label}</span>
+                                    {tab.count !== null ? <span className="profileTabBadge">{tab.count}</span> : null}
+                                    {activeTab === tab.id ? <span className="profileTabIndicator" /> : null}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -651,7 +654,7 @@ function ProfileTemplateRatingsAppendSkeleton() {
                             ))}
                         </div>
                     </div>
-                    <Skeleton className="profileTemplateRatingAction" rounded="lg" />
+                    <Skeleton className="profileTemplateRatingAction--skeleton" style={{ width: "100%", height: 38 }} rounded="lg" />
                 </article>
             ))}
         </>
@@ -790,7 +793,7 @@ function ProfileTemplateRatingCard({
 
             <button
                 type="button"
-                className="profileTemplateRatingAction"
+                className={`profileTemplateRatingAction${selectedRating !== currentRating ? " hasUnsavedSelection" : ""}`}
                 onClick={handleApplyRating}
                 disabled={isSaving || (!selectedRating && !currentRating) || selectedRating === currentRating}
             >

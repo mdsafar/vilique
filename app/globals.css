@@ -40,10 +40,10 @@ a {
 
 .appLogo {
   display: inline-flex;
-  align-items: start;
+  align-items: center;
   gap: 0.35em;
   font-family: "Pacifico", "Brush Script MT", cursive;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 400;
   letter-spacing: 0;
   color: #6d28d9;
@@ -52,17 +52,19 @@ a {
 
 .appLogoMark {
   flex: 0 0 auto;
-  width: 1.1em !important;
-  height: 1.1em !important;
-  border-radius: 0.3em;
-  object-fit: cover;
-  box-shadow: 0 10px 25px rgba(130, 42, 190, 0.15);
+  width: 1.35em !important;
+  height: 1.35em !important;
+  border-radius: 0;
+  object-fit: contain;
+  box-shadow: none;
+  transform: translateY(-1px);
 }
 
 .appLogoText {
   display: inline-block;
-  line-height: 1.2;
+  line-height: 1.25;
   padding-bottom: 0.18em;
+  padding-right: 0.05em;
   color: #7c3aed;
   background: linear-gradient(135deg, #6d28d9 0%, #9f4df0 48%, #c026d3 100%);
   -webkit-background-clip: text;
@@ -1719,8 +1721,11 @@ p {
 }
 
 .profileTemplateRatingAction--skeleton {
-  justify-self: start;
-  min-height: 32px;
+  display: block !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  border-radius: 10px;
   padding: 0;
   cursor: default;
 }
@@ -1968,57 +1973,81 @@ p {
   min-width: 0;
 }
 
+.profileTabListBar {
+  width: 100%;
+  border-bottom: 1px solid rgba(225, 213, 232, 0.72);
+  margin-top: 6px;
+}
+
 .profileTabList {
   width: fit-content;
   max-width: 100%;
-  min-height: 40px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 13px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 255, 0.88));
-  border: 1px solid rgba(225, 213, 232, 0.76);
-  box-shadow:
-    0 12px 28px rgba(42, 30, 36, 0.055),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  gap: 16px;
+  padding: 0 2px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
-.profileTabList button {
+.profileTabList button,
+.profileTabItem,
+.profileTabSkeletonItem {
+  position: relative;
   min-height: 32px;
   border: 0;
-  border-radius: 10px;
-  padding: 0 12px;
+  border-radius: 0;
+  padding: 4px 2px 10px 2px;
   background: transparent;
-  color: #756a82;
+  color: #64748b;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  font-weight: 850;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  transition: color 0.16s ease;
 }
 
-.profileTabList button b {
-  min-width: 20px;
-  min-height: 20px;
-  border-radius: 999px;
-  padding: 0 6px;
-  background: rgba(31, 18, 53, 0.08);
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 900;
+.profileTabList button:hover {
+  color: #334155;
 }
 
 .profileTabList button.active {
-  background: #ead8ff;
-  color: #6f43e8;
-  box-shadow: 0 10px 20px rgba(140, 76, 243, 0.12);
+  background: transparent;
+  color: #6d28d9;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.profileTabIndicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6d28d9 0%, #8b5cf6 100%);
+  border-radius: 3px 3px 0 0;
+}
+
+.profileTabBadge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(109, 40, 217, 0.08);
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profileTabList button.active .profileTabBadge {
+  background: rgba(109, 40, 217, 0.14);
+  color: #6d28d9;
 }
 
 .profileTabList button:focus-visible {
@@ -2344,29 +2373,46 @@ p {
   line-height: 1;
 }
 
-.profileTemplateRatingAction {
-  min-height: 32px;
+button.profileTemplateRatingAction {
+  width: 100%;
+  min-height: 38px;
   border: 0;
   border-radius: 10px;
-  padding: 0 12px;
-  background: rgba(140, 76, 243, 0.09);
-  color: #9a72e8;
+  padding: 0 14px;
+  background: rgba(124, 58, 237, 0.08);
+  color: #7c3aed;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.profileTemplateRatingAction:hover {
-  background: rgba(140, 76, 243, 0.14);
-  color: #6d28d9;
+button.profileTemplateRatingAction.hasUnsavedSelection,
+button.profileTemplateRatingAction:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: #ffffff;
 }
 
-.profileTemplateRatingAction:disabled {
+button.profileTemplateRatingAction:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+button.profileTemplateRatingAction:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+button.profileTemplateRatingAction:disabled {
   cursor: not-allowed;
-  opacity: 0.56;
+  opacity: 0.55;
+  background: rgba(124, 58, 237, 0.08);
+  color: #8b5cf6;
+  box-shadow: none;
+  transform: none;
 }
 
 .profileTransactions .paymentsHeader {
@@ -3015,12 +3061,12 @@ p {
 
 @media (min-width: 861px) {
   .profileActivityTabs {
-    padding-top: calc(var(--profile-fixed-section-height, 0px) + 8px);
+    padding-top: calc(var(--profile-fixed-section-height, 0px) + 18px);
+    box-sizing: border-box;
     width: 100%;
     margin: 0 auto;
-    padding-left: 24px;
-    padding-right: 24px;
-    box-sizing: border-box;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
   .profileFixedDesktopSection {
@@ -3044,7 +3090,7 @@ p {
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 3px;
     align-items: flex-start;
   }
 
@@ -3055,7 +3101,7 @@ p {
 
   .profileFixedDesktopInner .profileTabList {
     margin-left: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 0;
   }
 }
 
@@ -10848,31 +10894,33 @@ p {
   width: auto;
   min-height: 24px;
   margin: 0;
-  color: rgba(105, 105, 121, 0.72);
+  color: rgba(105, 105, 121, 0.65);
   font-family: var(--font-body);
   font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  letter-spacing: 0;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
   text-align: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
+  opacity: 0.85;
 }
 
 .weddingBrandCredit img {
   display: block;
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  object-fit: cover;
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  object-fit: contain;
   flex: 0 0 auto;
 }
 
 .weddingBrandCredit span {
-  display: block;
-  line-height: 18px;
+  padding-top: 3px;
+  display: inline-block;
+  line-height: 1;
 }
 
 .floatingFlowers {
@@ -14021,52 +14069,32 @@ body:has(.invitePreviewShell) {
 
   .profileTabList {
     width: 100%;
-    min-height: 52px;
-    padding: 4px;
-    border-radius: 16px;
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 244, 255, 0.94));
-    backdrop-filter: blur(18px);
-    box-shadow:
-      0 14px 34px rgba(42, 30, 36, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.94);
+    min-height: auto;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
   }
 
   .profileActivityTabs.isProfileTabsPinned {
-    padding-top: 68px;
+    padding-top: 50px;
   }
 
-  .profileActivityTabs.isProfileTabsPinned::before {
-    content: "";
+  .profileActivityTabs.isProfileTabsPinned .profileTabListBar {
     position: fixed;
-    inset: 0 0 auto;
-    z-index: 89;
-    height: 74px;
-    background:
-      linear-gradient(180deg, rgba(252, 249, 246, 0.98), rgba(252, 249, 246, 0.9));
-    border-bottom: 1px solid rgba(225, 213, 232, 0.58);
-    backdrop-filter: blur(16px);
-    box-shadow: 0 12px 28px rgba(42, 30, 36, 0.08);
-    pointer-events: none;
-  }
-
-  .profileActivityTabs.isProfileTabsPinned .profileTabList {
-    position: fixed;
-    left: 50%;
-    top: 8px;
+    left: 0;
+    right: 0;
+    top: 0;
     z-index: 90;
-    width: calc(100% - 28px);
-    max-width: 860px;
-    transform: translateX(-50%);
-  }
-
-  .profileTabList button {
-    flex: 1 1 0;
-    justify-content: center;
-    min-height: 44px;
-    border-radius: 13px;
-    padding-inline: 8px;
-    font-size: 12.75px;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: 6px 14px 0 14px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(225, 213, 232, 0.85);
+    box-shadow: 0 4px 20px rgba(42, 30, 36, 0.06);
   }
 
   .profileTabList button b {
@@ -15845,27 +15873,32 @@ body:has(.invitePreviewShell) {
     width: 100%;
   }
 
+  .profileTabListBar {
+    width: 100%;
+    margin-top: 6px;
+    margin-bottom: 10px;
+    padding-inline: 14px;
+    border-bottom: 1px solid rgba(225, 213, 232, 0.72);
+  }
+
   .profileTabList {
-    width: calc(100% - 28px);
-    margin-inline: 14px;
+    width: 100%;
+    gap: 0;
+    justify-content: space-around;
   }
 
-  .profileActivityTabs.isProfileTabsPinned .profileTabList {
-    left: 14px;
-    right: 14px;
-    width: auto;
-    max-width: none;
-    margin-inline: 0;
-    transform: none;
-  }
-
-  .profileTabList button {
-    flex: 1 1 0;
+  .profileTabList button,
+  .profileTabItem,
+  .profileTabSkeletonItem,
+  .profileTabList--skeleton > span {
+    flex: 1 1 0 !important;
+    width: 50% !important;
     justify-content: center;
     min-height: 44px;
-    border-radius: 13px;
-    padding-inline: 8px;
-    font-size: 12.75px;
+    height: 44px !important;
+    border-radius: 0;
+    padding-inline: 4px;
+    font-size: 13px;
   }
 
   .profileTabList button b {
@@ -15971,9 +16004,9 @@ body:has(.invitePreviewShell) {
   }
 
   .profileTemplateRatingAction {
-    min-height: 38px;
-    padding: 0 12px;
-    font-size: 12.5px;
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 12px;
   }
 
   .profileTemplateRatingAction--skeleton {
@@ -18124,20 +18157,22 @@ body:has(.invitePreviewShell) {
 .templatesPage .templatesBrand .appLogo {
   align-items: center;
   gap: 10px;
-  font-size: 28px;
+  font-size: 30px;
 }
 
 .templatesPage .templatesBrand .appLogoMark {
-  width: 46px !important;
-  height: 46px !important;
+  width: 44px !important;
+  height: 44px !important;
   border-radius: 0;
   box-shadow: none;
+  object-fit: contain;
+  transform: translateY(-1px);
 }
 
 .templatesPage .templatesBrand .appLogoText {
-  line-height: 1.35;
-  padding-block: 0.04em 0.24em;
-  transform: translateY(3px);
+  line-height: 1.25;
+  padding-bottom: 0.18em;
+  transform: translateY(1px);
 }
 
 .templatesPage .marketHeader {
