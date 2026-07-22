@@ -4,6 +4,8 @@ import React from "react";
 import { SWRConfig } from "swr";
 import { NavigationStateProvider } from "./NavigationStateProvider";
 
+import { LineLoaderProvider } from "./TopLineLoader";
+
 const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const fetcher = async (url: string) => {
@@ -32,7 +34,9 @@ const swrConfig = {
 export function AppProviders({ children }: { children: React.ReactNode }) {
     return (
         <SWRConfig value={swrConfig}>
-            <NavigationStateProvider>{children}</NavigationStateProvider>
+            <NavigationStateProvider>
+                <LineLoaderProvider>{children}</LineLoaderProvider>
+            </NavigationStateProvider>
         </SWRConfig>
     );
 }

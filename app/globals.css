@@ -7951,12 +7951,71 @@ p {
   white-space: nowrap;
 }
 
-.builderTitle.analyticsHeaderText p {
+.builderTitle.analyticsHeaderText p:not(.builderSaveStatusBadge) {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 10px;
   font-weight: 850;
   color: #7e5bd5;
+}
+
+.builderSaveStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 2px auto 0;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.builderSaveStatusBadge.status-saved,
+.builderSaveStatusBadge.status-idle,
+.builderSaveStatusBadge.status-saved *,
+.builderSaveStatusBadge.status-idle * {
+  color: #16a34a !important;
+}
+
+.builderSaveStatusBadge.status-dirty,
+.builderSaveStatusBadge.status-dirty * {
+  color: #d97706 !important;
+}
+
+.builderSaveStatusBadge.status-saving,
+.builderSaveStatusBadge.status-saving * {
+  color: #7e5bd5 !important;
+}
+
+.builderSaveStatusBadge.status-error,
+.builderSaveStatusBadge.status-error * {
+  color: #dc2626 !important;
+}
+
+.builderStatusIcon {
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.builderStatusIcon.statusSaved {
+  color: #16a34a !important;
+}
+
+.builderStatusIcon.statusDirty {
+  color: #d97706 !important;
+}
+
+.builderStatusIcon.statusSaving {
+  color: #7e5bd5 !important;
+}
+
+.builderStatusIcon.statusError {
+  color: #dc2626 !important;
 }
 
 @media (max-width: 560px) {
@@ -8007,7 +8066,7 @@ p {
 .builderTitle span {
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 9px;
+  padding: 2px 6px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #7e5bd5;
@@ -9450,7 +9509,7 @@ p {
     line-height: 1.12;
   }
 
-  .builderTitle.analyticsHeaderText p {
+  .builderTitle.analyticsHeaderText p:not(.builderSaveStatusBadge) {
     color: #7c3aed;
     font-size: 9px;
     letter-spacing: 0.12em;
@@ -9956,83 +10015,174 @@ p {
 
 .builderLoadingShell {
   min-height: 100svh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.92), transparent 28%),
-    linear-gradient(135deg, #fffaf8 0%, #faeef5 52%, #f4f8ff 100%);
-}
-
-.builderLoadingCard {
-  width: min(100%, 360px);
-  min-height: 108px;
-  border-radius: 18px;
-  padding: 22px 24px 24px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(229, 221, 235, 0.9);
-  box-shadow:
-    0 18px 50px rgba(72, 52, 76, 0.1),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  align-items: center;
-  gap: 14px;
-  color: #251635;
-  backdrop-filter: blur(14px);
+    radial-gradient(circle at 50% 40%, rgba(140, 76, 243, 0.08) 0%, transparent 55%),
+    linear-gradient(135deg, #fdfbfd 0%, #f7eff9 50%, #f0f4ff 100%);
   position: relative;
   overflow: hidden;
 }
 
-.builderLoadingCard::before {
-  content: "";
+.builderLoadingAmbient {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: rgba(140, 76, 243, 0.1);
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-.builderLoadingCard::after {
-  content: "";
+.builderLoadingGlow {
   position: absolute;
-  left: -40%;
-  bottom: 0;
-  width: 40%;
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #8c4cf3, #c56fb4);
-  animation: builderLoadingBar 1.35s ease-in-out infinite;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
 }
 
-.builderLoadingSpinner {
-  color: #8c4cf3;
+.builderLoadingGlow1 {
+  width: 320px;
+  height: 320px;
+  background: rgba(140, 76, 243, 0.25);
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: builderGlowPulse 4s ease-in-out infinite alternate;
+}
+
+.builderLoadingGlow2 {
+  width: 260px;
+  height: 260px;
+  background: rgba(224, 134, 198, 0.2);
+  bottom: 25%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  animation: builderGlowPulse 4s ease-in-out infinite alternate-reverse;
+}
+
+.builderLoadingFramelessContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.builderLoadingLogoHalo {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.builderLoadingLogoBadge {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow:
+    0 12px 30px rgba(124, 58, 237, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.builderLoadingLogo {
+  object-fit: contain;
+  width: 28px;
+  height: 28px;
+}
+
+.builderLoadingHaloRing {
+  position: absolute;
+  inset: -4px;
+  border-radius: 20px;
+  border: 2px solid rgba(124, 58, 237, 0.35);
+  animation: builderHaloPulse 2s ease-in-out infinite;
+}
+
+.builderLoadingHaloRingOuter {
+  position: absolute;
+  inset: -12px;
+  border-radius: 24px;
+  border: 1.5px dashed rgba(124, 58, 237, 0.2);
+  animation: builderHaloRotate 12s linear infinite;
 }
 
 .builderLoadingCopy {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
-  position: relative;
-  z-index: 1;
 }
 
-.builderLoadingCopy strong {
-  font-size: 18px;
-  line-height: 1.08;
-  letter-spacing: 0;
+.builderLoadingTitle {
+  font-size: 20px;
+  font-weight: 850;
+  color: #1e1b2e;
+  margin: 0;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
-.builderLoadingCopy span {
-  color: #6f6778;
+.builderLoadingSubtitle {
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 550;
+  color: #6b637b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.builderLoadingProgressTrack {
+  width: 180px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.12);
+  overflow: hidden;
+  position: relative;
+  margin-top: 4px;
+}
+
+.builderLoadingProgressBar {
+  width: 45%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c3aed, #c084fc);
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: builderLoadingBar 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 @keyframes builderLoadingBar {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(210%); }
-  100% { transform: translateX(350%); }
+  0% { left: -45%; width: 45%; }
+  50% { left: 30%; width: 55%; }
+  100% { left: 100%; width: 45%; }
+}
+
+@keyframes builderHaloPulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.06); opacity: 0.9; }
+}
+
+@keyframes builderHaloRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes builderGlowPulse {
+  0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.95); }
+  100% { opacity: 0.75; transform: translate(-50%, -50%) scale(1.1); }
 }
 
 @media (max-width: 899px) {
@@ -10138,7 +10288,7 @@ p {
     text-overflow: ellipsis;
   }
 
-  .builderTitle.analyticsHeaderText p {
+  .builderTitle.analyticsHeaderText p:not(.builderSaveStatusBadge) {
     color: #7c3aed;
     font-size: 10px;
     line-height: 1;
@@ -10241,7 +10391,7 @@ p {
   }
 
   .previewDevice {
-    --preview-card-scale: 0.92;
+    --preview-card-scale: 1;
     --public-invite-bg:
       radial-gradient(ellipse at 0% 0%, rgba(200, 160, 220, 0.35) 0%, transparent 45%),
       radial-gradient(ellipse at 50% 100%, rgba(240, 180, 200, 0.4) 0%, transparent 50%),
@@ -10333,21 +10483,22 @@ p {
     inset: auto;
     width: 100%;
     min-height: 100%;
-    padding: 24px 4px 90px;
+    padding: 26px 10px 24px;
     background: transparent;
     overflow: hidden;
     transform: none;
   }
 
   .previewScaleFrame .weddingCardWrapper {
-    width: 390px;
-    max-width: min(calc(100% - 8px), 390px);
+    width: 100%;
+    max-width: min(calc(100% - 20px), 430px);
+    margin-bottom: calc(76px + env(safe-area-inset-bottom));
     zoom: var(--preview-card-scale);
   }
 
   .previewScaleFrame .weddingCard {
-    padding: 36px 28px 64px;
-    border-radius: 28px;
+    padding: 26px 16px 54px;
+    border-radius: 22px;
   }
 
   .previewViewport .pastelWeddingPage::before,
@@ -10385,15 +10536,13 @@ p {
     border-radius: 22px 22px 0 0;
     padding: 12px 0 calc(20px + env(safe-area-inset-bottom));
     box-shadow: 0 -18px 54px rgba(35, 28, 34, 0.22);
-    transform: translateY(calc(100% + 24px));
-    transition: transform 0.24s ease;
+    will-change: transform;
     pointer-events: none;
     scrollbar-width: thin;
     scrollbar-color: rgba(80, 70, 78, 0.24) transparent;
   }
 
   .mobileBuilderSheet.active {
-    transform: translateY(0);
     pointer-events: auto;
   }
 
@@ -10405,13 +10554,11 @@ p {
     min-height: 0;
     border: 0;
     background: rgba(20, 18, 22, 0.34);
-    opacity: 0;
+    will-change: opacity;
     pointer-events: none;
-    transition: opacity 0.2s ease;
   }
 
   .mobileSheetScrim.active {
-    opacity: 1;
     pointer-events: auto;
     touch-action: none;
   }
@@ -13475,7 +13622,7 @@ body:has(.invitePreviewShell) {
 @media (max-width: 480px) {
   .invitePreviewShell {
     .pastelWeddingPage {
-    padding: calc(28px + env(safe-area-inset-top)) 14px 50px;
+    padding: calc(24px + env(safe-area-inset-top)) 10px 32px;
   }
 
   .weddingCard {
@@ -15172,40 +15319,36 @@ body:has(.invitePreviewShell) {
 .publishSuccessPanel {
   position: relative;
   z-index: 1;
-  width: min(100%, 470px);
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), #ffffff 54%),
-    #ffffff;
-  border: 1px solid rgba(218, 208, 230, 0.9);
-  box-shadow:
-    0 30px 80px rgba(31, 18, 53, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.96);
-  padding: 22px;
+  width: min(100%, 440px);
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(220, 210, 235, 0.8);
+  box-shadow: 0 24px 60px rgba(25, 15, 45, 0.22);
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   overflow: hidden;
 }
 
 .publishSuccessTop {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-.publishSuccessIcon {
-  width: 58px;
-  height: 58px;
-  border-radius: 17px;
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  background: linear-gradient(135deg, #16a34a 0%, #5bbd85 100%);
-  box-shadow:
-    0 16px 30px rgba(22, 163, 74, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+.publishSuccessIconBadge {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .publishSuccessCopy {
@@ -15214,118 +15357,124 @@ body:has(.invitePreviewShell) {
   gap: 4px;
 }
 
-.publishSuccessCopy p {
-  margin: 0;
-  color: #16a34a;
-  font-size: 11.5px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0;
-}
-
 .publishSuccessCopy h2 {
   margin: 0;
-  color: #1f1235;
-  font-size: 26px;
-  line-height: 1.08;
-  font-weight: 900;
+  color: #1a1523;
+  font-size: 21px;
+  line-height: 1.15;
+  font-weight: 850;
+  letter-spacing: -0.01em;
 }
 
 .publishSuccessCopy span {
-  color: #7c6f8a;
-  font-size: 13.5px;
-  line-height: 1.45;
-  font-weight: 600;
-}
-
-.publishSuccessLinkBox small {
-  color: #6d647b;
-  font-size: 10.5px;
-  font-weight: 900;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  color: #6b637b;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .publishSuccessLinkBox {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  border-radius: 15px;
-  background: #faf8fd;
-  border: 1px solid #e2ddf0;
-  padding: 11px;
+  border-radius: 12px;
+  background: #f8f6fc;
+  border: 1px solid rgba(220, 210, 235, 0.7);
+  padding: 10px 12px;
 }
 
-.publishSuccessLinkBox div {
+.publishSuccessUrlText {
   min-width: 0;
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.publishSuccessLinkBox span {
+.publishSuccessUrlText small {
+  color: #7c6f8a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.publishSuccessUrlText span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #5c5070;
-  font-size: 13px;
-  font-weight: 800;
+  color: #2d2438;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
-.publishSuccessLinkBox button,
-.publishSuccessProfileBtn,
-.publishSuccessOpenBtn {
-  border: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: 900;
-}
-
-.publishSuccessLinkBox button {
-  min-height: 40px;
-  border-radius: 11px;
-  padding: 0 14px;
-  color: #5d4c71;
+.publishSuccessCopyBtn {
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #3b2d50;
   background: #ffffff;
   border: 1px solid #d8cde8;
   white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 750;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.publishSuccessCopyBtn:hover {
+  background: #f3eefc;
+  border-color: #c4b5e0;
 }
 
 .publishSuccessActions {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  width: 100%;
-}
-
-.publishSuccessDialogActions {
-  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
   gap: 10px;
   width: 100%;
+  margin-top: 2px;
 }
 
 .publishSuccessOpenBtn,
 .publishSuccessProfileBtn {
-  min-height: 48px;
-  border-radius: 14px;
-  font-size: 14px;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 800;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .publishSuccessOpenBtn {
-  color: #5d4c71;
+  color: #3b2d50;
   background: #ffffff;
-  border: 1px solid #ded6ea;
+  border: 1px solid #d8cde8;
+}
+
+.publishSuccessOpenBtn:hover {
+  background: #f8f6fc;
+  border-color: #c4b5e0;
 }
 
 .publishSuccessProfileBtn {
   color: #ffffff;
-  background: linear-gradient(135deg, #8c4cf3 0%, #7030d9 100%);
-  box-shadow: 0 12px 22px rgba(140, 76, 243, 0.24);
+  background: #7c3aed;
+  border: 0;
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.22);
+}
+
+.publishSuccessProfileBtn:hover {
+  background: #6d28d9;
 }
 
 @media (max-width: 560px) {

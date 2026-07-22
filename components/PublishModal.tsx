@@ -9,8 +9,6 @@ import { useRazorpay } from "@/hooks/useRazorpay";
 import { formatPaiseToCurrency } from "@/lib/currency";
 import type { InvitationData } from "@/types/invitation";
 import { notifyProfileDataChanged } from "@/lib/events";
-import { useSWRConfig } from "swr";
-import { mutateInvitationState } from "@/lib/invitationCache";
 
 type Props = {
     invitation: InvitationData;
@@ -92,7 +90,6 @@ const DEFAULT_PAYMENT_FAILURE_LINES = [
 ];
 
 export default function PublishModal({ invitation, isOpen, onClose, onPublishSuccess }: Props) {
-    const { mutate: globalMutate } = useSWRConfig();
     const [slug, setSlug] = useState(invitation.slug);
     const [status, setStatus] = useState<SlugStatus>("idle");
     const [isPublishing, setIsPublishing] = useState(false);
@@ -115,6 +112,10 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
     >("idle");
 
     const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const paymentSuccessInProgressRef = useRef(false);
+    const currentAttemptIdRef = useRef(0);
+    const isVerifyingRef = useRef(false);
+    const lastFailureMessageRef = useRef<string | null>(null);
 
     // Prevent background scrolling when open
     useEffect(() => {
@@ -272,6 +273,11 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
     // Triggers Razorpay Checkout & verification
     async function handlePaymentAndPublish() {
         if (!canPublishOrPay || !paymentInfo) return;
+        const attemptId = ++currentAttemptIdRef.current;
+        paymentSuccessInProgressRef.current = false;
+        isVerifyingRef.current = false;
+        lastFailureMessageRef.current = null;
+
         setPublishError("");
         setPaymentError("");
 
@@ -294,6 +300,8 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             });
 
             const orderData = await orderRes.json();
+            if (currentAttemptIdRef.current !== attemptId) return;
+
             if (!orderRes.ok) {
                 setPaymentProcessingState("failed");
                 setPaymentError(orderData.error || "Failed to initialize payment order");
@@ -315,6 +323,8 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             // 3. Load Razorpay Checkout Script
             setPaymentProcessingState("openingCheckout");
             const isScriptLoaded = await loadScript();
+            if (currentAttemptIdRef.current !== attemptId) return;
+
             if (!isScriptLoaded) {
                 throw new Error("Unable to load payment portal script. Please check your connection.");
             }
@@ -328,7 +338,15 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                 description: orderData.description,
                 order_id: orderData.orderId,
                 handler: async function (response: RazorpayPaymentResponse) {
+                    if (currentAttemptIdRef.current !== attemptId) return;
+                    if (isVerifyingRef.current) return;
+                    isVerifyingRef.current = true;
+                    paymentSuccessInProgressRef.current = true;
+
+                    setPaymentError("");
+                    setPublishError("");
                     setPaymentProcessingState("verifyingPayment");
+
                     try {
                         const verifyRes = await fetch("/api/payments/razorpay/verify", {
                             method: "POST",
@@ -342,24 +360,14 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             }),
                         });
 
+                        if (currentAttemptIdRef.current !== attemptId) return;
+
                         const verifyData = await verifyRes.json();
                         
                         if (verifyRes.ok && verifyData.status === "success") {
                             setPaymentProcessingState("paymentSuccess");
                             setIsPublished(true);
                             setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
-                            mutateInvitationState(
-                                globalMutate,
-                                {
-                                    ...invitation,
-                                    status: "published",
-                                    publishedAt: verifyData.published_at || new Date().toISOString(),
-                                    slug: verifyData.slug || slug.toLowerCase().trim(),
-                                    updatedAt: new Date().toISOString(),
-                                    lifecycleStatus: "published",
-                                },
-                                invitation
-                            );
                             onPublishSuccess({
                                 slug: verifyData.slug,
                                 status: "published",
@@ -368,6 +376,8 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                         } else if (verifyData.status === "paymentPaidPublishFailed") {
                             // Payment processed but publishing failed (e.g. slug collision).
                             // User is now marked as already paid so they can choose a new slug and retry publishing.
+                            paymentSuccessInProgressRef.current = false;
+                            isVerifyingRef.current = false;
                             setPaymentInfo(prev => prev ? { ...prev, alreadyPaid: true } : null);
                             setPaymentProcessingState("idle");
                             setPublishError(verifyData.message || "Your payment was successful, but publishing is still being completed. Please do not pay again.");
@@ -381,14 +391,26 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             throw new Error(verifyData.error || "Payment verification failed");
                         }
                     } catch (verifyErr: unknown) {
+                        if (currentAttemptIdRef.current !== attemptId) return;
                         console.error(verifyErr);
+                        paymentSuccessInProgressRef.current = false;
+                        isVerifyingRef.current = false;
                         setPaymentProcessingState("failed");
                         setPaymentError(verifyErr instanceof Error ? verifyErr.message : "Failed to verify transaction. Please contact support.");
                     }
                 },
                 modal: {
                     ondismiss: function () {
-                        setPaymentProcessingState("idle");
+                        if (currentAttemptIdRef.current !== attemptId) return;
+                        if (paymentSuccessInProgressRef.current || isVerifyingRef.current) return;
+
+                        if (lastFailureMessageRef.current) {
+                            setPaymentProcessingState("failed");
+                            setPaymentError(lastFailureMessageRef.current);
+                            notifyProfileDataChanged();
+                        } else {
+                            setPaymentProcessingState("idle");
+                        }
                     },
                 },
                 prefill: {
@@ -432,12 +454,12 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             }
             const rzp = new Razorpay(options);
             rzp.on("payment.failed", function (response: RazorpayFailureResponse) {
-                setPaymentProcessingState("failed");
-                setPaymentError(response.error.description || "Payment failed. Please try again.");
-                notifyProfileDataChanged();
+                if (currentAttemptIdRef.current !== attemptId || paymentSuccessInProgressRef.current) return;
+                lastFailureMessageRef.current = response.error.description || "Payment failed. Please try again.";
             });
             rzp.open();
         } catch (err: unknown) {
+            if (currentAttemptIdRef.current !== attemptId) return;
             console.error(err);
             setPaymentProcessingState("idle");
             setPaymentError(err instanceof Error ? err.message : "Failed to initiate payment");
@@ -465,18 +487,6 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
             }
 
             setIsPublished(true);
-            mutateInvitationState(
-                globalMutate,
-                {
-                    ...invitation,
-                    status: "published",
-                    publishedAt: data.published_at || new Date().toISOString(),
-                    slug: data.slug || slug.toLowerCase().trim(),
-                    updatedAt: new Date().toISOString(),
-                    lifecycleStatus: "published",
-                },
-                invitation
-            );
             onPublishSuccess(data);
         } catch {
             setPublishError("An error occurred during publishing");

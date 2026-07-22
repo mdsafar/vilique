@@ -42,6 +42,7 @@ import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import { useLineLoader } from "./TopLineLoader";
 import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
 import { ProfileDataChangedDetail } from "@/lib/events";
 import {
@@ -245,7 +246,7 @@ export default function ProfileInvitationsList({
 
     useEffect(() => {
         const hasFilterChanged = prevStatusFilterRef.current !== statusFilter || prevDebouncedSearchRef.current !== debouncedSearch;
-        
+
         if (hasFilterChanged) {
             prevStatusFilterRef.current = statusFilter;
             prevDebouncedSearchRef.current = debouncedSearch;
@@ -301,14 +302,14 @@ export default function ProfileInvitationsList({
     useEffect(() => {
         if (window.location.pathname !== "/invitations") return;
         const params = new URLSearchParams(window.location.search);
-        
+
         const nextParams = new URLSearchParams();
         if (statusFilter !== "all") nextParams.set("status", statusFilter);
         if (debouncedSearch) nextParams.set("search", debouncedSearch);
-        
+
         params.sort();
         nextParams.sort();
-        
+
         if (params.toString() !== nextParams.toString()) {
             const nextUrl = nextParams.toString() ? `/invitations?${nextParams.toString()}` : "/invitations";
             window.history.replaceState(null, "", nextUrl);
@@ -424,84 +425,84 @@ export default function ProfileInvitationsList({
                     )}
                 </nav>
 
-            {isLoadingFirstPage ? (
-                <InvitationListSkeleton />
-            ) : invitations.length ? (
-                <div className="profileInvitationList" onScroll={handleListScroll}>
-                    {invitations.map((invitation) => (
-                        <InvitationRow
-                            invitation={invitation}
-                            statusFilter={statusFilter}
-                            key={invitation.id}
-                            stats={mergedStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
-                            onInvitationDeleted={(deletedInvitation) => {
-                                const prevBucket = getInvitationFilterBucket(deletedInvitation);
-                                const updatedCounts = adjustInvitationCounts(counts, prevBucket, null);
-                                updateCountsState(updatedCounts);
-                                setOptimisticMutations((current) => [
-                                    ...current.filter((mutation) => mutation.id !== deletedInvitation.id),
-                                    {
-                                        id: deletedInvitation.id,
-                                        deletedInvitation,
-                                        timestamp: Date.now(),
-                                    },
-                                ]);
+                {isLoadingFirstPage ? (
+                    <InvitationListSkeleton />
+                ) : invitations.length ? (
+                    <div className="profileInvitationList" onScroll={handleListScroll}>
+                        {invitations.map((invitation) => (
+                            <InvitationRow
+                                invitation={invitation}
+                                statusFilter={statusFilter}
+                                key={invitation.id}
+                                stats={mergedStats[invitation.id] || { rsvps: 0, views: 0, acceptsRsvps: false }}
+                                onInvitationDeleted={(deletedInvitation) => {
+                                    const prevBucket = getInvitationFilterBucket(deletedInvitation);
+                                    const updatedCounts = adjustInvitationCounts(counts, prevBucket, null);
+                                    updateCountsState(updatedCounts);
+                                    setOptimisticMutations((current) => [
+                                        ...current.filter((mutation) => mutation.id !== deletedInvitation.id),
+                                        {
+                                            id: deletedInvitation.id,
+                                            deletedInvitation,
+                                            timestamp: Date.now(),
+                                        },
+                                    ]);
 
-                                mutate((currentPages) => removeInvitationFromPages(currentPages, deletedInvitation), { revalidate: false });
-                                mutateInvitationState(globalMutate, undefined, undefined, deletedInvitation);
-                            }}
-                            onInvitationUpdated={(updatedInvitation, previousInvitation) => {
-                                const prevBucket = previousInvitation ? getInvitationFilterBucket(previousInvitation) : null;
-                                const nextBucket = getInvitationFilterBucket(updatedInvitation);
-                                const updatedCounts = adjustInvitationCounts(counts, prevBucket, nextBucket);
-                                updateCountsState(updatedCounts);
-                                setOptimisticMutations((current) => [
-                                    ...current.filter((mutation) => mutation.id !== updatedInvitation.id),
-                                    {
-                                        id: updatedInvitation.id,
-                                        invitation: updatedInvitation,
-                                        previous: previousInvitation,
-                                        timestamp: Date.now(),
-                                    },
-                                ]);
+                                    mutate((currentPages) => removeInvitationFromPages(currentPages, deletedInvitation), { revalidate: false });
+                                    mutateInvitationState(globalMutate, undefined, undefined, deletedInvitation);
+                                }}
+                                onInvitationUpdated={(updatedInvitation, previousInvitation) => {
+                                    const prevBucket = previousInvitation ? getInvitationFilterBucket(previousInvitation) : null;
+                                    const nextBucket = getInvitationFilterBucket(updatedInvitation);
+                                    const updatedCounts = adjustInvitationCounts(counts, prevBucket, nextBucket);
+                                    updateCountsState(updatedCounts);
+                                    setOptimisticMutations((current) => [
+                                        ...current.filter((mutation) => mutation.id !== updatedInvitation.id),
+                                        {
+                                            id: updatedInvitation.id,
+                                            invitation: updatedInvitation,
+                                            previous: previousInvitation,
+                                            timestamp: Date.now(),
+                                        },
+                                    ]);
 
-                                mutate(
-                                    (currentPages) => updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, statusFilter),
-                                    { revalidate: false }
-                                );
-                                mutateInvitationState(globalMutate, updatedInvitation, previousInvitation);
-                            }}
-                        />
-                    ))}
-                    {isLoadingNextPage ? <InvitationAppendSkeleton /> : null}
-                    {error && invitations.length ? (
-                        <div className="listLoadState" role="status">
-                            <span>Couldn&apos;t load more</span>
-                            <button type="button" onClick={() => mutate()}>Retry</button>
-                        </div>
-                    ) : null}
-                    {shouldShowEndState && invitations.length ? <div className="listEndState">You&apos;ve reached the end.</div> : null}
-                    <div ref={sentinelRef} className="infiniteScrollSentinel" aria-hidden="true" />
-                </div>
-            ) : (
-                <ListState
-                    actionLabel={error ? "Retry" : hasActiveFilters ? "Reset search & filters" : "Browse templates"}
-                    className="profileEmptyState"
-                    description={
-                        error
-                            ? "We could not retrieve your invitations."
-                            : hasActiveFilters
-                            ? "No invitations match this combination. Try a different tab or clear the search."
-                            : "Pick a template to publish your first invite."
-                    }
-                    details={hasActiveFilters ? emptyStateDetails : undefined}
-                    href={hasActiveFilters ? undefined : "/"}
-                    onAction={error ? () => { setSize(1); setListSize("invitations", 1); mutate(); } : hasActiveFilters ? handleResetAll : undefined}
-                    title={error ? "Could not load invitations" : hasActiveFilters ? "No matching invitations" : "Choose a template to begin"}
-                    variant={error ? "error" : hasActiveFilters ? "filtered" : "empty"}
-                />
-            )}
-        </div>
+                                    mutate(
+                                        (currentPages) => updateInvitationInPages(currentPages, updatedInvitation, previousInvitation, statusFilter),
+                                        { revalidate: false }
+                                    );
+                                    mutateInvitationState(globalMutate, updatedInvitation, previousInvitation);
+                                }}
+                            />
+                        ))}
+                        {isLoadingNextPage ? <InvitationAppendSkeleton /> : null}
+                        {error && invitations.length ? (
+                            <div className="listLoadState" role="status">
+                                <span>Couldn&apos;t load more</span>
+                                <button type="button" onClick={() => mutate()}>Retry</button>
+                            </div>
+                        ) : null}
+                        {shouldShowEndState && invitations.length ? <div className="listEndState">You&apos;ve reached the end.</div> : null}
+                        <div ref={sentinelRef} className="infiniteScrollSentinel" aria-hidden="true" />
+                    </div>
+                ) : (
+                    <ListState
+                        actionLabel={error ? "Retry" : hasActiveFilters ? "Reset search & filters" : "Browse templates"}
+                        className="profileEmptyState"
+                        description={
+                            error
+                                ? "We could not retrieve your invitations."
+                                : hasActiveFilters
+                                    ? "No invitations match this combination. Try a different tab or clear the search."
+                                    : "Pick a template to publish your first invite."
+                        }
+                        details={hasActiveFilters ? emptyStateDetails : undefined}
+                        href={hasActiveFilters ? undefined : "/"}
+                        onAction={error ? () => { setSize(1); setListSize("invitations", 1); mutate(); } : hasActiveFilters ? handleResetAll : undefined}
+                        title={error ? "Could not load invitations" : hasActiveFilters ? "No matching invitations" : "Choose a template to begin"}
+                        variant={error ? "error" : hasActiveFilters ? "filtered" : "empty"}
+                    />
+                )}
+            </div>
         </>
     );
 }
@@ -617,6 +618,8 @@ function InvitationRow({
     onInvitationDeleted: (invitation: InvitationData) => void;
     onInvitationUpdated: (updatedInvitation: InvitationData, previousInvitation: InvitationData) => void;
 }) {
+    const { startLineLoader } = useLineLoader();
+    const [isPreviewing, setIsPreviewing] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isOfflineOpen, setIsOfflineOpen] = useState(false);
@@ -626,6 +629,11 @@ function InvitationRow({
     const [isTakingOffline, setIsTakingOffline] = useState(false);
     const [isMakingOnline, setIsMakingOnline] = useState(false);
     const [isMoreOpen, setIsMoreOpen] = useState(false);
+
+    const handlePreview = useCallback(() => {
+        startLineLoader();
+        setIsPreviewing(true);
+    }, [startLineLoader]);
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const moreMenuFirstItemRef = useRef<HTMLButtonElement>(null);
     const router = useRouter();
@@ -921,9 +929,13 @@ function InvitationRow({
             <div className={`profileInviteActions ${isCompleted || isLiveToday ? "profileInviteActions--two" : isOffline && hasAnalyticsAccess ? "profileInviteActions--published" : isUpcoming ? "profileInviteActions--published" : ""}`}>
                 {isDraft ? (
                     <>
-                        <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
-                            <Eye size={14} aria-hidden="true" />
-                            <span>Preview</span>
+                        <Link href={previewHref} className="profileActionBtn profileActionBtn--primary" onClick={handlePreview}>
+                            {isPreviewing ? (
+                                <Loader2 size={14} className="spinner" aria-hidden="true" />
+                            ) : (
+                                <Eye size={14} aria-hidden="true" />
+                            )}
+                            <span>{isPreviewing ? "Loading…" : "Preview"}</span>
                         </Link>
                         <button
                             type="button"
@@ -957,9 +969,13 @@ function InvitationRow({
                     </>
                 ) : isOffline ? (
                     <>
-                        <Link href={previewHref} className="profileActionBtn profileActionBtn--primary">
-                            <Eye size={14} aria-hidden="true" />
-                            <span>Preview</span>
+                        <Link href={previewHref} className="profileActionBtn profileActionBtn--primary" onClick={handlePreview}>
+                            {isPreviewing ? (
+                                <Loader2 size={14} className="spinner" aria-hidden="true" />
+                            ) : (
+                                <Eye size={14} aria-hidden="true" />
+                            )}
+                            <span>{isPreviewing ? "Loading…" : "Preview"}</span>
                         </Link>
                         <button
                             type="button"
@@ -1108,34 +1124,34 @@ function InvitationRow({
                             ) : null}
                         </div>
                     </>
-	                ) : (
-	                    <>
-	                        <Link
-	                            href={previewHref}
-	                            target={isPublicLinkAvailable ? "_blank" : undefined}
-	                            rel={isPublicLinkAvailable ? "noreferrer" : undefined}
-	                            className="profileActionBtn profileActionBtn--primary"
-	                        >
-	                            {isPublicLinkAvailable ? (
-	                                <>
-	                                    <ExternalLink size={14} aria-hidden="true" />
-	                                    <span>Open</span>
-	                                </>
-	                            ) : (
-	                                <>
-	                                    <Eye size={14} aria-hidden="true" />
-	                                    <span>Preview</span>
-	                                </>
-	                            )}
-	                        </Link>
-	                        {hasAnalyticsAccess ? (
-	                            <Link href={analyticsHref} className="profileActionBtn">
-	                                <BarChart3 size={14} aria-hidden="true" />
-	                                <span>Analytics</span>
-	                            </Link>
-	                        ) : null}
-	                    </>
-	                )}
+                ) : (
+                    <>
+                        <Link
+                            href={previewHref}
+                            target={isPublicLinkAvailable ? "_blank" : undefined}
+                            rel={isPublicLinkAvailable ? "noreferrer" : undefined}
+                            className="profileActionBtn profileActionBtn--primary"
+                        >
+                            {isPublicLinkAvailable ? (
+                                <>
+                                    <ExternalLink size={14} aria-hidden="true" />
+                                    <span>Open</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Eye size={14} aria-hidden="true" />
+                                    <span>Preview</span>
+                                </>
+                            )}
+                        </Link>
+                        {hasAnalyticsAccess ? (
+                            <Link href={analyticsHref} className="profileActionBtn">
+                                <BarChart3 size={14} aria-hidden="true" />
+                                <span>Analytics</span>
+                            </Link>
+                        ) : null}
+                    </>
+                )}
             </div>
             {!isSample ? (
                 <>
@@ -1269,7 +1285,10 @@ function getDisplayNames(invitation: InvitationData) {
 }
 
 function getInvitationArtClass(invitation: InvitationData) {
-    const category = invitation.category.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const category =
+        (invitation.category ?? "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-");
     if (category.includes("birthday")) return "profileInviteRow--birthday";
     if (category.includes("house")) return "profileInviteRow--housewarming";
     if (category.includes("engagement")) return "profileInviteRow--engagement";

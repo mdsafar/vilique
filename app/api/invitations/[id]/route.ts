@@ -259,6 +259,13 @@ function getSafeUpdateErrorResponse(error: { code?: string; message?: string; de
     const details = error.details || "";
     const combined = `${message} ${details}`.toLowerCase();
 
+    if (error.code === "23505" || combined.includes("invitations_slug_key")) {
+        return NextResponse.json({
+            code: "SLUG_ALREADY_EXISTS",
+            error: "This invitation link is already taken. Please choose another title.",
+        }, { status: 409 });
+    }
+
     if (
         error.code === "PGRST202" ||
         error.code === "42883" ||

@@ -12,10 +12,6 @@ export const eventTypeSchema = z.enum([
     "rsvp_submit",
 ]);
 
-export const invitationCreateSchema = z.object({
-    templateKey: z.string().min(1).default("pastel-floral-wedding"),
-});
-
 export const invitationUpdateSchema = z.object({
     slug: z.string().min(3).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
     category: z.string().min(1).max(40).optional(),
@@ -37,6 +33,10 @@ export const invitationUpdateSchema = z.object({
     theme: z.record(z.string(), z.unknown()).optional(),
     sections: z.record(z.string(), z.unknown()).optional(),
     eventTimezone: z.string().max(80).optional(),
+});
+
+export const invitationCreateSchema = invitationUpdateSchema.extend({
+    templateKey: z.string().min(1).default("pastel-floral-wedding"),
 });
 
 export const rsvpCreateSchema = z.object({

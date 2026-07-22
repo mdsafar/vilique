@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { invitationCreateSchema } from "@/features/invitations/validation";
 import { buildInvitationSlug } from "@/features/invitations/slug";
 import { getInvitationLifecycle } from "@/lib/lifecycle";
+import type { Json } from "@/types/database";
 
 const INVITATION_LIMIT_DEFAULT = 10;
 const INVITATION_LIMIT_MAX = 30;
@@ -114,12 +115,37 @@ export async function POST(request: Request) {
     }
 
     const defaults = createDefaultInvitation();
+    const p = parsed.data;
+
+    const title = p.title ?? defaults.title;
+    const primaryName = p.primaryName ?? defaults.primaryName;
+    const secondaryName = p.secondaryName !== undefined ? p.secondaryName : defaults.secondaryName;
+    const eventDate = p.eventDate ?? defaults.eventDate;
+    const eventTime = p.eventTime !== undefined ? p.eventTime : defaults.eventTime;
+    const venueName = p.venueName !== undefined ? p.venueName : defaults.venueName;
+    const venueAddress = p.venueAddress !== undefined ? p.venueAddress : defaults.venueAddress;
+    const mapLink = p.mapLink !== undefined ? p.mapLink : defaults.mapLink;
+    const phone = p.phone !== undefined ? p.phone : defaults.phone;
+    const secondaryPhone = p.secondaryPhone !== undefined ? p.secondaryPhone : defaults.secondaryPhone;
+    const whatsapp = p.whatsapp !== undefined ? p.whatsapp : defaults.whatsapp;
+    const message = p.message !== undefined ? p.message : defaults.message;
+    const musicUrl = p.musicUrl !== undefined ? p.musicUrl : defaults.musicUrl;
+    const coverImageUrl = p.coverImageUrl !== undefined ? p.coverImageUrl : defaults.coverImageUrl;
+    const galleryUrls = p.galleryUrls !== undefined ? p.galleryUrls : [];
+    const theme = p.theme
+        ? { ...defaults.theme, ...p.theme }
+        : {
+            ...defaults.theme,
+            primaryColor: template.accent_color || defaults.theme.primaryColor,
+        };
+    const sections = p.sections !== undefined ? p.sections : {};
+
     let data = null as InvitationRowWithTemplate | null;
     let error = null as { code?: string; message?: string } | null;
 
     for (let attempt = 0; attempt < 3; attempt++) {
         const invitationId = crypto.randomUUID();
-        const slug = buildInvitationSlug(`${defaults.primaryName} ${defaults.secondaryName || ""}`, invitationId);
+        const slug = p.slug || buildInvitationSlug(`${primaryName} ${secondaryName || ""}`, invitationId);
 
         const result = await supabase
             .from("invitations")
@@ -128,25 +154,24 @@ export async function POST(request: Request) {
                 user_id: user.id,
                 template_id: template.id,
                 slug,
-                category: template.category,
-                title: defaults.title,
-                primary_name: defaults.primaryName,
-                secondary_name: defaults.secondaryName,
-                event_date: defaults.eventDate,
-                event_time: defaults.eventTime,
-                venue_name: defaults.venueName,
-                venue_address: defaults.venueAddress,
-                map_link: defaults.mapLink,
-                phone: defaults.phone,
-                secondary_phone: defaults.secondaryPhone,
-                message: defaults.message,
-                music_url: defaults.musicUrl,
-                theme: {
-                    ...defaults.theme,
-                    primaryColor: template.accent_color || defaults.theme.primaryColor,
-                },
-                sections: {},
-                gallery_urls: [],
+                category: p.category || template.category,
+                title,
+                primary_name: primaryName,
+                secondary_name: secondaryName,
+                event_date: eventDate,
+                event_time: eventTime,
+                venue_name: venueName,
+                venue_address: venueAddress,
+                map_link: mapLink,
+                phone,
+                secondary_phone: secondaryPhone,
+                whatsapp,
+                message,
+                music_url: musicUrl,
+                cover_image_url: coverImageUrl,
+                theme: theme as Json,
+                sections: sections as Json,
+                gallery_urls: galleryUrls,
                 status: "draft",
             })
             .select("*, invitation_templates(template_key)")
