@@ -15338,9 +15338,9 @@ body:has(.invitePreviewShell) {
 }
 
 .publishSuccessIconBadge {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15348,7 +15348,7 @@ body:has(.invitePreviewShell) {
   background: rgba(22, 163, 74, 0.1);
   border: 1px solid rgba(22, 163, 74, 0.2);
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .publishSuccessCopy {
@@ -15385,6 +15385,7 @@ body:has(.invitePreviewShell) {
 }
 
 .publishSuccessUrlText {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -15490,18 +15491,19 @@ body:has(.invitePreviewShell) {
   }
 
   .publishSuccessTop {
-    grid-template-columns: 48px minmax(0, 1fr);
+    display: flex;
+    align-items: flex-start;
     gap: 12px;
   }
 
-  .publishSuccessIcon {
-    width: 48px;
-    height: 48px;
-    border-radius: 15px;
+  .publishSuccessIconBadge {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
   }
 
   .publishSuccessCopy h2 {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .publishSuccessCopy span {
@@ -15509,11 +15511,15 @@ body:has(.invitePreviewShell) {
   }
 
   .publishSuccessLinkBox {
-    grid-template-columns: 1fr;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
   }
 
   .publishSuccessLinkBox button {
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
   }
 
   .publishSuccessDialogActions {

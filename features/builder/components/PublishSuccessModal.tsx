@@ -64,7 +64,7 @@ export default function PublishSuccessModal({
                 >
                     <div className="publishSuccessTop">
                         <div className="publishSuccessIconBadge">
-                            <Check size={18} strokeWidth={3} />
+                            <Check size={20} strokeWidth={2.75} />
                         </div>
                         <div className="publishSuccessCopy">
                             <h2>Your invitation is live</h2>
