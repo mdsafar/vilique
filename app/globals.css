@@ -9458,11 +9458,31 @@ p {
   gap: 7px;
   font-size: 13px;
   font-weight: 950;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.builderBottomBar button:disabled,
+.builderBottomBar a:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .builderBottomBar button:last-child {
   background: linear-gradient(135deg, #8c4cf3, #c56fb4);
   color: white;
+}
+
+.builderBottomBar button:last-child:disabled {
+  background: linear-gradient(135deg, rgba(140, 76, 243, 0.45), rgba(197, 111, 180, 0.45));
+  color: rgba(255, 255, 255, 0.75);
+  opacity: 0.55;
+  filter: grayscale(25%);
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 @media (min-width: 900px) {

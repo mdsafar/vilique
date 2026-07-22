@@ -23,24 +23,24 @@ function hasAuthCookie(): boolean {
     });
 }
 
-function getInitialAuthState(): AuthState {
-    if (typeof window === "undefined") {
-        return "checking";
-    }
-    return hasAuthCookie() ? "checking" : "guest";
-}
-
 function isSigningOut(): boolean {
     if (typeof window === "undefined") return false;
     return Boolean((window as unknown as { __isSigningOut?: boolean }).__isSigningOut);
 }
 
 export default function ProtectedRoute({ children, next, className, fallback }: Props) {
-    const [authState, setAuthState] = useState<AuthState>(getInitialAuthState);
+    const [authState, setAuthState] = useState<AuthState>("checking");
     const shellClassName = ["protectedRouteShell", className].filter(Boolean).join(" ");
 
     useEffect(() => {
         let active = true;
+
+        queueMicrotask(() => {
+            if (active && !hasAuthCookie() && !isSigningOut()) {
+                setAuthState("guest");
+            }
+        });
+
         const supabase = createClient();
 
         supabase.auth
