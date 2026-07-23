@@ -10655,17 +10655,23 @@ button.profileTemplateRatingAction:disabled {
   }
 
   .mobileBuilderSheet {
+    --mobile-sheet-effective-height: min(78svh, 660px);
     display: flex;
     flex-direction: column;
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--mobile-sheet-keyboard-offset, 0px);
+    top: max(
+      0px,
+      calc(
+        var(--mobile-sheet-viewport-bottom, 100svh)
+        - var(--mobile-sheet-effective-height)
+      )
+    );
+    bottom: auto;
     z-index: 160;
-    height: min(78svh, 660px);
-    max-height: min(78svh, 660px);
-    height: min(78dvh, 660px, var(--mobile-sheet-visible-height, 100dvh));
-    max-height: min(78dvh, 660px, var(--mobile-sheet-visible-height, 100dvh));
+    height: var(--mobile-sheet-effective-height);
+    max-height: var(--mobile-sheet-effective-height);
     min-height: 0;
     overflow: hidden;
     overscroll-behavior: contain;
@@ -10682,6 +10688,20 @@ button.profileTemplateRatingAction:disabled {
     pointer-events: none;
     scrollbar-width: thin;
     scrollbar-color: rgba(80, 70, 78, 0.24) transparent;
+  }
+
+  @supports (height: 100dvh) {
+    .mobileBuilderSheet {
+      --mobile-sheet-effective-height:
+        min(78dvh, 660px, var(--mobile-sheet-visible-height, 100dvh));
+      top: max(
+        0px,
+        calc(
+          var(--mobile-sheet-viewport-bottom, 100dvh)
+          - var(--mobile-sheet-effective-height)
+        )
+      );
+    }
   }
 
   .mobileBuilderSheet.active {
@@ -10815,7 +10835,7 @@ button.profileTemplateRatingAction:disabled {
     gap: 11px;
     align-content: start;
     grid-auto-rows: max-content;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
 
   .mobileBuilderSheet .editorForm label {

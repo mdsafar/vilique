@@ -91,21 +91,21 @@ export default function MobileEditorSheet({
             animationFrame = requestAnimationFrame(() => {
                 if (!sheet || !visualViewport) return;
 
-                const layoutHeight = root.clientHeight;
-                const keyboardOffset = Math.max(
+                const viewportHeight = Math.max(
                     0,
-                    layoutHeight
-                        - visualViewport.height
-                        - visualViewport.offsetTop,
+                    visualViewport.height,
                 );
+                const viewportBottom =
+                    Math.max(0, visualViewport.offsetTop)
+                    + viewportHeight;
 
                 sheet.style.setProperty(
                     "--mobile-sheet-visible-height",
-                    `${visualViewport.height}px`,
+                    `${viewportHeight}px`,
                 );
                 sheet.style.setProperty(
-                    "--mobile-sheet-keyboard-offset",
-                    `${keyboardOffset}px`,
+                    "--mobile-sheet-viewport-bottom",
+                    `${viewportBottom}px`,
                 );
             });
         };
@@ -139,7 +139,7 @@ export default function MobileEditorSheet({
                 "--mobile-sheet-visible-height",
             );
             sheet?.style.removeProperty(
-                "--mobile-sheet-keyboard-offset",
+                "--mobile-sheet-viewport-bottom",
             );
 
             body.style.overflow = previousBodyOverflow;

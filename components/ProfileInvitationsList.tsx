@@ -551,7 +551,6 @@ function InvitationSkeletonCard() {
                         <ButtonSkeleton className="profileInviteStatusSkeleton" width={96} height={25} />
                     </div>
                     <TextSkeleton className="profileInviteNamesSkeleton" width="76%" height={21} />
-                    <TextSkeleton className="profileInviteMessageSkeleton" width="88%" height={16} />
                     <div className="profileInviteMeta">
                         <span className="profileInviteMetaPairSkeleton">
                             <Skeleton className="profileInviteMetaIconSkeleton" rounded="sm" />
@@ -845,11 +844,6 @@ function InvitationRow({
                     </div>
 
                     <h3>{getDisplayNames(invitation)}</h3>
-                    <p className="inviteMessage">
-                        {isPaidPublishFailed
-                            ? "Paid, but publish did not complete. Edit and publish again."
-                            : getDashboardInviteSummary(lifecycleStatus)}
-                    </p>
 
                     <div className="profileInviteMeta">
                         <span>
@@ -1239,21 +1233,6 @@ function getLifecycleStatusIcon(status: DashboardLifecycleStatus) {
             return <CheckCircle2 size={size} aria-hidden="true" />;
         case "offline":
             return <WifiOff size={size} aria-hidden="true" />;
-    }
-}
-
-function getDashboardInviteSummary(status: DashboardLifecycleStatus) {
-    switch (status) {
-        case "draft":
-            return "Complete details, then publish when ready.";
-        case "upcoming":
-            return "Public invite is live and ready for guests.";
-        case "live_today":
-            return "Event is live today. Track guest activity.";
-        case "completed":
-            return "Event completed. Review views and activity.";
-        case "offline":
-            return "Offline. Guests cannot access this invitation.";
     }
 }
 
