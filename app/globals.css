@@ -3169,7 +3169,7 @@ button.profileTemplateRatingAction:disabled {
   justify-content: space-between;
   margin-bottom: 14px;
   border-bottom: 1px solid #f3f4f6;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
 }
 
 .profileInvitations h2 {
@@ -10660,10 +10660,13 @@ button.profileTemplateRatingAction:disabled {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: var(--mobile-sheet-keyboard-offset, 0px);
     z-index: 160;
     height: min(78svh, 660px);
     max-height: min(78svh, 660px);
+    height: min(78dvh, 660px, var(--mobile-sheet-visible-height, 100dvh));
+    max-height: min(78dvh, 660px, var(--mobile-sheet-visible-height, 100dvh));
+    min-height: 0;
     overflow: hidden;
     overscroll-behavior: contain;
     margin: 0;
@@ -10673,7 +10676,7 @@ button.profileTemplateRatingAction:disabled {
     backdrop-filter: blur(24px);
     border: 1px solid rgba(35, 28, 34, 0.08);
     border-radius: 22px 22px 0 0;
-    padding: 12px 0 calc(20px + env(safe-area-inset-bottom));
+    padding: 12px 0 0;
     box-shadow: 0 -18px 54px rgba(35, 28, 34, 0.22);
     will-change: transform;
     pointer-events: none;
@@ -10792,11 +10795,23 @@ button.profileTemplateRatingAction:disabled {
     min-width: 0;
   }
 
-  .mobileBuilderSheet .editorForm {
+  .mobileBuilderSheet > .builderReadOnlyFieldset {
+    display: flex;
     flex: 1 1 auto;
     min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .mobileBuilderSheet .editorForm {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-bottom: calc(24px + env(safe-area-inset-bottom));
     gap: 11px;
     align-content: start;
     grid-auto-rows: max-content;
@@ -10822,7 +10837,7 @@ button.profileTemplateRatingAction:disabled {
     min-height: 48px;
     border-radius: 12px;
     padding: 10px 12px;
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .mobileBuilderSheet .editorForm textarea {
@@ -18511,12 +18526,7 @@ body:has(.invitePreviewShell) {
 @media (max-width: 767px) {
   .templatesPage {
     --templates-fixed-header-height: 166px;
-    --templates-condensed-header-height: 112px;
-    transition: padding-top 0.28s ease;
-  }
-
-  .templatesPage:has(.templatesFixedHeader.isHeaderCondensed) {
-    padding-top: calc(var(--templates-condensed-header-height) + 10px);
+    padding-top: var(--header-layout-padding, 176px);
   }
 
   .templatesPage .marketHeroPanel {
@@ -18524,32 +18534,17 @@ body:has(.invitePreviewShell) {
   }
 
   .templatesPage .templatesAppHeader {
-    max-height: 52px;
+    max-height: var(--header-title-height, 52px);
+    margin-bottom: var(--header-title-spacing, 8px);
     overflow: hidden;
-    opacity: 1;
-    transform: translateY(0);
-    transition:
-      max-height 0.28s ease,
-      opacity 0.2s ease,
-      margin 0.28s ease,
-      transform 0.28s ease;
-    will-change: max-height, opacity, transform;
+    opacity: var(--header-reveal-progress, 1);
+    transform: translateY(var(--header-reveal-offset, 0px));
+    transform-origin: top;
+    will-change: max-height, margin-bottom, opacity, transform;
   }
 
-  .templatesPage .templatesFixedHeader.isHeaderCondensed .templatesAppHeader {
-    max-height: 0;
-    margin-bottom: 0;
-    opacity: 0;
+  .templatesPage .templatesFixedHeader[data-header-reveal-state="hidden"] .templatesAppHeader {
     pointer-events: none;
-    transform: translateY(-12px);
-  }
-
-  .templatesPage .templatesFixedHeader.isHeaderCondensed .marketHeaderTop {
-    gap: 0;
-  }
-
-  .templatesPage .templatesAppHeader {
-    margin-bottom: 4px;
   }
 
   .templatesPage .templatesBrand {
@@ -18563,13 +18558,12 @@ body:has(.invitePreviewShell) {
   .templatesPage .marketHeaderTop {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 0;
   }
 
   .templatesPage .templatesAppHeader {
     min-width: 0;
     flex: 0 0 auto;
-    margin-bottom: 0;
   }
 
   .templatesPage .marketSearch {
@@ -19624,7 +19618,7 @@ body:has(.invitePreviewShell) {
 .profileInvitations > header {
   flex: 0 0 auto;
   align-items: flex-end;
-  margin-bottom: 8px;
+  margin-bottom: 0px;
   border-bottom: 0;
 }
 
@@ -19694,7 +19688,7 @@ body:has(.invitePreviewShell) {
   overflow-y: auto;
   overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 8px 18px calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 18px);
+  padding: 18px 18px calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 18px);
 }
 
 .profileEmptyState {
@@ -19738,8 +19732,7 @@ body:has(.invitePreviewShell) {
   width: 100%;
   min-height: 38px;
   align-items: center;
-  padding: 8px 18px 12px;
-  margin-bottom: 8px;
+  padding: 12px 18px 10px;
   border-radius: 0;
   background:
     radial-gradient(circle at 94% 0%, rgba(140, 76, 243, 0.08), transparent 34%),
@@ -19862,7 +19855,7 @@ body:has(.invitePreviewShell) {
   }
 
   .profileInvitations > header {
-    margin-bottom: 4px;
+    margin-bottom: 0px;
     padding-bottom: 10px;
   }
 
@@ -19877,39 +19870,29 @@ body:has(.invitePreviewShell) {
 
   .profileControls {
     margin-bottom: 14px;
-    gap: 10px;
-  }
-
-  .profileInvitations > .profileControls {
-    padding: 18px 16px 16px;
-  }
-
-  .profileInvitations > .profileControls .profileControlsTitle {
-    max-height: 44px;
-    overflow: hidden;
-    opacity: 1;
-    transform: translateY(0);
-    transition:
-      max-height 0.28s ease,
-      opacity 0.2s ease,
-      transform 0.28s ease;
-    will-change: max-height, opacity, transform;
-  }
-
-  .profileInvitations > .profileControls.isTitleCollapsed {
     gap: 0;
   }
 
-  .profileInvitations > .profileControls.isTitleCollapsed .profileControlsTitle {
-    max-height: 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-10px);
+  .profileInvitations > .profileControls {
+    padding: var(--header-top-padding, 18px) 16px 16px;
   }
 
-  .profileInvitations > .profileControls.isTitleCollapsed .profileSearchWrapper,
-  .profileInvitations > .profileControls.isTitleCollapsed .profileSearchSkeleton {
-    margin-top: 0;
+  .profileInvitations > .profileControls .profileControlsTitle {
+    max-height: var(--header-title-height, 44px);
+    overflow: hidden;
+    opacity: var(--header-reveal-progress, 1);
+    transform: translateY(var(--header-reveal-offset, 0px));
+    transform-origin: top;
+    will-change: max-height, opacity, transform;
+  }
+
+  .profileInvitations > .profileControls[data-header-reveal-state="hidden"] .profileControlsTitle {
+    pointer-events: none;
+  }
+
+  .profileInvitations > .profileControls[data-header-reveal-state] .profileSearchWrapper,
+  .profileInvitations > .profileControls[data-header-reveal-state] .profileSearchSkeleton {
+    margin-top: var(--header-search-spacing, 12px);
   }
 
 
@@ -19949,7 +19932,7 @@ body:has(.invitePreviewShell) {
   }
 
   .profileInvitationList {
-    padding: 8px 12px calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 18px);
+    padding: 15px 12px calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 18px);
   }
 
   .filterTabBtn {
@@ -20048,6 +20031,13 @@ body:has(.invitePreviewShell) {
   border-radius: 11px;
   font-size: 12px;
   gap: 9px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .templatesPage .templatesAppHeader,
+  .profileInvitations > .profileControls .profileControlsTitle {
+    transform: none;
+  }
 }
 
 @media (min-width: 901px) {

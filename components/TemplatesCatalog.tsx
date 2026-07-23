@@ -16,6 +16,7 @@ import { useNavigationState } from "@/components/NavigationStateProvider";
 import { formatTemplateRating } from "@/lib/templateRatingFormat";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useTopOnlyHeaderVisibility } from "@/hooks/useTopOnlyHeaderVisibility";
 import TemplateCardSkeleton from "@/components/skeletons/TemplateCardSkeleton";
 import { ButtonSkeleton } from "@/components/ui/Skeleton";
 import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
@@ -70,7 +71,17 @@ export default function TemplatesCatalog() {
     } = useNavigationState();
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
-    const [isMobileHeaderCollapsed, setIsMobileHeaderCollapsed] = useState(false);
+    const {
+        headerRevealRef,
+    } = useTopOnlyHeaderVisibility({
+        mediaQuery: "(max-width: 767px)",
+        listenToWindow: true,
+        titleHeight: 52,
+        titleSpacing: 8,
+        layoutTargetSelector: ".templatesPage",
+        expandedLayoutPadding: 176,
+        collapsedLayoutPadding: 116,
+    });
     const savedSize = listSizes["templates"] ?? 1;
 
     const prevCategoryRef = useRef(activeCategory);
@@ -157,7 +168,7 @@ export default function TemplatesCatalog() {
 
     useEffect(() => {
         const hasFilterChanged = prevCategoryRef.current !== activeCategory || prevDebouncedSearchRef.current !== debouncedSearch;
-        
+
         if (hasFilterChanged) {
             prevCategoryRef.current = activeCategory;
             prevDebouncedSearchRef.current = debouncedSearch;
@@ -169,69 +180,23 @@ export default function TemplatesCatalog() {
     useEffect(() => {
         if (window.location.pathname !== "/") return;
         const params = new URLSearchParams(window.location.search);
-        
+
         const nextParams = new URLSearchParams();
         if (activeCategory !== "all") nextParams.set("category", activeCategory);
         if (debouncedSearch) nextParams.set("search", debouncedSearch);
-        
+
         params.sort();
         nextParams.sort();
-        
+
         if (params.toString() !== nextParams.toString()) {
             const nextUrl = nextParams.toString() ? `/?${nextParams.toString()}` : "/";
             window.history.replaceState(null, "", nextUrl);
         }
     }, [activeCategory, debouncedSearch]);
 
-    useEffect(() => {
-        const mobileQuery = window.matchMedia("(max-width: 767px)");
-        let lastScrollY = window.scrollY;
-        let animationFrame = 0;
-
-        const updateHeaderVisibility = () => {
-            animationFrame = 0;
-            const currentScrollY = window.scrollY;
-            const scrollDelta = currentScrollY - lastScrollY;
-            const focusedElement = document.activeElement;
-            const isSearching = focusedElement instanceof Element && focusedElement.closest(".marketHeroPanel");
-
-            if (!mobileQuery.matches || currentScrollY < 40 || isSearching) {
-                setIsMobileHeaderCollapsed(false);
-                lastScrollY = currentScrollY;
-                return;
-            }
-
-            if (scrollDelta > 8 && currentScrollY > 90) {
-                setIsMobileHeaderCollapsed(true);
-            } else if (scrollDelta < -8) {
-                setIsMobileHeaderCollapsed(false);
-            }
-
-            lastScrollY = currentScrollY;
-        };
-
-        const handleScroll = () => {
-            if (animationFrame) return;
-            animationFrame = window.requestAnimationFrame(updateHeaderVisibility);
-        };
-
-        const handleViewportChange = () => {
-            if (!mobileQuery.matches) setIsMobileHeaderCollapsed(false);
-        };
-
-        window.addEventListener("scroll", handleScroll, { passive: true });
-        mobileQuery.addEventListener("change", handleViewportChange);
-
-        return () => {
-            window.removeEventListener("scroll", handleScroll);
-            mobileQuery.removeEventListener("change", handleViewportChange);
-            if (animationFrame) window.cancelAnimationFrame(animationFrame);
-        };
-    }, []);
-
     return (
         <>
-            <div className={`templatesFixedHeader${isMobileHeaderCollapsed ? " isHeaderCondensed" : ""}`}>
+            <div ref={headerRevealRef} className="templatesFixedHeader">
                 <section className="marketHeroPanel" aria-label="Template marketplace">
                     <header className="marketHeader">
                         <div className="marketHeaderTop">

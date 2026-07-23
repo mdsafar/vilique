@@ -41,6 +41,7 @@ import { useSWRConfig } from "swr";
 import { ButtonSkeleton, Skeleton, TextSkeleton } from "@/components/ui/Skeleton";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useTopOnlyHeaderVisibility } from "@/hooks/useTopOnlyHeaderVisibility";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { useLineLoader } from "./TopLineLoader";
 import { deduplicateItems, shouldStopRequesting, shouldDisableSentinel } from "@/lib/pagination";
@@ -107,8 +108,17 @@ export default function ProfileInvitationsList({
     const debouncedSearch = useDebouncedValue(searchTerm, searchTerm ? 350 : 0);
     const [cachedCounts, setCachedCounts] = useState<Record<string, number> | null>(null);
     const [optimisticMutations, setOptimisticMutations] = useState<PendingMutation[]>([]);
-    const [isMobileTitleCollapsed, setIsMobileTitleCollapsed] = useState(false);
-    const lastListScrollTopRef = useRef(0);
+    const {
+        headerRevealRef,
+        scheduleVisibilityUpdate:
+            scheduleMobileTitleVisibilityUpdate,
+    } = useTopOnlyHeaderVisibility({
+        mediaQuery: "(max-width: 560px)",
+        titleHeight: 44,
+        expandedTopPadding: 18,
+        collapsedTopPadding: 8,
+        searchSpacing: 12,
+    });
     const tabSizeKey = `invitations_${statusFilter}${debouncedSearch ? `_${debouncedSearch}` : ""}`;
     const savedSize = listSizes[tabSizeKey] ?? 1;
 
@@ -305,23 +315,9 @@ export default function ProfileInvitationsList({
     }, [debouncedSearch, statusFilter]);
 
     const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
-        if (!window.matchMedia("(max-width: 560px)").matches) {
-            setIsMobileTitleCollapsed(false);
-            return;
-        }
-
-        const currentScrollTop = event.currentTarget.scrollTop;
-        const scrollDelta = currentScrollTop - lastListScrollTopRef.current;
-
-        if (currentScrollTop < 16) {
-            setIsMobileTitleCollapsed(false);
-        } else if (scrollDelta > 6 && currentScrollTop > 36) {
-            setIsMobileTitleCollapsed(true);
-        } else if (scrollDelta < -6) {
-            setIsMobileTitleCollapsed(false);
-        }
-
-        lastListScrollTopRef.current = currentScrollTop;
+        scheduleMobileTitleVisibilityUpdate(
+            event.currentTarget.scrollTop,
+        );
     };
 
     if (isUnauthorized && showAuthModalOnUnauthorized) {
@@ -340,7 +336,7 @@ export default function ProfileInvitationsList({
 
     return (
         <>
-            <header className={`profileControls${isMobileTitleCollapsed ? " isTitleCollapsed" : ""}`}>
+            <header ref={headerRevealRef} className="profileControls">
                 <div className="profileControlsTitle">
                     <h2>Your invitations</h2>
                     <p>Manage and track all your invitation websites</p>

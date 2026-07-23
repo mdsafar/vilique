@@ -2,6 +2,10 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
+import {
+    useEffect,
+    useRef,
+} from "react";
 
 import EditorForm from "@/features/builder/components/EditorForm";
 import EditorTabs from "@/features/builder/components/EditorTabs";
@@ -61,6 +65,92 @@ export default function MobileEditorSheet({
     updateMusicFile,
     onClose,
 }: MobileEditorSheetProps) {
+    const sheetRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const body = document.body;
+        const root = document.documentElement;
+        const previousBodyOverflow = body.style.overflow;
+        const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
+        const previousRootOverflow = root.style.overflow;
+        const previousRootOverscrollBehavior = root.style.overscrollBehavior;
+
+        body.style.overflow = "hidden";
+        body.style.overscrollBehavior = "none";
+        root.style.overflow = "hidden";
+        root.style.overscrollBehavior = "none";
+
+        const sheet = sheetRef.current;
+        const visualViewport = window.visualViewport;
+        let animationFrame = 0;
+
+        const updateVisibleViewport = () => {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = requestAnimationFrame(() => {
+                if (!sheet || !visualViewport) return;
+
+                const layoutHeight = root.clientHeight;
+                const keyboardOffset = Math.max(
+                    0,
+                    layoutHeight
+                        - visualViewport.height
+                        - visualViewport.offsetTop,
+                );
+
+                sheet.style.setProperty(
+                    "--mobile-sheet-visible-height",
+                    `${visualViewport.height}px`,
+                );
+                sheet.style.setProperty(
+                    "--mobile-sheet-keyboard-offset",
+                    `${keyboardOffset}px`,
+                );
+            });
+        };
+
+        if (visualViewport) {
+            updateVisibleViewport();
+            visualViewport.addEventListener(
+                "resize",
+                updateVisibleViewport,
+                { passive: true },
+            );
+            visualViewport.addEventListener(
+                "scroll",
+                updateVisibleViewport,
+                { passive: true },
+            );
+        }
+
+        return () => {
+            cancelAnimationFrame(animationFrame);
+            visualViewport?.removeEventListener(
+                "resize",
+                updateVisibleViewport,
+            );
+            visualViewport?.removeEventListener(
+                "scroll",
+                updateVisibleViewport,
+            );
+
+            sheet?.style.removeProperty(
+                "--mobile-sheet-visible-height",
+            );
+            sheet?.style.removeProperty(
+                "--mobile-sheet-keyboard-offset",
+            );
+
+            body.style.overflow = previousBodyOverflow;
+            body.style.overscrollBehavior =
+                previousBodyOverscrollBehavior;
+            root.style.overflow = previousRootOverflow;
+            root.style.overscrollBehavior =
+                previousRootOverscrollBehavior;
+        };
+    }, [isOpen]);
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -78,6 +168,7 @@ export default function MobileEditorSheet({
                     />
 
                     <motion.section
+                        ref={sheetRef}
                         key="mobile-sheet"
                         initial={{ y: "100%" }}
                         animate={{ y: "0%" }}
