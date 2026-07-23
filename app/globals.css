@@ -3980,6 +3980,12 @@ button.profileTemplateRatingAction:disabled {
   overflow: hidden;
 }
 
+.profilePublicLink > svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
 .profilePublicLinkWrap {
   width: 100%;
   max-width: 100%;
@@ -4018,6 +4024,13 @@ button.profileTemplateRatingAction:disabled {
   flex: 0 0 14px;
   color: #9ca3af;
   stroke-width: 2.1;
+}
+
+.profilePublicLinkPlaceholder > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profilePublicLink span {
@@ -19983,20 +19996,18 @@ body:has(.invitePreviewShell) {
   }
 
   .profilePublicLinkPlaceholder {
-    min-height: 38px;
+    min-height: 32px;
     align-items: center;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    font-size: 13px;
-    line-height: 1.25;
-    gap: 8px;
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1.2;
+    gap: 6px;
   }
 
   .profilePublicLinkPlaceholder svg {
-    width: 18px;
-    height: 18px;
-    flex-basis: 18px;
+    width: 14px;
+    height: 14px;
+    flex-basis: 14px;
   }
 
   .profileInviteActions {

@@ -863,8 +863,8 @@ function InvitationRow({
                                 <CalendarDays size={14} aria-hidden="true" />
                             )}
                             {showUpdatedDate
-                                ? `Updated ${formatDate(invitation.updatedAt)}`
-                                : `Created ${formatDate(invitation.createdAt)}`}
+                                ? `Updated ${formatDateTime(invitation.updatedAt)}`
+                                : `Created ${formatDateTime(invitation.createdAt)}`}
                         </span>
                     </div>
 
@@ -890,11 +890,13 @@ function InvitationRow({
                 <div className="profilePublicLinkWrap profilePublicLinkWrap--empty">
                     <span className="profilePublicLinkPlaceholder">
                         <Lock size={14} aria-hidden="true" />
-                        {isOfflineRecord
-                            ? isPaidPublishFailed
-                                ? "Paid, but not live yet. Edit and publish again."
-                                : "Public link unavailable while this invitation is offline."
-                            : "Not published yet. Preview or edit to continue."}
+                        <span>
+                            {isOfflineRecord
+                                ? isPaidPublishFailed
+                                    ? "Paid, but not live yet. Edit and publish again."
+                                    : "Public link unavailable while this invitation is offline."
+                                : "Not published yet. Preview or edit to continue."}
+                        </span>
                     </span>
                 </div>
             ) : null}
@@ -1261,6 +1263,20 @@ function formatDate(value: string) {
             month: "short",
             day: "numeric",
             year: "numeric",
+        }).format(new Date(value));
+    } catch {
+        return value;
+    }
+}
+
+function formatDateTime(value: string) {
+    try {
+        return new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
         }).format(new Date(value));
     } catch {
         return value;
