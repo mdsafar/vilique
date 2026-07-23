@@ -10674,14 +10674,8 @@ button.profileTemplateRatingAction:disabled {
     position: fixed;
     left: 0;
     right: 0;
-    top: max(
-      0px,
-      calc(
-        var(--mobile-sheet-viewport-bottom, 100svh)
-        - var(--mobile-sheet-effective-height)
-      )
-    );
-    bottom: auto;
+    top: auto;
+    bottom: var(--mobile-sheet-keyboard-offset, 0px);
     z-index: 160;
     height: var(--mobile-sheet-effective-height);
     max-height: var(--mobile-sheet-effective-height);
@@ -10707,13 +10701,6 @@ button.profileTemplateRatingAction:disabled {
     .mobileBuilderSheet {
       --mobile-sheet-effective-height:
         min(78dvh, 660px, var(--mobile-sheet-visible-height, 100dvh));
-      top: max(
-        0px,
-        calc(
-          var(--mobile-sheet-viewport-bottom, 100dvh)
-          - var(--mobile-sheet-effective-height)
-        )
-      );
     }
   }
 

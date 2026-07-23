@@ -84,6 +84,18 @@ export default function MobileEditorSheet({
 
         const sheet = sheetRef.current;
         const visualViewport = window.visualViewport;
+        const fixedViewportProbe = document.createElement("div");
+        fixedViewportProbe.setAttribute("aria-hidden", "true");
+        Object.assign(fixedViewportProbe.style, {
+            position: "fixed",
+            right: "0",
+            bottom: "0",
+            width: "0",
+            height: "0",
+            visibility: "hidden",
+            pointerEvents: "none",
+        });
+        body.appendChild(fixedViewportProbe);
         let animationFrame = 0;
 
         const updateVisibleViewport = () => {
@@ -95,17 +107,26 @@ export default function MobileEditorSheet({
                     0,
                     visualViewport.height,
                 );
-                const viewportBottom =
+                const fixedViewportBottom =
+                    fixedViewportProbe
+                        .getBoundingClientRect()
+                        .bottom;
+                const visualViewportBottom =
                     Math.max(0, visualViewport.offsetTop)
                     + viewportHeight;
+                const keyboardOffset = Math.max(
+                    0,
+                    fixedViewportBottom
+                        - visualViewportBottom,
+                );
 
                 sheet.style.setProperty(
                     "--mobile-sheet-visible-height",
                     `${viewportHeight}px`,
                 );
                 sheet.style.setProperty(
-                    "--mobile-sheet-viewport-bottom",
-                    `${viewportBottom}px`,
+                    "--mobile-sheet-keyboard-offset",
+                    `${keyboardOffset}px`,
                 );
             });
         };
@@ -139,8 +160,9 @@ export default function MobileEditorSheet({
                 "--mobile-sheet-visible-height",
             );
             sheet?.style.removeProperty(
-                "--mobile-sheet-viewport-bottom",
+                "--mobile-sheet-keyboard-offset",
             );
+            fixedViewportProbe.remove();
 
             body.style.overflow = previousBodyOverflow;
             body.style.overscrollBehavior =
