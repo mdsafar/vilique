@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/immutability */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -41,7 +42,6 @@ import {
     builderLocalPreviewKey,
     builderPreviewSnapshotMaxAgeMs,
     getBuilderPreviewKey,
-    getBuilderRecoveryKey,
     readBuilderPreviewSnapshot,
     type BuilderPreviewSnapshot,
 } from "@/features/builder/lib/builderPreviewSession";
@@ -66,6 +66,7 @@ import {
 import { builderLockHeaders, isBuilderConflictCode } from "@/features/builder/lib/builderLock";
 import { useInvitationEditorLock } from "@/features/builder/hooks/useInvitationEditorLock";
 import BuilderLockBanner from "@/features/builder/components/BuilderLockBanner";
+import { isRecoverableTemporaryDraft } from "@/features/builder/lib/temporaryDraftRecovery";
 
 
 export default function BuilderPage() {
@@ -87,6 +88,14 @@ export default function BuilderPage() {
             </BuilderProtectedContent>
         </Suspense>
     );
+}
+
+interface RecoveryData {
+    draftId: string;
+    timestamp: number;
+    baselinePayload?: string;
+    recoveredPayload?: string;
+    builderMode?: BuilderMode;
 }
 
 function BuilderContent() {
@@ -128,10 +137,7 @@ function BuilderContent() {
 
     // Dynamic Scoped Storage Keys
     const scopedRecoveryKey = useMemo(
-        () =>
-            getBuilderRecoveryKey(
-                templateKey,
-            ),
+        () => `vilique-builder:recovery:template:${templateKey}`,
         [templateKey],
     );
 
@@ -154,7 +160,6 @@ function BuilderContent() {
     const [recoveredDraftId, setRecoveredDraftId] = useState<string | null>(null);
     const [recoveredDraftTimestamp, setRecoveredDraftTimestamp] = useState<number | string | null>(null);
     const [lockOverlayDismissed, setLockOverlayDismissed] = useState(false);
-    const [isEnteringViewOnly, setIsEnteringViewOnly] = useState(false);
     const [isTakingOverLock, setIsTakingOverLock] = useState(false);
     const [lockInvitationId, setLockInvitationId] = useState<string | null>(
         initialPreviewSnapshot?.invitationId ?? existingId,
@@ -197,12 +202,34 @@ function BuilderContent() {
         initialPreviewSnapshot?.requiresExitDecision ?? false,
     );
     const invitationRef = useRef(invitation);
+    const recoveryDataRef = useRef<RecoveryData | null>(null);
     const [hasUserEditedState, setHasUserEditedState] = useState(initialPreviewSnapshot?.hasUserEdited ?? false);
     const hasUserEditedRef = useRef(initialPreviewSnapshot?.hasUserEdited ?? false);
     const setHasUserEdited = useCallback((edited: boolean) => {
         hasUserEditedRef.current = edited;
         setHasUserEditedState(edited);
     }, []);
+
+    // Sync recovery data to localStorage on every edit for draft-edit and published-edit modes
+    useEffect(() => {
+        if (!isInitialized || !hasUserEditedRef.current || isSessionFinalizedRef.current) return;
+        if (builderMode !== "draft-edit" && builderMode !== "published-edit") return;
+
+        const draftId = latestDraftId.current || existingId;
+        if (draftId && draftId !== "default-draft-placeholder-id") {
+            const currentPayload = JSON.stringify(invitation);
+            localStorage.setItem(
+                scopedRecoveryKey,
+                JSON.stringify({
+                    draftId,
+                    timestamp: Date.now(),
+                    baselinePayload: baselinePayloadRef.current,
+                    recoveredPayload: currentPayload,
+                    builderMode,
+                }),
+            );
+        }
+    }, [invitation, isInitialized, existingId, scopedRecoveryKey, builderMode]);
     const baselinePayloadRef = useRef(initialPreviewSnapshot?.baselinePayload ?? "");
     const [baselineComparablePayloadState] = useState(
         initialPreviewSnapshot?.baselineComparablePayload ?? "",
@@ -254,12 +281,14 @@ function BuilderContent() {
             latestDraftId.current = normalized.id;
             setLockInvitationId(normalized.id);
             const payload = buildSavePayload(normalized);
-            baselinePayloadRef.current = payload;
-            baselineComparablePayloadRef.current = buildComparablePayload(normalized);
+            if (!requiresExitDecisionRef.current) {
+                baselinePayloadRef.current = payload;
+                baselineComparablePayloadRef.current = buildComparablePayload(normalized);
+                hasUserEditedRef.current = false;
+                setHasUserEditedState(false);
+                requiresExitDecisionRef.current = false;
+            }
             lastPersistedPayloadRef.current = payload;
-            hasUserEditedRef.current = false;
-            setHasUserEditedState(false);
-            requiresExitDecisionRef.current = false;
             setSaveStatus("idle");
             return Number.isSafeInteger(normalized.revision) ? Number(normalized.revision) : 0;
         } catch {
@@ -273,6 +302,7 @@ function BuilderContent() {
         onLostOwnership: cancelPendingEditsForLockLoss,
         preserveLocalOnResume: Boolean(initialPreviewSnapshot) && !isBrowserReload,
         resumeRevision: initialPreviewSnapshot?.invitation.revision ?? null,
+        autoTakeover: builderMode === "new" || Boolean(recoveredDraftId),
     });
 
     // Sync ref to always hold latest invitation without triggering stale closures
@@ -405,6 +435,54 @@ function BuilderContent() {
 
             hasUserEditedRef.current = false;
 
+            const recoveryData = localStorage.getItem(scopedRecoveryKey);
+            if (recoveryData) {
+                try {
+                    const parsed = JSON.parse(recoveryData);
+                    const isMatch = existingId 
+                        ? parsed.draftId === existingId 
+                        : (typeof parsed.draftId === "string" && parsed.draftId && (parsed.builderMode === "new" || !parsed.builderMode));
+
+                    if (isMatch) {
+                        const recoveryResponse = await fetch(
+                            `/api/invitations/${parsed.draftId}`,
+                            { cache: "no-store" },
+                        );
+
+                        if (recoveryResponse.ok) {
+                            const recoveryInvitation = await recoveryResponse.json();
+                            const isRecoverable = existingId
+                                ? (parsed.builderMode === "draft-edit" || parsed.builderMode === "published-edit")
+                                : isRecoverableTemporaryDraft(recoveryInvitation);
+
+                            if (isRecoverable) {
+                                setRecoveredDraftId(parsed.draftId);
+                                setRecoveredDraftTimestamp(parsed.timestamp || null);
+                                recoveryDataRef.current = parsed;
+                                setShowRecoveryModal(true);
+                                setIsLoadingInvitation(false);
+                                setIsInitialized(true);
+                                return;
+                            } else {
+                                localStorage.removeItem(scopedRecoveryKey);
+                            }
+                        } else if (recoveryResponse.status === 401) {
+                            setAuthStatus("guest");
+                            return;
+                        } else if (recoveryResponse.status === 404 || recoveryResponse.status === 409) {
+                            localStorage.removeItem(scopedRecoveryKey);
+                        }
+                    }
+                } catch {
+                    try {
+                        const parsed = JSON.parse(recoveryData);
+                        if (!parsed?.draftId) localStorage.removeItem(scopedRecoveryKey);
+                    } catch {
+                        localStorage.removeItem(scopedRecoveryKey);
+                    }
+                }
+            }
+
             if (existingId) {
                 try {
                     const response = await fetch(`/api/invitations/${existingId}`);
@@ -440,22 +518,6 @@ function BuilderContent() {
                     }
                 }
                 return;
-            }
-
-            // Check for an interrupted auto-created draft session.
-            const recoveryData = localStorage.getItem(scopedRecoveryKey);
-            if (recoveryData) {
-                try {
-                    const parsed = JSON.parse(recoveryData);
-                    if (parsed.draftId) {
-                        setRecoveredDraftId(parsed.draftId);
-                        setLockInvitationId(parsed.draftId);
-                        setRecoveredDraftTimestamp(parsed.timestamp || null);
-                        setShowRecoveryModal(true);
-                    }
-                } catch {
-                    localStorage.removeItem(scopedRecoveryKey);
-                }
             }
 
             const defaultInv =
@@ -527,7 +589,10 @@ function BuilderContent() {
             setSaveStatus("saved");
             return true;
         }
-        if (!force && builderMode === "published-edit") return true;
+        if (!force && (builderMode === "draft-edit" || builderMode === "published-edit")) {
+            setSaveStatus("dirty");
+            return true;
+        }
 
         const errors = validateInvitationFields(requestedInvitation);
         if (Object.keys(errors).length > 0) {
@@ -697,6 +762,42 @@ function BuilderContent() {
             }
         }
     }, [builderMode, cache, cancelPendingEditsForLockLoss, editorLock, globalMutate, scopedRecoveryKey, showToast]);
+
+    const revertDatabaseToBaseline = useCallback(async () => {
+        if (!baselinePayloadRef.current) return;
+        try {
+            const parsedClean = JSON.parse(baselinePayloadRef.current);
+            const normalizedClean = builderDateUtils.normalizeInvitationDate(parsedClean);
+            await flushSave(normalizedClean, true);
+        } catch (err) {
+            console.error("Failed to revert database to baseline:", err);
+        }
+    }, [flushSave]);
+
+    // Silently restore draft database baseline on tab close if the publish modal is active
+    useEffect(() => {
+        const handlePageHide = () => {
+            if (isPublishModalOpen && builderMode === "draft-edit" && baselinePayloadRef.current) {
+                const targetId = latestDraftId.current || existingId;
+                if (targetId && targetId !== "default-draft-placeholder-id") {
+                    void fetch(`/api/invitations/${targetId}`, {
+                        method: "PATCH",
+                        keepalive: true,
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(editorLock.credentials ? builderLockHeaders(editorLock.credentials) : {}),
+                        },
+                        body: baselinePayloadRef.current,
+                    });
+                }
+            }
+        };
+
+        window.addEventListener("pagehide", handlePageHide);
+        return () => {
+            window.removeEventListener("pagehide", handlePageHide);
+        };
+    }, [isPublishModalOpen, builderMode, existingId, editorLock.credentials]);
 
     useEffect(() => {
         if (!isInitialized) return;
@@ -1342,20 +1443,39 @@ function BuilderContent() {
             const res = await fetch(`/api/invitations/${recoveredDraftId}`);
             if (res.ok) {
                 const draft = await res.json();
-                const normalized = builderDateUtils.normalizeInvitationDate(draft);
+                let normalized = builderDateUtils.normalizeInvitationDate(draft);
+                const payload = buildSavePayload(normalized);
+
+                if (recoveryDataRef.current && (recoveryDataRef.current.builderMode === "draft-edit" || recoveryDataRef.current.builderMode === "published-edit") && recoveryDataRef.current.baselinePayload) {
+                    if (recoveryDataRef.current.recoveredPayload) {
+                        const parsedRecovered = JSON.parse(recoveryDataRef.current.recoveredPayload);
+                        normalized = builderDateUtils.normalizeInvitationDate(parsedRecovered);
+                    }
+                    const cleanInvitation = JSON.parse(recoveryDataRef.current.baselinePayload);
+                    baselinePayloadRef.current = recoveryDataRef.current.baselinePayload;
+                    baselineComparablePayloadRef.current = buildComparablePayload(cleanInvitation);
+                    setBuilderMode(recoveryDataRef.current.builderMode);
+                    hasUserEditedRef.current = true;
+                    setHasUserEditedState(true);
+                } else {
+                    baselinePayloadRef.current = payload;
+                    baselineComparablePayloadRef.current = buildComparablePayload(normalized);
+                    setBuilderMode("new");
+                }
+
                 invitationRef.current = normalized;
                 setInvitation(normalized);
                 latestDraftId.current = normalized.id;
                 setLockInvitationId(normalized.id);
-
-                const payload = buildSavePayload(normalized);
-                baselinePayloadRef.current = payload;
-                baselineComparablePayloadRef.current = buildComparablePayload(normalized);
                 lastPersistedPayloadRef.current = payload;
-                setBuilderMode("new");
                 requiresExitDecisionRef.current = true;
+            } else if (res.status === 401) {
+                setAuthStatus("guest");
+            } else if (res.status === 404 || res.status === 409) {
+                await handleRecoveryStartFresh();
+                return;
             } else {
-                localStorage.removeItem(scopedRecoveryKey);
+                showToast("Failed to recover draft", "error");
             }
         } catch {
             showToast("Failed to recover draft", "error");
@@ -1365,7 +1485,40 @@ function BuilderContent() {
     }
 
     async function handleRecoveryDiscard() {
-        await handleRecoveryStartFresh();
+        const recoveryData = recoveryDataRef.current;
+        if (recoveryData && (recoveryData.builderMode === "draft-edit" || recoveryData.builderMode === "published-edit")) {
+            setIsLoadingInvitation(true);
+            setShowRecoveryModal(false);
+            try {
+                const res = await fetch(`/api/invitations/${recoveredDraftId}`);
+                if (res.ok) {
+                    const draft = await res.json();
+                    const normalized = builderDateUtils.normalizeInvitationDate(draft);
+                    
+                    setLockInvitationId(normalized.id);
+                    latestDraftId.current = normalized.id;
+                    setBuilderMode(recoveryData.builderMode);
+
+                    invitationRef.current = normalized;
+                    setInvitation(normalized);
+                    const payload = buildSavePayload(normalized);
+                    baselinePayloadRef.current = payload;
+                    baselineComparablePayloadRef.current = buildComparablePayload(normalized);
+                    lastPersistedPayloadRef.current = payload;
+                    
+                    hasUserEditedRef.current = false;
+                    setHasUserEditedState(false);
+                }
+            } catch {
+                showToast("Failed to discard changes", "error");
+            }
+            localStorage.removeItem(scopedRecoveryKey);
+            setRecoveredDraftId(null);
+            setIsLoadingInvitation(false);
+            setIsInitialized(true);
+        } else {
+            await handleRecoveryStartFresh();
+        }
     }
 
     async function handleRecoveryStartFresh() {
@@ -1445,11 +1598,10 @@ function BuilderContent() {
     function handlePublishSuccess(
         updatedInvitation: PublishModalSuccessPayload,
     ) {
-        editorLock.release();
+        if (updatedInvitation.status !== "published") return;
+
         editorLock.markPublished();
-        saveRequestRevisionRef.current += 1;
-        pendingSaveController.current?.abort();
-        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+        finalizeSession();
         const previousDraft: InvitationData = publishPreviousInvitationRef.current || {
             ...invitationRef.current,
             status: "draft" as const,
@@ -1529,24 +1681,17 @@ function BuilderContent() {
 
     return (
         <main className="builderShell">
-            {((editorLock.mode === "readonly" || editorLock.mode === "lost") && !lockOverlayDismissed || isTakingOverLock) && (
+            {builderMode !== "new" && (
                 <BuilderLockBanner
+                    isOpen={!!((editorLock.mode === "readonly" || editorLock.mode === "lost") && !lockOverlayDismissed || isTakingOverLock)}
                     lost={editorLock.mode === "lost"}
-                    viewOnlyBusy={isEnteringViewOnly}
                     takeOverBusy={isTakingOverLock}
-                    onRefresh={() => {
-                        setIsEnteringViewOnly(true);
-                        void editorLock.refresh()
-                            .then((revision) => {
-                                if (revision !== null) setLockOverlayDismissed(true);
-                            })
-                            .finally(() => setIsEnteringViewOnly(false));
-                    }}
                     onTakeOver={() => {
                         setLockOverlayDismissed(false);
                         setIsTakingOverLock(true);
                         void editorLock.takeOver().finally(() => setIsTakingOverLock(false));
                     }}
+                    onClose={() => navigateOut(builderBackTarget)}
                 />
             )}
             <BuilderTopbar
@@ -1693,9 +1838,12 @@ function BuilderContent() {
                 onLeaveCancel={() =>
                     setLeaveModalOpen(false)
                 }
-                onPublishClose={() =>
-                    setIsPublishModalOpen(false)
-                }
+                onPublishClose={() => {
+                    setIsPublishModalOpen(false);
+                    if (builderMode === "draft-edit") {
+                        void revertDatabaseToBaseline();
+                    }
+                }}
                 onPublishSuccess={
                     handlePublishSuccess
                 }

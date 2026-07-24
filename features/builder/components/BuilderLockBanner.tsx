@@ -2,27 +2,30 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, LockKeyhole } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 type Props = {
+    isOpen: boolean;
     lost: boolean;
-    viewOnlyBusy: boolean;
     takeOverBusy: boolean;
-    onRefresh: () => void;
     onTakeOver: () => void;
+    onClose: () => void;
 };
 
 export default function BuilderLockBanner({
+    isOpen,
     lost,
-    viewOnlyBusy,
     takeOverBusy,
-    onRefresh,
     onTakeOver,
+    onClose,
 }: Props) {
     const dialogRef = useRef<HTMLElement>(null);
-    const busy = viewOnlyBusy || takeOverBusy;
+    const busy = takeOverBusy;
 
     useEffect(() => {
+        if (!isOpen) return;
+
         const scrollY = window.scrollY;
         const previous = {
             bodyOverflow: document.body.style.overflow,
@@ -70,40 +73,82 @@ export default function BuilderLockBanner({
             document.body.style.width = previous.bodyWidth;
             window.scrollTo(0, scrollY);
         };
-    }, []);
+    }, [isOpen]);
 
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="builderLockOverlay">
-            <section ref={dialogRef} className="builderLockBanner" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="builder-lock-title" aria-describedby="builder-lock-description">
-                <div className="builderLockMessage">
-                    <strong id="builder-lock-title">{lost ? "Editing was moved to another tab or device." : "This invitation is being edited in another tab or device."}</strong>
-                    <span id="builder-lock-description">You can continue in view-only mode or take over editing here.</span>
-                </div>
-                <div className="builderLockActions">
-                    <button
-                        type="button"
-                        onClick={onRefresh}
-                        disabled={busy}
-                        aria-busy={viewOnlyBusy}
-                        autoFocus
+        <AnimatePresence>
+            {isOpen && (
+                <div
+                    className="modalOverlay"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-describedby="builder-lock-description"
+                    aria-labelledby="builder-lock-title"
+                >
+                    <motion.div
+                        className="modalBackdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    />
+
+                    <motion.section
+                        ref={dialogRef}
+                        className="modalPanel"
+                        style={{ maxWidth: "440px" }}
+                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                        transition={{ type: "spring", duration: 0.35 }}
                     >
-                        {viewOnlyBusy && <Loader2 size={15} className="spinner" aria-hidden="true" />}
-                        <span>{viewOnlyBusy ? "Loading view…" : lost ? "View latest version" : "View only"}</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onTakeOver}
-                        disabled={busy}
-                        aria-busy={takeOverBusy}
-                    >
-                        {takeOverBusy && <Loader2 size={15} className="spinner" aria-hidden="true" />}
-                        <span>{takeOverBusy ? "Taking over…" : "Take over editing"}</span>
-                    </button>
+                        <div className="modalHeader">
+                            <span
+                                className="modalWarningIcon"
+                                style={{
+                                    color: "#7e5bd5",
+                                    background: "rgba(245, 243, 255, 0.9)",
+                                    boxShadow: "0 4px 12px rgba(126, 91, 213, 0.1)",
+                                }}
+                            >
+                                <LockKeyhole size={24} />
+                            </span>
+                            <h2 id="builder-lock-title">
+                                {lost
+                                    ? "Editing was moved to another tab or device."
+                                    : "This invitation is being edited in another tab or device."}
+                            </h2>
+                        </div>
+
+                        <div id="builder-lock-description" className="modalMessage">
+                            You can continue in view-only mode or take over editing here.
+                        </div>
+
+                        <div className="modalActions">
+                            <button
+                                type="button"
+                                className="modalBtnCancel"
+                                onClick={onClose}
+                                disabled={busy}
+                                autoFocus
+                            >
+                                <span>{lost ? "Close" : "Back"}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="modalBtnConfirm modalBtnConfirm--purple-pastel"
+                                onClick={onTakeOver}
+                                disabled={busy}
+                            >
+                                {takeOverBusy && <Loader2 size={15} className="spinner" aria-hidden="true" />}
+                                <span>{takeOverBusy ? "Taking over…" : "Take over editing"}</span>
+                            </button>
+                        </div>
+                    </motion.section>
                 </div>
-            </section>
-        </div>,
+            )}
+        </AnimatePresence>,
         document.body,
     );
 }

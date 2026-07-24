@@ -16,12 +16,14 @@ export function useInvitationEditorLock({
     onLostOwnership,
     preserveLocalOnResume = false,
     resumeRevision = null,
+    autoTakeover = false,
 }: {
     invitationId: string | null;
     onRefreshCanonical: RefreshCanonical;
     onLostOwnership: () => void;
     preserveLocalOnResume?: boolean;
     resumeRevision?: number | null;
+    autoTakeover?: boolean;
 }) {
     const [mode, setMode] = useState<LockMode>(invitationId ? "pending" : "owned");
     const [credentials, setCredentials] = useState<BuilderLockCredentials | null>(null);
@@ -58,6 +60,36 @@ export function useInvitationEditorLock({
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || !result.owned) {
+                if (autoTakeover && !takeover) {
+                    const takeoverResponse = await fetch(`/api/invitations/${invitationId}/editor-lock`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            action: "takeover",
+                            editorSessionId: sessionIdRef.current,
+                            clientMetadata: { platform: navigator.platform, language: navigator.language },
+                        }),
+                    });
+                    const takeoverResult = await takeoverResponse.json().catch(() => ({}));
+                    if (takeoverResponse.ok && takeoverResult.owned) {
+                        const canPreserveLocal = preserveLocalOnResume
+                            && Number.isSafeInteger(resumeRevision)
+                            && Number(takeoverResult.revision) === resumeRevision;
+                        const revision = canPreserveLocal ? Number(resumeRevision) : await onRefreshCanonical();
+                        if (revision !== null) {
+                            const next = {
+                                editorSessionId: sessionIdRef.current,
+                                lockGeneration: Number(takeoverResult.lockGeneration),
+                                revision,
+                            };
+                            credentialsRef.current = next;
+                            setCredentials(next);
+                            setMode("owned");
+                            publishEvent("taken-over", next.lockGeneration);
+                            return true;
+                        }
+                    }
+                }
                 loseOwnership("readonly");
                 return false;
             }
@@ -83,7 +115,7 @@ export function useInvitationEditorLock({
             loseOwnership("readonly");
             return false;
         }
-    }, [invitationId, loseOwnership, onRefreshCanonical, preserveLocalOnResume, publishEvent, resumeRevision]);
+    }, [invitationId, loseOwnership, onRefreshCanonical, preserveLocalOnResume, publishEvent, resumeRevision, autoTakeover]);
 
     useEffect(() => {
         if (!invitationId) {

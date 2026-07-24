@@ -384,11 +384,6 @@ export default function PublishModal({ invitation, isOpen, onClose, onPublishSuc
                             setPaymentProcessingState("idle");
                             setPublishError(verifyData.message || "Your payment was successful, but publishing is still being completed. Please do not pay again.");
                             notifyProfileDataChanged();
-                            onPublishSuccess({
-                                slug: invitation.slug,
-                                status: invitation.status || "draft",
-                                published_at: invitation.publishedAt || null,
-                            });
                         } else {
                             throw new Error(verifyData.error || "Payment verification failed");
                         }

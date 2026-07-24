@@ -73,17 +73,21 @@ function LeaveModal({
 
     const modalTitle = isNewMode
         ? "Save draft before leaving?"
-        : "Save changes before leaving?";
+        : isDraftEditMode
+            ? "Save changes before leaving?"
+            : "Publish changes before leaving?";
 
     const modalDescription = isNewMode
         ? "Your invitation has unsaved changes. Would you like to save your draft before going back?"
         : isDraftEditMode
             ? "Your draft has unsaved changes. Would you like to save your changes before going back?"
-            : "Your live invitation has unsaved changes. Save changes or keep editing.";
+            : "Your live invitation has unsaved changes. Discard changes to go back, or continue editing.";
 
     const saveButtonText = isNewMode
         ? "Save Draft & Back"
-        : "Save Changes & Back";
+        : isDraftEditMode
+            ? "Save Changes & Back"
+            : "Publish Changes & Back";
 
     const discardButtonText = "Discard"
 
@@ -151,44 +155,47 @@ function LeaveModal({
                             </h2>
                             <p style={{
                                 margin: 0,
-                                fontSize: "13px",
-                                color: "#6b7280",
+                                fontSize: "13.5px",
                                 lineHeight: 1.5,
+                                color: "#4b5563",
+                                fontFamily: "Arial, Helvetica, sans-serif",
                             }}>
                                 {modalDescription}
                             </p>
                         </div>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", marginTop: "4px" }}>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    void onSave();
-                                }}
-                                disabled={saving || discarding}
-                                style={{
-                                    width: "100%",
-                                    minHeight: "46px",
-                                    borderRadius: "14px",
-                                    border: "none",
-                                    background: (saving || discarding)
-                                        ? "#e5e7eb"
-                                        : "linear-gradient(135deg, #8c4cf3 0%, #c46fb4 100%)",
-                                    color: (saving || discarding) ? "#9ca3af" : "#fff",
-                                    fontWeight: 800,
-                                    fontSize: "14px",
-                                    cursor: (saving || discarding) ? "not-allowed" : "pointer",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "8px",
-                                    transition: "all 0.2s",
-                                    boxShadow: (saving || discarding) ? "none" : "0 4px 16px rgba(140, 76, 243, 0.3)",
-                                }}
-                            >
-                                {saving ? <Loader2 size={15} className="spinner" /> : <Save size={15} />}
-                                {saving ? "Saving…" : saveButtonText}
-                            </button>
+                            {mode !== "published-edit" && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void onSave();
+                                    }}
+                                    disabled={saving || discarding}
+                                    style={{
+                                        width: "100%",
+                                        minHeight: "46px",
+                                        borderRadius: "14px",
+                                        border: "none",
+                                        background: (saving || discarding)
+                                            ? "#e5e7eb"
+                                            : "linear-gradient(135deg, #8c4cf3 0%, #c46fb4 100%)",
+                                        color: (saving || discarding) ? "#9ca3af" : "#fff",
+                                        fontWeight: 800,
+                                        fontSize: "14px",
+                                        cursor: (saving || discarding) ? "not-allowed" : "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "8px",
+                                        transition: "all 0.2s",
+                                        boxShadow: (saving || discarding) ? "none" : "0 4px 16px rgba(140, 76, 243, 0.3)",
+                                    }}
+                                >
+                                    {saving ? <Loader2 size={15} className="spinner" /> : <Save size={15} />}
+                                    {saving ? "Saving…" : saveButtonText}
+                                </button>
+                            )}
 
                             <div style={{ display: "flex", gap: "8px", width: "100%" }}>
                                 <button

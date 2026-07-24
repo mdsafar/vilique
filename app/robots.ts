@@ -1,16 +1,27 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@/lib/config/site";
+
+const BASE_URL = "https://www.vilique.in";
 
 export default function robots(): MetadataRoute.Robots {
     return {
         rules: [
             {
                 userAgent: "*",
-                allow: ["/", "/pricing", "/about", "/contact", "/terms", "/privacy", "/refund-policy"],
-                disallow: ["/i/", "/invite/", "/builder", "/profile", "/invitations", "/api/"],
+                allow: "/",
+                disallow: [
+                    "/api/",
+                    "/auth/",
+                    "/builder",
+                    "/dashboard",
+                    "/invitations",
+                    "/invite/",
+                    "/profile",
+                    "/signup",
+                    "/templates/*/preview",
+                ],
             },
         ],
-        sitemap: `${siteConfig.url}/sitemap.xml`,
-        host: siteConfig.url,
+        sitemap: `${BASE_URL}/sitemap.xml`,
+        host: BASE_URL,
     };
 }

@@ -116,7 +116,7 @@ export async function PATCH(request: Request, { params }: Context) {
             (error.code === "P0001" && combined.includes("completed invitations cannot be edited"));
             
         if (!isExpected) {
-            reportError(error, "invitation.update_db_failed", { invitationId: id, userId: user.id });
+            reportError(new Error(error.message || JSON.stringify(error)), "invitation.update_db_failed", { invitationId: id, userId: user.id });
         }
         
         return getSafeUpdateErrorResponse(error);
@@ -200,59 +200,123 @@ export async function DELETE(request: Request, { params }: Context) {
     if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const lock = parseBuilderLockHeaders(request);
-    if (!lock) {
-        return NextResponse.json({ code: "LOCK_NOT_OWNED", error: "A valid editor lock is required." }, { status: 409 });
-    }
-    const { data: lockData, error: lockError } = await looseSupabase(createAdminClient()).rpc("check_invitation_editor_lock", {
-        p_invitation_id: id,
-        p_user_id: user.id,
-        p_editor_session_id: lock.editorSessionId,
-    });
-    const currentLock = (lockData || {}) as { owned?: boolean; lockGeneration?: number; revision?: number; available?: boolean };
-    if (lockError || !currentLock.owned || currentLock.lockGeneration !== lock.lockGeneration || currentLock.revision !== lock.revision) {
-        const code = currentLock.revision !== lock.revision ? "STALE_REVISION" : currentLock.available ? "LOCK_EXPIRED" : "LOCK_TAKEN_OVER";
-        return NextResponse.json({ code, error: "Editing ownership changed. Reload the latest version." }, { status: 409 });
-    }
-
-    const { data: invite, error: inviteError } = await supabase
-        .from("invitations")
-        .select("id, status, payment_status, first_published_at")
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .single();
-
-    if (inviteError || !invite) {
-        return NextResponse.json({ error: "Invitation not found." }, { status: 404 });
-    }
 
     const supabaseAdmin = createAdminClient();
-    const { data: paidPayment } = await supabaseAdmin
+    const { data: invite, error: inviteError } = await supabaseAdmin
+        .from("invitations")
+        .select("id, status, lifecycle_status, event_status, payment_status, first_published_at, published_at")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+    if (inviteError) {
+        return NextResponse.json({ error: "Could not inspect the temporary draft." }, { status: 500 });
+    }
+
+    // A stale browser marker is already cleared when its row no longer exists.
+    // Return the same success shape so repeated discard calls are harmless.
+    if (!invite) {
+        return NextResponse.json({ success: true, disposition: "already_cleared" });
+    }
+
+    const { data: paidPayment, error: paidPaymentError } = await supabaseAdmin
         .from("payments")
         .select("id")
         .eq("invitation_id", id)
         .eq("user_id", user.id)
-        .in("status", ["paid", "published"])
+        .or(
+            "status.in.(paid,captured,authorized,reconciling,publish_pending,published,recovery_pending,manual_review),payment_state.eq.captured",
+        )
+        .limit(1)
         .maybeSingle();
 
-    if (paidPayment || invite.payment_status === "paid" || invite.first_published_at) {
+    if (paidPaymentError) {
+        return NextResponse.json({ error: "Could not inspect the temporary draft." }, { status: 500 });
+    }
+
+    if (
+        paidPayment
+        || invite.status !== "draft"
+        || (invite.lifecycle_status && invite.lifecycle_status !== "draft")
+        || (invite.event_status && invite.event_status !== "draft")
+        || invite.payment_status !== "unpaid"
+        || invite.first_published_at
+        || invite.published_at
+    ) {
+        return NextResponse.json({ success: true, disposition: "finalized" });
+    }
+
+    const lock = parseBuilderLockHeaders(request);
+    if (!lock) {
+        // If no lock header is passed (e.g., when discarding from the recovery modal on initial load),
+        // we can safely delete the temporary draft directly since the user owns the draft.
+        const { error: deleteError } = await supabaseAdmin
+            .from("invitations")
+            .delete()
+            .eq("id", id)
+            .eq("user_id", user.id);
+
+        if (deleteError) {
+            return NextResponse.json({ error: "Could not discard the temporary draft." }, { status: 500 });
+        }
+
         return NextResponse.json({
-            code: "PAID_INVITATION_PROTECTED",
-            error: "This invitation has a payment attached and cannot be deleted. You can archive or edit it instead.",
+            success: true,
+            disposition: "deleted",
+        });
+    }
+
+    const { data, error } = await looseSupabase(supabaseAdmin).rpc("discard_temporary_invitation_draft", {
+        p_invitation_id: id,
+        p_user_id: user.id,
+        p_editor_session_id: lock.editorSessionId,
+        p_lock_generation: lock.lockGeneration,
+        p_expected_revision: lock.revision,
+    });
+    if (error) {
+        if (error.code === "PGRST202") {
+            const { error: deleteError } = await supabaseAdmin
+                .from("invitations")
+                .delete()
+                .eq("id", id)
+                .eq("user_id", user.id);
+            if (deleteError) {
+                reportError(new Error(deleteError.message), "invitation.temporary_draft_discard_fallback_failed", {
+                    invitationId: id,
+                    userId: user.id,
+                });
+                return NextResponse.json({ error: "Could not discard the temporary draft." }, { status: 500 });
+            }
+            return NextResponse.json({
+                success: true,
+                disposition: "deleted",
+            });
+        }
+        reportError(new Error(error.message || JSON.stringify(error)), "invitation.temporary_draft_discard_failed", {
+            invitationId: id,
+            userId: user.id,
+        });
+        return NextResponse.json({ error: "Could not discard the temporary draft." }, { status: 500 });
+    }
+
+    const result = (data || {}) as {
+        success?: boolean;
+        disposition?: string;
+        conflict?: boolean;
+        code?: string;
+    };
+
+    if (result.conflict) {
+        return NextResponse.json({
+            code: result.code || "LOCK_NOT_OWNED",
+            error: "Editing ownership changed. Reload the latest version.",
         }, { status: 409 });
     }
 
-    const { error } = await supabase
-        .from("invitations")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
-
-    if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+        success: true,
+        disposition: result.disposition || "deleted",
+    });
 }
 
 function stripUndefined<T extends Record<string, unknown>>(value: T) {
